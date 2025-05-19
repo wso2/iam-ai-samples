@@ -1,0 +1,6 @@
+fastapi==0.115.9
+uvicorn==0.34.2
+autogen_agentchat==0.5.7
+autogen-ext==0.5.7
+dotenv==0.9.9
+authlib==1.5.2
