@@ -1,2 +1,6 @@
-# iam-ai-samples
-Include the IAM samples for AI use-cases
+# IAM AI Samples
+
+This repo includes the AI samples for IAM products
+
+1) [Hotel Booking Agent with AutoGen](hotel-booking-agent-autogen/README.md)
+
