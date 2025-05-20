@@ -19,23 +19,102 @@ The project consists of:
 - Asgardeo tenant or other OAuth 2.0 provider
 - (Hotel API service)[https://github.com/nadheesh/agent_demo_hotel_api]
 
-## Configuration
+## Configuration Setup
 
-Set up the following environment variables:
+### Asgardeo Configuration (OAuth Provider)
+
+1. **Create an Asgardeo Account**:
+   - Sign up at [https://wso2.com/asgardeo/](https://wso2.com/asgardeo/)
+   - Create a new organization/tenant
+
+2. **Create an Application**:
+   - Navigate to Applications > New Application
+   - Select "Standard-Based Application (OAuth/OIDC)"
+
+3. **Configure the Application**:
+   - **Name**: Hotel Booking Assistant
+   - **Grant Types**: Check "Code", "Client Credentials" and "Refresh"
+   - **Callback URLs**: Add `http://localhost:8000/callback` (or your deployment URL)
+   - **Access Token Type**: JWT
+   - **Allowed Origins**: Add your frontend domain for CORS
+
+4. **Configure Scopes**:
+   - Navigate to "Scopes" section
+   - Create custom scopes for the Hotel API:
+     - `read_hotels`: Permission to view hotel listings
+     - `read_rooms`: Permission to view room details
+     - `create_bookings`: Permission to make reservations
+   - Assign these scopes to your application
+
+5. **Get Credentials**:
+   - After creating the app, copy the "Client ID" and "Client Secret"
+   - Use these in your environment variables (`ASGARDEO_CLIENT_ID` and `ASGARDEO_CLIENT_SECRET`)
+
+### Azure OpenAI Configuration
+
+1. **Create an Azure OpenAI Resource**:
+   - Log in to the [Azure Portal](https://portal.azure.com/)
+   - Search for "Azure OpenAI" and create a new resource
+   - Select a region where GPT models are available
+
+2. **Deploy a Model**:
+   - In your Azure OpenAI resource, navigate to "Deployments"
+   - Click "Create new deployment"
+   - Select model (e.g., "gpt-4o")
+   - Provide a deployment name (e.g., "hotel-assistant")
+
+3. **Get API Details**:
+   - Navigate to "Keys and Endpoint" in your Azure OpenAI resource
+   - Copy the "Endpoint" URL (like `https://your-resource.openai.azure.com/`)
+   - Copy one of the available keys
+
+4. **Set Environment Variables**:
+   - Use the endpoint URL for `AZURE_OPENAI_ENDPOINT`
+   - Use the keys copied for `AZURE_OPENAI_API_KEY`
+   - Use the deployment name for `AZURE_OPENAI_DEPLOYMENT_NAME`
+
+### Hotel API Configuration
+
+1. Deploy [Hotel API](https://github.com/nadheesh/agent_demo_hotel_api) using the given source in WSO2 Choreo.
+2. Set scopes to the API endpoints as follows.
+   - `read_hotels` → GET /api/hotels
+   - `read_rooms` → GET /api/hotels/{id}
+   - `create_bookings` → POST /api/bookings
+
+If you're using a pre-existing Hotel API:
+1. Obtain the base URL of the API
+2. Ensure the API is configured to validate OAuth tokens from your Asgardeo tenant
+3. Confirm the API expects tokens in the format: `Authorization: Bearer <token>`
+
+If you need to set up a Hotel API:
+1. Implement an API with endpoints for:
+   - `/api/hotels` - List all hotels
+   - `/api/hotels/{id}` - Get hotel details and rooms
+   - `/api/bookings` - Create a booking
+
+2. Configure the API to validate OAuth tokens:
+   - Use a middleware to check for valid tokens
+   - Validate tokens against your Asgardeo tenant
+   - Check for appropriate scopes based on the operation
+
+## Environment Variables
+
+Create a `.env` file with the following configurations:
 
 ```
-# API Service
-HOTEL_API_BASE_URL=http://your-hotel-api-url
-
-# Asgardeo (OAuth App for Hotel API)
-ASGARDEO_CLIENT_ID=your_client_id
-ASGARDEO_CLIENT_SECRET=your_client_secret  
-ASGARDEO_TENANT_DOMAIN=https://your-tenant.asgardeo.io
+# Asgardeo (OAuth provider)
+ASGARDEO_CLIENT_ID=your_client_id_from_asgardeo_application
+ASGARDEO_CLIENT_SECRET=your_client_secret_from_asgardeo_application
+ASGARDEO_TENANT_DOMAIN=https://api.asgardeo.io/t/your-tenant-name
 ASGARDEO_REDIRECT_URI=http://localhost:8000/callback
 
 # Azure OpenAI
-AZURE_OPENAI_ENDPOINT=your_endpoint
+AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
 AZURE_OPENAI_DEPLOYMENT_NAME=your_deployment_name
+AZURE_OPENAI_API_KEY=your_api_key
+
+# API Service
+HOTEL_API_BASE_URL=http://your-hotel-api-url
 ```
 
 ## Key Components
