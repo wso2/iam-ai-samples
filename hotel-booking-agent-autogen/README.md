@@ -1,6 +1,6 @@
 # Building Secured AI Agents
 
-This repository demonstrates how to build AI assistants that can securely access protected APIs using OAuth
+This sample demonstrates how to build AI assistants that can securely access protected APIs using OAuth
 authentication. The example shows a hotel booking assistant that interacts with secured APIs.
 
 ## Overview
@@ -71,7 +71,7 @@ Follow these steps to create agents with secure API access:
 
 ```python
 auth_manager = AuthManager(
-    idp_base_url="https://your-tenant.asgardeo.io",
+    idp_base_url="https://api.asgardeo.io/t/<your-tenant-handle>",
     client_id="your_client_id",
     client_secret="your_client_secret",
     redirect_uri="http://localhost:8000/callback",
@@ -177,7 +177,7 @@ Used for service-to-service API calls where no user context is needed:
 
 ### Authorization Code Flow
 
-Used when user context is required:
+Used when human-in-the-loop (user context) is required:
 
 1. Tool is invoked by the agent
 2. `SecureFunctionTool` requests token from `AuthManager`
