@@ -44,6 +44,7 @@ redirect_url = os.environ.get('ASGARDEO_REDIRECT_URI', 'http://localhost:8000/ca
 # Azure OpenAI configs
 azure_openai_endpoint = os.environ.get('AZURE_OPENAI_ENDPOINT')
 deployment_name = os.environ.get('AZURE_OPENAI_DEPLOYMENT_NAME')
+azure_openai_api_version = os.environ.get('AZURE_OPENAI_API_VERSION')
 
 app = FastAPI()
 
@@ -55,7 +56,7 @@ class TextResponse(BaseModel):
 
 model_client = AzureOpenAIChatCompletionClient(
     azure_deployment=deployment_name,
-    api_version="2024-02-01",
+    api_version=azure_openai_api_version,
     azure_endpoint=azure_openai_endpoint,
     model="gpt-4o"
 )
