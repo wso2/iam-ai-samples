@@ -218,15 +218,23 @@ The repository includes a complete example of a hotel booking assistant that:
 
 ### Running the Example
 
+1. Create a virtual environment.
+
+```bash
+python3 -m venv .venv
+```
+
 1. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Set up environment variables in a `.env` file
+2. Set up environment variables in a `.env` file.
 
 3. Start the FastAPI service:
+
+> Install `uvicorn[standard]` by running `pip install 'uvicorn[standard]'` if you already haven't.
 
 ```bash
 uvicorn app.service:app --reload
