@@ -37,18 +37,21 @@ The project consists of:
    - **Callback URLs**: Add `http://localhost:8000/callback` (or your deployment URL)
    - **Access Token Type**: JWT
    - **Allowed Origins**: Add your frontend domain for CORS
+   - Navigate to **Roles** tab and set audience as "Organization"
 
-4. **Configure Scopes**:
-   - Navigate to "Scopes" section
+After creating the app, copy the "Client ID" and "Client Secret". Use these in your environment variables (`ASGARDEO_CLIENT_ID` and `ASGARDEO_CLIENT_SECRET`)
+
+4. **Configure Hotel Booking API**:
+   - Navigate to "API Resources" and create a new API resource.
    - Create custom scopes for the Hotel API:
      - `read_hotels`: Permission to view hotel listings
      - `read_rooms`: Permission to view room details
      - `create_bookings`: Permission to make reservations
-   - Assign these scopes to your application
+     - Authorize this API to the application created in step 3.
 
-5. **Get Credentials**:
-   - After creating the app, copy the "Client ID" and "Client Secret"
-   - Use these in your environment variables (`ASGARDEO_CLIENT_ID` and `ASGARDEO_CLIENT_SECRET`)
+5. **Role configuration**:
+   - Navigate to "Roles" and create an organization role "Hotel Staff".
+   - Assign the hotel API created in step 4 and add its scopes to the role.
 
 ### Azure OpenAI Configuration
 
