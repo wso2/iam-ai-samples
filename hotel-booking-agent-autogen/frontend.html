@@ -623,17 +623,19 @@
                 if (pendingAuthRequests[data.state]) {
                     log('Found pending auth request for state', data.state);
 
-                    <!--                        const authResponse = {-->
-                    <!--                            success: true,-->
-                    <!--                            state: data.state,-->
-                    <!--                            access_token: tokenData.access_token,-->
-                    <!--                            id_token: tokenData.id_token,-->
-                    <!--                            booking_details: pendingAuthRequests[data.state].context-->
-                    <!--                        };-->
+// const authResponse = {
+//     success: true,
+//     state: data.state,
+//     access_token: tokenData.access_token,
+//     id_token: tokenData.id_token,
+//     booking_details: pendingAuthRequests[data.state].context
+// };
 
-                <!--                        // Send the token back through the WebSocket-->
-                    <!--                        log('Sending token to backend via WebSocket');-->
-                    <!--                        ws.send(JSON.stringify(authResponse));-->
+
+// Send the token back through the WebSocket
+// log('Sending token to backend via WebSocket');
+// ws.send(JSON.stringify(authResponse));
+
                     addSystemMessage("Authorization completed successfully. Processing your booking...");
 
                     // Clean up the pending request

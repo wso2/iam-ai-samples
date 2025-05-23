@@ -27,7 +27,7 @@ from starlette.websockets import WebSocketDisconnect
 from app.prompt import agent_system_prompt
 from app.tools import fetch_hotels, fetch_rooms, make_booking
 from autogen.tool import SecureFunctionTool
-from sdk.auth import AuthRequestMessage, AuthManager, AuthSchema, AuthConfig, OAuthTokenType
+from sdk.auth import AuthRequestMessage, AuthManager, AuthSchema, AuthConfig, AgentConfig, OAuthTokenType
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -103,7 +103,11 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         client_id,
         client_secret,
         redirect_url,
-        message_handler)
+        message_handler,
+        agent_config=AgentConfig(
+            agent_id=os.environ.get('AGENT_ID'),
+            agent_secret=os.environ.get('AGENT_SECRET'),
+        ))
 
     # Store the auth manager by session_id
     auth_managers[session_id] = auth_manager
@@ -113,8 +117,11 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         fetch_hotels,
         description="Fetches all hotels and information about them",
         name="FetchHotelsTool",
-        auth=AuthSchema(auth_manager, AuthConfig(scopes=["read_hotels"],
-                                                 token_type=OAuthTokenType.CLIENT_TOKEN)),
+        auth=AuthSchema(auth_manager, AuthConfig(
+            scopes=["read_hotels"],
+            token_type=OAuthTokenType.CLIENT_TOKEN,
+            resource="booking_api"
+        )),
         strict=True
     )
 
@@ -122,7 +129,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         fetch_rooms,
         description="Fetch the rooms available, and information related such as price, amenities, etc.",
         name="FetchHotelRoomsTool",
-        auth=AuthSchema(auth_manager, AuthConfig(scopes=["read_rooms"])),
+        auth=AuthSchema(auth_manager, AuthConfig(scopes=["read_rooms"],
+                                                 resource="booking_api")),
         strict=True
     )
 
@@ -131,7 +139,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         description="Books the hotel room selected by the user.",
         name="BookHotelTool",
         auth=AuthSchema(auth_manager, AuthConfig(scopes=["create_bookings", "openid", "profile"],
-                                                 token_type=OAuthTokenType.OBO_TOKEN)),
+                                                 token_type=OAuthTokenType.OBO_TOKEN,
+                                                 resource="booking_api")),
         strict=True
     )
 
