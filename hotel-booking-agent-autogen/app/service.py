@@ -105,7 +105,11 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         client_id,
         client_secret,
         redirect_url,
-        message_handler)
+        message_handler,
+        agent_config=AgentConfig(
+            agent_id=os.environ.get('AGENT_ID'),
+            agent_secret=os.environ.get('AGENT_SECRET'),
+        ))
 
     # Store the auth manager by session_id
     auth_managers[session_id] = auth_manager
