@@ -1,15 +1,16 @@
 # Building Secured AI Agents
 
-This sample demonstrates how to build AI assistants that can securely access protected APIs using OAuth authentication.
-The example shows a hotel booking assistant that interacts with secured APIs.
+This sample demonstrates how to build AI assistants that can securely access protected APIs using OAuth
+authentication. The example shows a hotel booking assistant that interacts with secured APIs.
 
 ## Overview
 
 The project consists of:
 
 1. **Authentication SDK** (`auth.py`) - Handles OAuth flows including client credentials and user authorization
-2. **Service Layer** (`service.py`) - Implements a WebSocket API for the hotel booking assistant
-3. **API Tools** (`tools.py`) - API client functions for hotel services
+2. **Secure Function Tools** (`tool.py`) - Extends AutoGen's function tools with authentication capabilities
+3. **Service Layer** (`service.py`) - Implements a WebSocket API for the hotel booking assistant
+4. **API Tools** (`tools.py`) - API client functions for hotel services
 
 ## Prerequisites
 
@@ -23,80 +24,78 @@ The project consists of:
 ### Asgardeo Configuration (OAuth Provider)
 
 1. **Create an Asgardeo Account**:
-    - Sign up at [https://wso2.com/asgardeo/](https://wso2.com/asgardeo/)
-    - Create a new organization/tenant
+   - Sign up at [https://wso2.com/asgardeo/](https://wso2.com/asgardeo/)
+   - Create a new organization/tenant
 
 2. **Create an Application**:
-    - Navigate to Applications > New Application
-    - Select "Standard-Based Application (OAuth/OIDC)"
+   - Navigate to Applications > New Application
+   - Select "Standard-Based Application (OAuth/OIDC)"
 
 3. **Configure the Application**:
-    - **Name**: Hotel Booking Assistant
-    - **Grant Types**: Check "Code", "Client Credentials" and "Refresh"
-    - **Callback URLs**: Add `http://localhost:8000/callback` (or your deployment URL)
-    - **Access Token Type**: JWT
-    - **Allowed Origins**: Add your frontend domain for CORS
+   - **Name**: Hotel Booking Assistant
+   - **Grant Types**: Check "Code", "Client Credentials" and "Refresh"
+   - **Callback URLs**: Add `http://localhost:8000/callback` (or your deployment URL)
+   - **Access Token Type**: JWT
+   - **Allowed Origins**: Add your frontend domain for CORS
 
 4. **Configure Scopes**:
-    - Navigate to "Scopes" section
-    - Create custom scopes for the Hotel API:
-        - `read_hotels`: Permission to view hotel listings
-        - `read_rooms`: Permission to view room details
-        - `create_bookings`: Permission to make reservations
-    - Assign these scopes to your application
+   - Navigate to "Scopes" section
+   - Create custom scopes for the Hotel API:
+     - `read_hotels`: Permission to view hotel listings
+     - `read_rooms`: Permission to view room details
+     - `create_bookings`: Permission to make reservations
+   - Assign these scopes to your application
 
 5. **Get Credentials**:
-    - After creating the app, copy the "Client ID" and "Client Secret"
-    - Use these in your environment variables (`ASGARDEO_CLIENT_ID` and `ASGARDEO_CLIENT_SECRET`)
+   - After creating the app, copy the "Client ID" and "Client Secret"
+   - Use these in your environment variables (`ASGARDEO_CLIENT_ID` and `ASGARDEO_CLIENT_SECRET`)
 
 ### Azure OpenAI Configuration
 
 1. **Create an Azure OpenAI Resource**:
-    - Log in to the [Azure Portal](https://portal.azure.com/)
-    - Search for "Azure OpenAI" and create a new resource
-    - Select a region where GPT models are available
+   - Log in to the [Azure Portal](https://portal.azure.com/)
+   - Search for "Azure OpenAI" and create a new resource
+   - Select a region where GPT models are available
 
 2. **Deploy a Model**:
-    - In your Azure OpenAI resource, navigate to "Deployments"
-    - Click "Create new deployment"
-    - Select model (e.g., "gpt-4o")
-    - Provide a deployment name (e.g., "hotel-assistant")
+   - In your Azure OpenAI resource, navigate to "Deployments"
+   - Click "Create new deployment"
+   - Select model (e.g., "gpt-4o")
+   - Provide a deployment name (e.g., "hotel-assistant")
 
 3. **Get API Details**:
-    - Navigate to "Keys and Endpoint" in your Azure OpenAI resource
-    - Copy the "Endpoint" URL (like `https://your-resource.openai.azure.com/`)
-    - Copy one of the available keys
+   - Navigate to "Keys and Endpoint" in your Azure OpenAI resource
+   - Copy the "Endpoint" URL (like `https://your-resource.openai.azure.com/`)
+   - Copy one of the available keys
 
 4. **Set Environment Variables**:
-    - Use the endpoint URL for `AZURE_OPENAI_ENDPOINT`
-    - Use the keys copied for `AZURE_OPENAI_API_KEY`
-    - Use the deployment name for `AZURE_OPENAI_DEPLOYMENT_NAME`
+   - Use the endpoint URL for `AZURE_OPENAI_ENDPOINT`
+   - Use the keys copied for `AZURE_OPENAI_API_KEY`
+   - Use the deployment name for `AZURE_OPENAI_DEPLOYMENT_NAME`
 
 ### Hotel API Configuration
 
 1. Deploy [Hotel API](https://github.com/nadheesh/agent_demo_hotel_api) using the given source in WSO2 Choreo.
 2. Set scopes to the API endpoints as follows.
-    - `read_hotels` → GET /api/hotels
-    - `read_rooms` → GET /api/hotels/{id}
-    - `create_bookings` → POST /api/bookings
+   - `read_hotels` → GET /api/hotels
+   - `read_rooms` → GET /api/hotels/{id}
+   - `create_bookings` → POST /api/bookings
 
 If you're using a pre-existing Hotel API:
-
 1. Obtain the base URL of the API
 2. Ensure the API is configured to validate OAuth tokens from your Asgardeo tenant
 3. Confirm the API expects tokens in the format: `Authorization: Bearer <token>`
 
 If you need to set up a Hotel API:
-
 1. Implement an API with endpoints for:
-    - `/api/hotels` - List all hotels
-    - `/api/hotels/{id}` - Get hotel details and rooms
-    - `/api/bookings` - Create a booking
+   - `/api/hotels` - List all hotels
+   - `/api/hotels/{id}` - Get hotel details and rooms
+   - `/api/bookings` - Create a booking
 
 2. Configure the API to validate OAuth tokens:
-    - Use a middleware to check for valid tokens
-    - Validate tokens against your Asgardeo tenant
-    - Check for appropriate scopes based on the operation
+   - Use a middleware to check for valid tokens
+   - Validate tokens against your Asgardeo tenant
+   - Check for appropriate scopes based on the operation
 
 ## Environment Variables
 
@@ -135,6 +134,14 @@ Key classes:
 - `AuthConfig`: Defines authentication requirements (scopes, token type)
 - `AuthSchema`: Links tools with authentication requirements
 
+### Secure Function Tool (tool.py)
+
+The `SecureFunctionTool` extends AutoGen's `FunctionTool` with:
+
+- Automatic token acquisition before function execution
+- Permission enforcement through scopes
+- Transparent function call modification to include tokens
+
 ### Building Authenticated Agents
 
 Follow these steps to create agents with secure API access:
@@ -154,42 +161,49 @@ auth_manager = AuthManager(
 2. **Create Secure Function Tools**:
 
 ```python
-class ToolClass():
-    def __init__(self, auth_manager: AuthManager):
-        # Initialize with AuthManager
-        self.auth_manager = auth_manager
-
-    # Tool function with token fetch (for OBO flow)
-    async def fetch_data(self, param1, param2):
-        # Fetch token using Auth manager
-        token = await self.auth_manager.get_oauth_token(
-            AuthConfig(
-                scopes=["create_bookings"],
-                token_type=OAuthTokenType.OBO_TOKEN
-            ))
-        # Use token.access_token for API calls
-        headers = {"Authorization": f"Bearer {token.access_token}"}
-        # Make API request...
+# API function with token parameter
+async def fetch_data(param1, param2, token: OAuthToken):
+    # Use token.access_token for API calls
+    headers = {"Authorization": f"Bearer {token.access_token}"}
+    # Make API request...
 
 
-# Initialize the tool class with AuthManager
-tool_class = ToolClass(auth_manager)
-
-# Create the function tool as usual 
-obo_tool = FunctionTool(
-    tool_class.fetch_data,
+# Create secure tool with client credentials (service-to-service)
+service_tool = SecureFunctionTool(
+    fetch_data,
     description="Fetches data from service API",
-    name="FetchDataTool"
+    name="FetchDataTool",
+    auth=AuthSchema(
+        auth_manager,
+        AuthConfig(
+            scopes=["read_data"],
+            token_type=OAuthTokenType.CLIENT_TOKEN
+        )
+    )
+)
+
+# Create secure tool requiring user authorization
+user_context_tool = SecureFunctionTool(
+    make_transaction,
+    description="Makes a transaction on behalf of the user",
+    name="TransactionTool",
+    auth=AuthSchema(
+        auth_manager,
+        AuthConfig(
+            scopes=["write_data", "openid", "profile"],
+            token_type=OAuthTokenType.OBO_TOKEN
+        )
+    )
 )
 ```
 
-3. **Create an Assistant with the tools**:
+3. **Create an Assistant with the secure tools**:
 
 ```python
 assistant = AssistantAgent(
     "my_assistant",
     model_client=your_model_client,
-    tools=[obo_tool, ...],
+    tools=[service_tool, user_context_tool],
     system_message="You are a helpful assistant..."
 )
 ```
@@ -218,8 +232,7 @@ pip install -r requirements.txt
 uvicorn app.service:app --reload
 ```
 
-4. Connect to the WebSocket endpoint at `ws://localhost:8000/chat?session_id=unique_id` or
-   use [frontend.html](frontend.html) single-page HTML.
+4. Connect to the WebSocket endpoint at `ws://localhost:8000/chat?session_id=unique_id` or use [frontend.html](frontend.html) single-page HTML.
 
 ### User Flow
 
@@ -236,7 +249,7 @@ uvicorn app.service:app --reload
 Used for service-to-service API calls where no user context is needed:
 
 1. Tool is invoked by the agent
-2. Tool function requests token from `AuthManager`
+2. `SecureFunctionTool` requests token from `AuthManager`
 3. `AuthManager` checks token cache, fetches new token if needed
 4. Token is injected into tool function call
 5. API call is made with service credentials
@@ -246,7 +259,7 @@ Used for service-to-service API calls where no user context is needed:
 Used when human-in-the-loop (user context) is required:
 
 1. Tool is invoked by the agent
-2. Tool function requests token from `AuthManager`
+2. `SecureFunctionTool` requests token from `AuthManager`
 3. `AuthManager` generates auth URL and state parameter
 4. Auth request is sent through message handler to client
 5. User is redirected to login page
