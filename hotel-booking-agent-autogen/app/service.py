@@ -108,6 +108,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         message_handler,
         agent_config=AgentConfig(
             agent_id=os.environ.get('AGENT_ID'),
+            agent_name=os.environ.get('AGENT_NAME'),
             agent_secret=os.environ.get('AGENT_SECRET'),
         ))
 

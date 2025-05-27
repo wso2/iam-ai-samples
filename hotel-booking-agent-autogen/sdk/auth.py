@@ -42,6 +42,7 @@ class OAuthTokenType(str, Enum):
     """OAuth token types supported by the tools"""
     CLIENT_TOKEN = "client_credentials"
     OBO_TOKEN = "authorization_code"
+    AGENT_TOKEN = "agent_token"
 
 
 class OAuthToken(BaseModel):
@@ -96,6 +97,7 @@ class TokenManager:
         return token
 
 class AgentConfig(BaseModel):
+    agent_name: str
     agent_id: str
     agent_secret: str
     
@@ -221,14 +223,13 @@ class AuthManager:
                     url=self.token_endpoint,
                     code=code,
                     grant_type=OAuthTokenType.OBO_TOKEN,
-                    agent_token=self.agent_token if self.agent_token else None,
+                    actor_token=self.agent_token if self.agent_token else None,
                 )
             elif config.token_type == OAuthTokenType.CLIENT_TOKEN:  # Fetch Client token
                 token = await client.fetch_token(url=self.token_endpoint)
             elif config.token_type == OAuthTokenType.AGENT_TOKEN:
                 token = self.authenticate_agent_with_totp(                    
-                    self.redirect_uri,
-                    self.agent_config
+                    config
                 )
             else:
                 raise ValueError(f"Unsupported token type: {config.token_type}")
@@ -273,6 +274,8 @@ class AuthManager:
         if auth_config.resource:
             params.append(f"resource={auth_config.resource}")
         auth_url = f"{self.authorize_endpoint}?" + "&".join(params)
+        # log auth_url
+        print("\n\n***********Auth URL***************:", auth_url, "\n\n")
 
         # Notify client via handler
         await self._message_handler(
@@ -365,7 +368,7 @@ class AuthManager:
             base_url (str): The base URL of the identity server.
             client_id (str): The OAuth2 client ID.
             redirect_uri (str): Redirect URI registered for the OAuth2 client.
-            agent_id (str): The agent identifier (username).
+            agent_name (str): The agent identifier (username).
 
         Returns:
             Optional[str]: The access token if successful, otherwise None.
@@ -393,9 +396,11 @@ class AuthManager:
             "resource": "booking_api"
         }
         
+        print("\n\nAuthorize Data:", authorize_data, "\n\n")
         resp = requests.post(self.authorize_endpoint, data=authorize_data, verify=False)
-        resp.raise_for_status()
+        # resp.raise_for_status()
         resp_json = resp.json()
+        print("\n\nAuthorize Response:", resp_json, "\n\n")
         
         flow_id = resp_json.get("flowId")
         idf_authenticator_id = resp_json.get("nextStep", {}).get("authenticators", [{}])[0].get("authenticatorId")
@@ -406,7 +411,7 @@ class AuthManager:
             "selectedAuthenticator": {
                 "authenticatorId": idf_authenticator_id,
                 "params": {
-                    "username": self.agent_config.agent_id if self.agent_config else ""
+                    "username": self.agent_config.agent_name if self.agent_config else ""
                 }
             }
         }
@@ -448,6 +453,7 @@ class AuthManager:
             "code": code,
             "code_verifier": code_verifier,
             "redirect_uri": self.redirect_uri,
+            "scope": scopes,
             "resource": "booking_api"
         }
         
