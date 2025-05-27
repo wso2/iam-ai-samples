@@ -10,16 +10,8 @@
   entered into with WSO2 governing the purchase of this software and any
 """
 
-import os
-
 import httpx
-from dotenv import load_dotenv
-
-from sdk.auth import OAuthToken
-
-load_dotenv()
-
-hotel_api_base_url = os.environ.get('HOTEL_API_BASE_URL')
+from sdk.auth import AuthManager, AuthConfig, OAuthTokenType
 
 
 async def _get(base_url: str, path: str, bearer_token: str, params: dict = None) -> dict:
@@ -36,44 +28,53 @@ async def _get(base_url: str, path: str, bearer_token: str, params: dict = None)
         return response.json()
 
 
-async def fetch_hotels(token: OAuthToken) -> dict:
-    path = "api/hotels"
-    return await _get(hotel_api_base_url, path, token.access_token)
+class HotelAPI:
+    def __init__(self, base_url, auth_manager: AuthManager):
+        self.base_url = base_url
+        self.auth_manager = auth_manager
 
+    async def fetch_hotels(self) -> dict:
+        path = "api/hotels"
+        token = await self.auth_manager.get_oauth_token(
+            AuthConfig(scopes=["read_hotels"], token_type=OAuthTokenType.CLIENT_TOKEN))
+        return await _get(self.base_url, path, token.access_token)
 
-async def fetch_rooms(hotel_id: int, token: OAuthToken) -> dict:
-    path = f"api/hotels/{hotel_id}"
-    return await _get(hotel_api_base_url, path, token.access_token)
+    async def fetch_rooms(self, hotel_id: int) -> dict:
+        path = f"api/hotels/{hotel_id}"
+        token = await self.auth_manager.get_oauth_token(
+            AuthConfig(scopes=["read_rooms"], token_type=OAuthTokenType.CLIENT_TOKEN))
+        return await _get(self.base_url, path, token.access_token)
 
+    async def make_booking(self, hotel_id: int, room_id: int, date_from: str, date_to: str,  # used for API
+                           hotel_name: str, total_cost: str,  # used for confirmation
+                           ):
+        token = await self.auth_manager.get_oauth_token(
+            AuthConfig(scopes=["create_bookings"], token_type=OAuthTokenType.OBO_TOKEN))
 
-async def make_booking(hotel_id: int, room_id: int, date_from: str, date_to: str,  # used for API
-                       hotel_name: str, total_cost: str,  # used for confirmation
-                       token: OAuthToken  # used for authorization
-                       ):
-    async with httpx.AsyncClient() as client:
-        # Set the authorization header with the access token
-        headers = {
-            "Authorization": f"Bearer {token.access_token}",
-            "Content-Type": "application/json"
-        }
+        async with httpx.AsyncClient() as client:
+            # Set the authorization header with the access token
+            headers = {
+                "Authorization": f"Bearer {token.access_token}",
+                "Content-Type": "application/json"
+            }
 
-        # Prepare the booking data
-        booking_data = {
-            "hotel_id": hotel_id,
-            "room_id": room_id,
-            "check_in": date_from,
-            "check_out": date_to
-        }
+            # Prepare the booking data
+            booking_data = {
+                "hotel_id": hotel_id,
+                "room_id": room_id,
+                "check_in": date_from,
+                "check_out": date_to
+            }
 
-        # Make the POST request to the bookings endpoint
-        response = await client.post(
-            f"{hotel_api_base_url}/api/bookings",
-            json=booking_data,
-            headers=headers
-        )
+            # Make the POST request to the bookings endpoint
+            response = await client.post(
+                f"{self.base_url}/api/bookings",
+                json=booking_data,
+                headers=headers
+            )
 
-        # Raise an exception for HTTP errors
-        response.raise_for_status()
+            # Raise an exception for HTTP errors
+            response.raise_for_status()
 
-        # Return the JSON response
-        return response.json()
+            # Return the JSON response
+            return response.json()
