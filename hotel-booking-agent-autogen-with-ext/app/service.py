@@ -15,16 +15,16 @@ import os
 from typing import Literal, Dict
 
 from app.prompt import agent_system_prompt
-from app.tools import HotelAPI
+from app.tools import fetch_hotels, fetch_rooms, make_booking
+from autogen.extension import SecureFunctionTool
 from autogen_agentchat.agents import AssistantAgent
 from autogen_agentchat.messages import TextMessage
 from autogen_core import CancellationToken
-from autogen_core.tools import FunctionTool
 from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, HTTPException
 from pydantic import BaseModel
-from sdk.auth import AuthRequestMessage, AuthManager
+from sdk.auth import AuthRequestMessage, AuthManager, AuthSchema, AuthConfig, OAuthTokenType
 from starlette.responses import HTMLResponse
 from starlette.websockets import WebSocketDisconnect
 
@@ -39,9 +39,6 @@ client_id = os.environ.get('ASGARDEO_CLIENT_ID')
 client_secret = os.environ.get('ASGARDEO_CLIENT_SECRET')
 idp_base_url = os.environ.get('ASGARDEO_TENANT_DOMAIN')
 redirect_url = os.environ.get('ASGARDEO_REDIRECT_URI', 'http://localhost:8000/callback')
-
-# Hotel API configs
-hotel_api_base_url = os.environ.get('HOTEL_API_BASE_URL')
 
 # Azure OpenAI configs
 azure_openai_endpoint = os.environ.get('AZURE_OPENAI_ENDPOINT')
@@ -110,25 +107,29 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     auth_managers[session_id] = auth_manager
 
     # Create the set of tools required
-    hotel_api_client = HotelAPI(hotel_api_base_url, auth_manager)
-    fetch_hotels_tool = FunctionTool(
-        hotel_api_client.fetch_hotels,
+    fetch_hotels_tool = SecureFunctionTool(
+        fetch_hotels,
         description="Fetches all hotels and information about them",
         name="FetchHotelsTool",
+        auth=AuthSchema(auth_manager, AuthConfig(scopes=["read_hotels"],
+                                                 token_type=OAuthTokenType.CLIENT_TOKEN)),
         strict=True
     )
 
-    fetch_hotel_rooms_tool = FunctionTool(
-        hotel_api_client.fetch_rooms,
+    fetch_hotel_rooms_tool = SecureFunctionTool(
+        fetch_rooms,
         description="Fetch the rooms available, and information related such as price, amenities, etc.",
         name="FetchHotelRoomsTool",
+        auth=AuthSchema(auth_manager, AuthConfig(scopes=["read_rooms"])),
         strict=True
     )
 
-    book_hotel_tool = FunctionTool(
-        hotel_api_client.make_booking,
+    book_hotel_tool = SecureFunctionTool(
+        make_booking,
         description="Books the hotel room selected by the user.",
         name="BookHotelTool",
+        auth=AuthSchema(auth_manager, AuthConfig(scopes=["create_bookings", "openid", "profile"],
+                                                 token_type=OAuthTokenType.OBO_TOKEN)),
         strict=True
     )
 
