@@ -65,8 +65,6 @@ async def make_booking(hotel_id: int, room_id: int, date_from: str, date_to: str
             "check_out": date_to
         }
 
-        headers["X-JWT-Assertion"] = headers["Authorization"].split(" ")[1]
-        
         # Make the POST request to the bookings endpoint
         response = await client.post(
             f"{hotel_api_base_url}/api/bookings",
