@@ -22,7 +22,7 @@ from autogen_core import CancellationToken
 from autogen_core.tools import FunctionTool
 from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, HTTPException
+from fastapi import FastAPI, Request, WebSocket, HTTPException
 from pydantic import BaseModel
 from sdk.auth import AuthRequestMessage, AuthManager
 from starlette.responses import HTMLResponse
@@ -88,6 +88,9 @@ async def run_agent(assistant: AssistantAgent, websocket: WebSocket):
         # Send the response back to the client
         await websocket.send_json(TextResponse(content=response.chat_message.content).model_dump())
 
+@app.get('/')
+async def index():
+    return FileResponse('static/index.html')
 
 @app.websocket("/chat")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
