@@ -223,7 +223,7 @@ class AuthManager:
                     url=self.token_endpoint,
                     code=code,
                     grant_type=OAuthTokenType.OBO_TOKEN,
-                    actor_token=self.agent_token if self.agent_token else None,
+                    actor_token=self.agent_token["access_token"] if self.agent_token else None,
                 )
             elif config.token_type == OAuthTokenType.CLIENT_TOKEN:  # Fetch Client token
                 token = await client.fetch_token(url=self.token_endpoint)
@@ -328,6 +328,8 @@ class AuthManager:
             token = await self._fetch_obo_token(config)
         elif config.token_type == OAuthTokenType.CLIENT_TOKEN:
             token = await self._fetch_oauth_token(config)
+        elif config.token_type == OAuthTokenType.AGENT_TOKEN:
+            token = await self._fetch_oauth_token(config)
         else:
             raise ValueError(f"Unsupported token type: {config.token_type}")
 
@@ -360,7 +362,7 @@ class AuthManager:
     def authenticate_agent_with_totp(
         self,
         auth_config: Optional[AuthConfig] = None
-    ) -> Optional[str]:
+    ):
         """
         Perform the full OAuth2 authentication flow for an agent using TOTP.
 
@@ -373,6 +375,11 @@ class AuthManager:
         Returns:
             Optional[str]: The access token if successful, otherwise None.
         """
+        print("\n\n***********Agent Authentication Started***************\n\n")
+        
+        print("\n\nAgent Config:", self.agent_config, "\n\n")
+        print("\n\nAuth Config:", auth_config, "\n\n")
+        
         scopes = "openid"      
         if auth_config is not None:
              scopes = " ".join(auth_config.scopes)
@@ -465,10 +472,12 @@ class AuthManager:
         resp.raise_for_status()
         resp_json = resp.json()
         
+        print(resp_json)
+        
         # print("\n\nToken Response:", resp_json, "\n\n")
         print("\n\n***********Agent Token***************:", resp_json.get("access_token"), "\n\n")
 
-        return resp_json.get("access_token")
+        return resp_json
 
     def generate_code_verifier(self, length: int = 64) -> str:
         return secrets.token_urlsafe(length)[:length]
