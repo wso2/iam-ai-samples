@@ -22,27 +22,17 @@ from authlib.integrations.httpx_client import AsyncOAuth2Client
 from cachetools import TTLCache
 from pydantic import BaseModel, Field
 
-import requests
-import pyotp
-from typing import Optional
-
-import base64
-import hashlib
-import secrets
-
-import os
-
 logger = logging.getLogger(__name__)
 
 DEFAULT_TOKEN_STORE_MAX_SIZE = 1000
 DEFAULT_TOKEN_STORE_TTL = 3600
 DEFAULT_AUTHORIZATION_TIMEOUT = 300  # 5 minute timeout
 
+
 class OAuthTokenType(str, Enum):
     """OAuth token types supported by the tools"""
     CLIENT_TOKEN = "client_credentials"
     OBO_TOKEN = "authorization_code"
-    AGENT_TOKEN = "agent_token"
 
 
 class OAuthToken(BaseModel):
@@ -65,7 +55,6 @@ class AuthConfig(BaseModel):
     """Context information for tool authorization"""
     scopes: List[str] = Field(default_factory=list)
     token_type: OAuthTokenType = OAuthTokenType.CLIENT_TOKEN
-    resource: str
 
     class Config:
         frozen = True
@@ -96,11 +85,7 @@ class TokenManager:
 
         return token
 
-class AgentConfig(BaseModel):
-    agent_name: str
-    agent_id: str
-    agent_secret: str
-    
+
 class AuthManager:
     def __init__(
             self,
@@ -113,24 +98,18 @@ class AuthManager:
             *,
             token_store_maxsize: int = DEFAULT_TOKEN_STORE_MAX_SIZE,
             token_store_ttl: int = DEFAULT_TOKEN_STORE_TTL,
-            authorization_timeout: int = DEFAULT_AUTHORIZATION_TIMEOUT,
-            agent_config: AgentConfig
+            authorization_timeout: int = DEFAULT_AUTHORIZATION_TIMEOUT
     ):
         # Basic OAuth config
         if not idp_base_url.endswith("/"):
             idp_base_url = idp_base_url.rstrip("/")
         self.token_endpoint = f"{idp_base_url}/oauth2/token"
         self.authorize_endpoint = f"{idp_base_url}/oauth2/authorize"
-        self.authn_url = f"{idp_base_url}/oauth2/authn"
         self.client_id = client_id
         self.client_secret = client_secret
         self.redirect_uri = redirect_uri
         self.scopes = scopes or []
         self.authorization_timeout = authorization_timeout
-        # Step 01
-        self.agent_config = agent_config
-        # Obtain the agent token when the auth manager is initialized
-        self.agent_token = self.authenticate_agent_with_totp()
 
         # Pending authorization requests
         self._pending_auths: Dict[str, Tuple[List[str], asyncio.Future]] = {}
@@ -189,7 +168,6 @@ class AuthManager:
             client_secret=self.client_secret,
             redirect_uri=self.redirect_uri,
             scope=scopes,
-            verify=False,
         )
 
         try:
@@ -207,7 +185,6 @@ class AuthManager:
             client_secret=self.client_secret,
             redirect_uri=self.redirect_uri,  # Only applicable for OBO token, else should be None
             scope=config.scopes,
-            verify=False,
         )
 
         try:
@@ -215,22 +192,13 @@ class AuthManager:
             if config.token_type == OAuthTokenType.OBO_TOKEN:  # Fetch OBO tokens
                 if not code:
                     raise ValueError("'code' is required for OBO token")
-                
-                print("\n\n***********Agent Token In Memory***************:", self.agent_token, "\n\n")
-                     
-                # Step 03           
                 token = await client.fetch_token(
                     url=self.token_endpoint,
                     code=code,
-                    grant_type=OAuthTokenType.OBO_TOKEN,
-                    actor_token=self.agent_token["access_token"] if self.agent_token else None,
+                    grant_type=OAuthTokenType.OBO_TOKEN
                 )
             elif config.token_type == OAuthTokenType.CLIENT_TOKEN:  # Fetch Client token
                 token = await client.fetch_token(url=self.token_endpoint)
-            elif config.token_type == OAuthTokenType.AGENT_TOKEN:
-                token = self.authenticate_agent_with_totp(                    
-                    config
-                )
             else:
                 raise ValueError(f"Unsupported token type: {config.token_type}")
         except Exception as e:
@@ -239,7 +207,7 @@ class AuthManager:
 
         return OAuthToken(**token)
 
-    async def _fetch_obo_token(self, auth_config: AuthConfig) -> Optional["OAuthToken"]:
+    async def _fetch_obo_token(self, config: AuthConfig) -> Optional["OAuthToken"]:
         """
         Fetches the OBO token for the given scopes.
         Requests user authorization and waits for a token asynchronously.
@@ -258,31 +226,26 @@ class AuthManager:
 
         # Create a future to await authorization completion
         future = asyncio.Future()
-        self._pending_auths[state] = auth_config.scopes, auth_config.resource, future
+        self._pending_auths[state] = config.scopes, future
 
         # TODO Support for PKCE
         # Construct authorization URL
-        scope = " ".join(auth_config.scopes)
-        params = [
-            f"client_id={self.client_id}",
-            "response_type=code",
-            f"scope={scope}",
-            f"redirect_uri={self.redirect_uri}",
-            f"state={state}",
-            f"requested_actor={self.agent_config.agent_id}"
-        ]
-        if auth_config.resource:
-            params.append(f"resource={auth_config.resource}")
-        auth_url = f"{self.authorize_endpoint}?" + "&".join(params)
-        # log auth_url
-        ##print("\n\n***********Auth URL***************:", auth_url, "\n\n")
+        scope = " ".join(config.scopes)
+        auth_url = (
+            f"{self.authorize_endpoint}?"
+            f"client_id={self.client_id}&"
+            f"response_type=code&"
+            f"scope={scope}&"
+            f"redirect_uri={self.redirect_uri}&"
+            f"state={state}"
+        )
 
         # Notify client via handler
         await self._message_handler(
             AuthRequestMessage(
                 auth_url=auth_url,
                 state=state,
-                scopes=auth_config.scopes)
+                scopes=config.scopes)
         )
 
         # Wait for authorization to complete (with timeout)
@@ -312,8 +275,8 @@ class AuthManager:
         # Check if a valid token exists already
         token = self._token_manager.get_token(config)
 
-        # If a token exits, check if it is expired and if it is OBO token
-        if token and token.is_expired() and config.token_type == OAuthTokenType.OBO_TOKEN:
+        # If a token exits, check if it is expired
+        if token and token.is_expired():
             # If the token is expired, try refreshing it
             logger.debug("Token expired. Attempting to refresh %s for the scopes %s", config.token_type.name,
                          config.scopes)
@@ -328,8 +291,6 @@ class AuthManager:
             token = await self._fetch_obo_token(config)
         elif config.token_type == OAuthTokenType.CLIENT_TOKEN:
             token = await self._fetch_oauth_token(config)
-        elif config.token_type == OAuthTokenType.AGENT_TOKEN:
-            token = await self._fetch_oauth_token(config)
         else:
             raise ValueError(f"Unsupported token type: {config.token_type}")
 
@@ -340,7 +301,7 @@ class AuthManager:
 
     async def process_callback(self, state: str, code: str) -> OAuthToken:
 
-        scopes, resource, future = self._pending_auths.pop(state, None)
+        scopes, future = self._pending_auths.pop(state, None)
 
         if not future and future.done():
             logger.error(f"No pending authorization for state: {state}")
@@ -348,144 +309,14 @@ class AuthManager:
 
         try:
             token = await self._fetch_oauth_token(
-                AuthConfig(scopes=scopes, token_type=OAuthTokenType.OBO_TOKEN, resource=resource), code=code
+                AuthConfig(scopes=scopes, token_type=OAuthTokenType.OBO_TOKEN), code=code
             )
             future.set_result(token)
-            print("\n\n*****OBO Token Response*********:", token, "\n\n")
             return token
         except Exception as e:
             future.set_exception(e)
             logger.error(f"Error fetching token: {e}")
             raise
-    
-    # Step 02
-    def authenticate_agent_with_totp(
-        self,
-        auth_config: Optional[AuthConfig] = None
-    ):
-        """
-        Perform the full OAuth2 authentication flow for an agent using TOTP.
-
-        Args:
-            base_url (str): The base URL of the identity server.
-            client_id (str): The OAuth2 client ID.
-            redirect_uri (str): Redirect URI registered for the OAuth2 client.
-            agent_name (str): The agent identifier (username).
-
-        Returns:
-            Optional[str]: The access token if successful, otherwise None.
-        """
-        # print("\n\n***********Agent Authentication Started***************\n\n")
-        
-        # print("\n\nAgent Config:", self.agent_config, "\n\n")
-        # print("\n\nAuth Config:", auth_config, "\n\n")
-        
-        scopes = "openid"      
-        if auth_config is not None:
-             scopes = " ".join(auth_config.scopes)
-
-        code_verifier = self.generate_code_verifier()
-        code_challenge = self.generate_code_challenge(code_verifier)
-        
-        # TODO: Allow this to be overriden
-        AGENT_DEFAULT_APP_CLIENT_ID = "vMH8K3zdIhlSiIDmmvnebNOI_bIa"
-
-        # Step 1: Init Authorize
-        authorize_data = {
-            "client_id": AGENT_DEFAULT_APP_CLIENT_ID,
-            "response_type": "code",
-            "redirect_uri": self.redirect_uri,
-            "state": "1234",
-            "scope": scopes,
-            "response_mode": "direct",
-            "code_challenge": code_challenge,
-            "code_challenge_method": "S256",
-            "resource": "booking_api"
-        }
-        
-        # print("\n\nAuthorize Data:", authorize_data, "\n\n")
-        resp = requests.post(self.authorize_endpoint, data=authorize_data, verify=False)
-        # resp.raise_for_status()
-        resp_json = resp.json()
-        # print("\n\nAuthorize Response:", resp_json, "\n\n")
-        
-        flow_id = resp_json.get("flowId")
-        idf_authenticator_id = resp_json.get("nextStep", {}).get("authenticators", [{}])[0].get("authenticatorId")
-
-        # Step 2: Authenticate with IDF
-        idf_body = {
-            "flowId": flow_id,
-            "selectedAuthenticator": {
-                "authenticatorId": idf_authenticator_id,
-                "params": {
-                    "username": self.agent_config.agent_name if self.agent_config else ""
-                }
-            }
-        }
-        
-        resp = requests.post(self.authn_url, json=idf_body, verify=False)
-        resp.raise_for_status()
-        resp_json = resp.json()
-
-        totp_authenticator_id = resp_json.get("nextStep", {}).get("authenticators", [{}])[0].get("authenticatorId")
-
-        # Step 3: Authenticate with TOTP
-        totp_token = pyotp.TOTP(self.agent_config.agent_secret).now()
-        
-        # print("\n\nTOTP Token:", totp_token, "\n\n")
-
-        totp_body = {
-            "flowId": flow_id,
-            "selectedAuthenticator": {
-                "authenticatorId": totp_authenticator_id,
-                "params": {
-                    "token": totp_token
-                }
-            }
-        }
-        resp = requests.post(self.authn_url, json=totp_body, verify=False)
-        resp.raise_for_status()
-        resp_json = resp.json()
-        
-        # print("\n\totp Auth Response:", resp_json, "\n\n")
-
-        code = resp_json.get("authData", {}).get("code")
-        if not code:
-            return None
-
-        # Step 4: Get token
-        token_data = {
-            "grant_type": "authorization_code",
-            "client_id": AGENT_DEFAULT_APP_CLIENT_ID,
-            "code": code,
-            "code_verifier": code_verifier,
-            "redirect_uri": self.redirect_uri,
-            "scope": scopes,
-            "resource": "booking_api"
-        }
-        
-        # print("\n\nToken Data:", token_data, "\n\n")
-        
-        headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        resp = requests.post(self.token_endpoint, data=token_data, headers=headers, verify=False)
-    
-        resp.raise_for_status()
-        resp_json = resp.json()
-        
-        # print(resp_json)
-        
-        # print("\n\nToken Response:", resp_json, "\n\n")
-        #print("\n\n***********Agent Token***************:", resp_json.get("access_token"), "\n\n")
-
-        return resp_json
-
-    def generate_code_verifier(self, length: int = 64) -> str:
-        return secrets.token_urlsafe(length)[:length]
-
-    def generate_code_challenge(self, code_verifier: str) -> str:
-        sha256_digest = hashlib.sha256(code_verifier.encode('utf-8')).digest()
-        code_challenge = base64.urlsafe_b64encode(sha256_digest).rstrip(b'=').decode('utf-8')
-        return code_challenge
 
 
 class AuthSchema:
