@@ -116,6 +116,7 @@ ASGARDEO_REDIRECT_URI=http://localhost:8000/callback
 AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
 AZURE_OPENAI_DEPLOYMENT_NAME=your_deployment_name
 AZURE_OPENAI_API_KEY=your_api_key
+AZURE_OPENAI_API_VERSION=azure openai version (eg: 2025-01-01-preview)
 
 # API Service
 HOTEL_API_BASE_URL=http://your-hotel-api-url
