@@ -10,9 +10,6 @@
   entered into with WSO2 governing the purchase of this software and any
 """
 from app.service import app
-from fastapi.staticfiles import StaticFiles
-
-app.mount('/', StaticFiles(directory='static', html=True), name='static')
 
 if __name__ == '__main__':
     import uvicorn
