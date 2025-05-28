@@ -13,7 +13,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Gardeo Hotel - Booking Assistant</title>
+    <title>Hotel Booking Assistant</title>
     <!-- Include the marked library for Markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
     <!-- Include DOMPurify for HTML sanitization -->
@@ -23,30 +23,20 @@
     <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.3.1/lib/highlight.min.js"></script>
     <!-- UUID generation library -->
     <script src="https://cdn.jsdelivr.net/npm/uuid@8.3.2/dist/umd/uuidv4.min.js"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap" rel="stylesheet">
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --primary-color: #2c5f41;
-            --primary-light: #e8f5e8;
-            --secondary-color: #f8f9fa;
-            --accent-gold: #d4af37;
-            --border-color: #e1e8ed;
-            --text-color: #1a202c;
-            --text-light: #718096;
-            --success-color: #38a169;
-            --danger-color: #e53e3e;
-            --warning-color: #d69e2e;
-            --chat-bg: #ffffff;
-            --shadow-light: 0 2px 12px rgba(0, 0, 0, 0.08);
-            --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.12);
-            --shadow-heavy: 0 8px 30px rgba(0, 0, 0, 0.16);
-            --border-radius: 12px;
-            --border-radius-small: 8px;
-            --gradient-primary: linear-gradient(135deg, #2c5f41 0%, #38a169 100%);
-            --gradient-gold: linear-gradient(135deg, #d4af37 0%, #f6e05e 100%);
+            --primary-color: #1976D2;
+            --primary-light: #e3f2fd;
+            --secondary-color: #f5f5f5;
+            --border-color: #e0e0e0;
+            --text-color: #212121;
+            --text-light: #757575;
+            --success-color: #4CAF50;
+            --danger-color: #f44336;
+            --warning-color: #FFC107;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
         }
 
         * {
@@ -56,535 +46,452 @@
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            font-family: var(--font-family);
+            max-width: 900px;
+            margin: 0 auto;
             padding: 20px;
-            position: relative;
+            color: var(--text-color);
+            line-height: 1.5;
+            background-color: #fafafa;
         }
 
-        body::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.1"/><circle cx="20" cy="80" r="0.5" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
-            pointer-events: none;
-        }
-
-        .chat-container {
-            width: 100%;
-            max-width: 1000px;
-            height: 600px;
-            background: var(--chat-bg);
-            border-radius: 20px;
-            box-shadow: var(--shadow-heavy);
+        header {
             display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            position: relative;
-            animation: slideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(40px) scale(0.95);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-
-        .chat-header {
-            background: var(--gradient-primary);
-            padding: 20px;
-            color: white;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .chat-header::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            animation: float 6s ease-in-out infinite;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-10px) rotate(180deg); }
-        }
-
-        .hotel-info {
-            display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 8px;
-            position: relative;
-            z-index: 1;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
         }
 
-        .hotel-logo {
-            width: 48px;
-            height: 48px;
-            background: var(--gradient-gold);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            font-weight: bold;
-            color: white;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        }
-
-        .hotel-details h1 {
-            font-family: 'Playfair Display', serif;
-            font-size: 22px;
+        h2 {
+            color: var(--primary-color);
             font-weight: 600;
-            margin: 0;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-
-        .hotel-subtitle {
-            font-size: 14px;
-            opacity: 0.9;
-            font-weight: 400;
-        }
-
-        .chat-status {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            opacity: 0.9;
-            position: relative;
-            z-index: 1;
-        }
-
-        .status-indicator {
-            width: 8px;
-            height: 8px;
-            background: #4ade80;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.6; transform: scale(1.1); }
-        }
-
-        .session-controls {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            display: flex;
-            gap: 8px;
-            z-index: 2;
-        }
-
-        .control-btn {
-            width: 32px;
-            height: 32px;
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            border-radius: 8px;
-            color: white;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
-            backdrop-filter: blur(10px);
-        }
-
-        .control-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: scale(1.05);
         }
 
         #chat {
-            flex: 1;
-            list-style: none;
-            padding: 20px;
-            margin: 0;
+            list-style-type: none;
+            padding: 0;
+            margin: 0 0 20px 0;
+            height: 500px;
             overflow-y: auto;
-            background: #f8fafc;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            background-color: white;
+            box-shadow: var(--shadow);
         }
 
         #chat li {
-            max-width: 85%;
-            padding: 12px 16px;
+            margin: 8px;
+            padding: 10px 14px;
             border-radius: var(--border-radius);
-            position: relative;
-            animation: messageSlide 0.3s ease-out;
-        }
-
-        @keyframes messageSlide {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            max-width: 80%;
+            line-height: 1.4;
         }
 
         .user-message {
-            background: var(--gradient-primary);
-            color: white;
-            align-self: flex-end;
-            border-bottom-right-radius: 4px;
-            box-shadow: var(--shadow-light);
+            background-color: var(--primary-light);
+            color: var(--text-color);
+            text-align: right;
+            margin-left: auto;
+            border-bottom-right-radius: 2px;
+            position: relative;
         }
 
         .assistant-message {
-            background: white;
-            color: var(--text-color);
-            align-self: flex-start;
-            border-bottom-left-radius: 4px;
-            box-shadow: var(--shadow-light);
-            border: 1px solid var(--border-color);
+            background-color: var(--secondary-color);
+            margin-right: auto;
+            border-bottom-left-radius: 2px;
+            position: relative;
         }
 
-        .system-message {
-            background: rgba(212, 175, 55, 0.1);
-            color: var(--text-light);
-            text-align: center;
-            font-style: italic;
-            font-size: 14px;
-            align-self: center;
-            border-radius: 20px;
-            padding: 8px 16px;
-            border: 1px solid rgba(212, 175, 55, 0.2);
-        }
-
-        .message-input-container {
-            padding: 20px;
-            background: white;
-            border-top: 1px solid var(--border-color);
-        }
-
-        .message-input-wrapper {
-            display: flex;
-            gap: 12px;
-            align-items: flex-end;
-        }
-
-        #msg {
-            flex: 1;
-            padding: 14px 18px;
-            border: 2px solid var(--border-color);
-            border-radius: 24px;
-            font-family: inherit;
-            font-size: 15px;
-            background: #f8fafc;
-            transition: all 0.2s ease;
-            resize: none;
-            min-height: 24px;
-            max-height: 120px;
-            overflow-y: auto;
-        }
-
-        #msg:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            background: white;
-            box-shadow: 0 0 0 3px rgba(44, 95, 65, 0.1);
-        }
-
-        #sendButton {
-            width: 48px;
-            height: 48px;
-            background: var(--gradient-primary);
-            border: none;
-            border-radius: 50%;
-            color: white;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
-            box-shadow: var(--shadow-light);
-        }
-
-        #sendButton:hover {
-            transform: scale(1.05);
-            box-shadow: var(--shadow-medium);
-        }
-
-        #sendButton:active {
-            transform: scale(0.95);
-        }
-
-        /* Markdown content styling */
+        /* Markdown content refinements */
         .markdown-content {
-            line-height: 1.6;
+            text-align: left;
         }
 
         .markdown-content p {
-            margin: 0 0 12px 0;
+            margin: 0 0 8px 0;
         }
 
         .markdown-content p:last-child {
             margin-bottom: 0;
         }
 
-        .markdown-content h1, .markdown-content h2, .markdown-content h3 {
-            margin: 16px 0 8px 0;
-            color: var(--primary-color);
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4 {
+            margin: 12px 0 8px 0;
+            line-height: 1.2;
         }
 
-        .markdown-content ul, .markdown-content ol {
-            margin: 8px 0;
+        .markdown-content h1:first-child,
+        .markdown-content h2:first-child,
+        .markdown-content h3:first-child,
+        .markdown-content h4:first-child {
+            margin-top: 0;
+        }
+
+        .markdown-content ul,
+        .markdown-content ol {
+            margin: 4px 0;
             padding-left: 20px;
         }
 
         .markdown-content li {
-            margin: 4px 0;
-            max-width: none;
+            margin: 2px 0;
             padding: 0;
+            max-width: none;
             background: none;
         }
 
-        .markdown-content code {
-            background: rgba(44, 95, 65, 0.1);
-            padding: 2px 6px;
+        .markdown-content pre {
+            background-color: #f6f8fa;
             border-radius: 4px;
-            font-family: 'SF Mono', Monaco, monospace;
+            padding: 10px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+
+        .markdown-content code {
+            background-color: rgba(175, 184, 193, 0.2);
+            border-radius: 3px;
+            padding: 0.2em 0.4em;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
             font-size: 0.9em;
         }
 
-        .markdown-content pre {
-            background: #f1f5f9;
-            padding: 16px;
-            border-radius: 8px;
-            overflow-x: auto;
-            margin: 12px 0;
+        .markdown-content pre code {
+            background-color: transparent;
+            padding: 0;
+            font-size: 0.9em;
+            line-height: 1.4;
         }
 
-        /* Consent and auth styling */
-        .consent-buttons, .auth-container {
-            margin-top: 12px;
-            padding: 16px;
-            background: rgba(44, 95, 65, 0.05);
-            border-radius: 8px;
-            border: 1px solid rgba(44, 95, 65, 0.1);
+        .markdown-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 8px 0;
+            font-size: 0.9em;
+        }
+
+        .markdown-content th, .markdown-content td {
+            border: 1px solid #ddd;
+            padding: 6px 8px;
+            text-align: left;
+        }
+
+        .markdown-content th {
+            background-color: #f2f2f2;
+            font-weight: 600;
+        }
+
+        .markdown-content blockquote {
+            border-left: 4px solid var(--primary-color);
+            padding: 4px 12px;
+            color: var(--text-light);
+            margin: 8px 0;
+            background-color: rgba(25, 118, 210, 0.05);
         }
 
         .consent-buttons {
+            margin-top: 10px;
             display: flex;
             gap: 8px;
         }
 
-        .accept-button, .reject-button, .auth-button {
-            padding: 10px 16px;
-            border: none;
-            border-radius: 6px;
-            font-weight: 500;
+        button {
+            padding: 8px 16px;
             cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            font-family: var(--font-family);
+            font-weight: 500;
             transition: all 0.2s ease;
-            font-size: 14px;
         }
 
-        .accept-button, .auth-button {
-            background: var(--gradient-primary);
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        .accept-button {
+            background-color: var(--success-color);
             color: white;
         }
 
         .reject-button {
-            background: #f7fafc;
-            color: var(--text-color);
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        #messageInput {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            position: relative;
+        }
+
+        #msg {
+            flex: 1;
+            padding: 12px 15px;
+            border-radius: var(--border-radius);
             border: 1px solid var(--border-color);
+            font-family: var(--font-family);
+            font-size: 1em;
+            transition: border-color 0.2s;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
         }
 
-        .accept-button:hover, .auth-button:hover {
-            transform: translateY(-1px);
-            box-shadow: var(--shadow-light);
+        #msg:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.2);
         }
 
-        .reject-button:hover {
-            background: #edf2f7;
+        #sendButton {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 0 20px;
+            border-radius: var(--border-radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .system-message {
+            background-color: #fff8e1;
+            font-style: italic;
+            text-align: center;
+            padding: 8px;
+            margin: 8px;
+            border-radius: var(--border-radius);
+            max-width: none !important;
+            font-size: 0.9em;
+            color: var(--text-light);
+            border-left: 3px solid var(--warning-color);
+        }
+
+        .consent-context {
+            font-size: 0.85em;
+            color: var(--text-light);
+            margin-top: 5px;
+            background-color: rgba(0, 0, 0, 0.03);
+            padding: 5px 8px;
+            border-radius: 4px;
+        }
+
+        #session-info {
+            font-size: 0.8em;
+            color: var(--text-light);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Auth container refinements */
+        .auth-container {
+            background-color: #e8f5e9;
+            border-left: 4px solid var(--success-color);
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 4px;
+            box-shadow: var(--shadow);
+        }
+
+        .auth-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #2e7d32;
+        }
+
+        .auth-description {
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .auth-details {
+            background-color: rgba(0, 0, 0, 0.05);
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            font-size: 0.9em;
+        }
+
+        .auth-button {
+            background-color: var(--success-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .auth-button::after {
+            font-size: 1.2em;
+        }
+
+        /* Debug panel enhancements */
+        #debug-panel {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #263238;
+            border-radius: var(--border-radius);
+            display: none;
+            box-shadow: var(--shadow);
+        }
+
+        #debug-panel h3 {
+            color: white;
+            margin-bottom: 10px;
+            font-size: 1em;
+            font-weight: 500;
+        }
+
+        #debug-toggle {
+            font-size: 0.8em;
+            background-color: #37474F;
+            margin-top: 10px;
+            color: white;
+        }
+
+        #debug-log {
+            max-height: 150px;
+            overflow-y: auto;
+            margin-top: 10px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.8em;
+            white-space: pre-wrap;
+            background-color: #000;
+            color: #4CAF50;
+            padding: 10px;
+            border-radius: 4px;
+            line-height: 1.4;
+        }
+
+        /* Message timestamp */
+        .msg-timestamp {
+            font-size: 0.7em;
+            color: var(--text-light);
+            margin-top: 4px;
+            text-align: right;
         }
 
         /* Typing indicator */
         .typing-indicator {
-            align-self: flex-start;
-            background: white;
-            border: 1px solid var(--border-color);
-            padding: 16px 20px;
             display: flex;
-            gap: 4px;
             align-items: center;
+            margin: 8px;
+            padding: 10px 14px;
+            background-color: var(--secondary-color);
+            border-radius: var(--border-radius);
+            max-width: 60px;
+            margin-right: auto;
+            position: relative;
         }
 
         .typing-indicator span {
-            width: 8px;
             height: 8px;
-            background: var(--primary-color);
+            width: 8px;
+            background-color: #b6b6b6;
             border-radius: 50%;
-            animation: typing 1.4s infinite ease-in-out;
+            display: inline-block;
+            margin: 0 2px;
             opacity: 0.4;
+            animation: typing 1s infinite;
         }
 
-        .typing-indicator span:nth-child(1) { animation-delay: 0s; }
-        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        .typing-indicator span:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
 
         @keyframes typing {
-            0%, 60%, 100% {
-                transform: translateY(0);
+            0% {
                 opacity: 0.4;
+                transform: translateY(0);
             }
-            30% {
-                transform: translateY(-10px);
+            50% {
                 opacity: 1;
+                transform: translateY(-4px);
+            }
+            100% {
+                opacity: 0.4;
+                transform: translateY(0);
             }
         }
 
-        /* Custom scrollbar */
+        /* Scrollbar customization */
         #chat::-webkit-scrollbar {
-            width: 6px;
+            width: 8px;
         }
 
         #chat::-webkit-scrollbar-track {
-            background: transparent;
+            background: #f1f1f1;
+            border-radius: 4px;
         }
 
         #chat::-webkit-scrollbar-thumb {
-            background: rgba(44, 95, 65, 0.2);
-            border-radius: 3px;
+            background: #c1c1c1;
+            border-radius: 4px;
         }
 
         #chat::-webkit-scrollbar-thumb:hover {
-            background: rgba(44, 95, 65, 0.4);
+            background: #a8a8a8;
         }
 
-        /* Timestamp styling */
-        .msg-timestamp {
-            font-size: 11px;
-            opacity: 0.6;
-            margin-top: 6px;
-            text-align: right;
+        /* New session button styling */
+        #new-session-btn {
+            background-color: transparent;
+            color: var(--text-light);
+            border: 1px solid var(--border-color);
+            font-size: 0.85em;
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
-        .assistant-message .msg-timestamp {
-            text-align: left;
+        #new-session-btn:hover {
+            background-color: #f5f5f5;
+            color: var(--text-color);
         }
 
-        /* Debug panel (hidden) */
-        #debug-panel {
-            display: none;
+        #new-session-btn::before {
+            content: "⟳";
+            font-size: 1.1em;
         }
-
-        #debug-toggle {
-            display: none;
-        }
-
-        /* Responsive design */
-        @media (max-width: 480px) {
-            body {
-                padding: 10px;
-            }
-            
-            .chat-container {
-                height: 100vh;
-                max-height: 100vh;
-                border-radius: 0;
-            }
-            
-            .chat-header {
-                padding: 16px;
-            }
-            
-            .hotel-info {
-                gap: 10px;
-            }
-            
-            .hotel-logo {
-                width: 40px;
-                height: 40px;
-                font-size: 20px;
-            }
-            
-            .hotel-details h1 {
-                font-size: 18px;
-            }
-        }
-
-        /* Welcome animation */
-        .welcome-message {
-            background: var(--gradient-gold);
-            color: white;
-            text-align: center;
-            padding: 16px;
-            border-radius: var(--border-radius);
-            margin-bottom: 16px;
-            animation: welcomeGlow 2s ease-in-out;
-        }
-
-        @keyframes welcomeGlow {
-            0%, 100% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.3); }
-            50% { box-shadow: 0 0 30px rgba(212, 175, 55, 0.5); }
-        }
-    </style>
-
     </style>
 </head>
 <body>
-    <div class="chat-container">
-        <!-- Chat Header -->
-        <div class="chat-header">
-            <div class="hotel-info">
-                <div class="hotel-logo">G</div>
-                <div class="hotel-details">
-                    <h1>Gardeo Hotel</h1>
-                    <div class="hotel-subtitle">Luxury Booking Assistant</div>
-                </div>
-            </div>
-            <div class="chat-status">
-                <div class="status-indicator"></div>
-                <span>AI Assistant Online</span>
-            </div>
-            <div class="session-controls">
-                <button class="control-btn" onclick="startNewSession()" title="New Session">
-                    <i class="fas fa-redo"></i>
-                </button>
-                <button class="control-btn" onclick="toggleDebug()" title="Debug Info">
-                    <i class="fas fa-bug"></i>
-                </button>
-            </div>
-        </div>
+<header>
+    <h2>Hotel Booking Assistant</h2>
+    <div id="session-info"></div>
+</header>
 
-        <!-- Chat Messages -->
-        <ul id="chat"></ul>
+<ul id="chat"></ul>
 
-        <!-- Message Input -->
-        <div class="message-input-container">
-            <div class="message-input-wrapper">
-                <input id="msg" type="text" placeholder="Ask me about rooms, amenities, or bookings..." autocomplete="off"/>
-                <button id="sendButton" onclick="sendMessage()">
-                    <i class="fas fa-paper-plane"></i>
-                </button>
-            </div>
-        </div>
-    </div>
+<div id="messageInput">
+    <input id="msg" type="text" placeholder="Type your message..." autocomplete="off"/>
+    <button id="sendButton" onclick="sendMessage()">Send</button>
+</div>
 
 <!-- Debug panel (hidden by default) -->
 <div id="debug-panel">
@@ -656,6 +563,23 @@
 
     const sessionId = getSessionId();
 
+    // Add session info and new session button
+    function setupSessionInfo() {
+        const sessionInfo = document.getElementById('session-info');
+
+        const sessionIdSpan = document.createElement('span');
+        sessionIdSpan.textContent = 'Session ID: ' + sessionId.substring(0, 8) + '...';
+        sessionInfo.appendChild(sessionIdSpan);
+
+        const newSessionButton = document.createElement('button');
+        newSessionButton.id = 'new-session-btn';
+        newSessionButton.textContent = 'New Session';
+        newSessionButton.addEventListener('click', startNewSession);
+        sessionInfo.appendChild(newSessionButton);
+    }
+
+    setupSessionInfo();
+
     // Configure marked for markdown rendering
     document.addEventListener('DOMContentLoaded', function () {
         if (typeof marked !== 'undefined') {
@@ -699,19 +623,17 @@
                 if (pendingAuthRequests[data.state]) {
                     log('Found pending auth request for state', data.state);
 
-// const authResponse = {
-//     success: true,
-//     state: data.state,
-//     access_token: tokenData.access_token,
-//     id_token: tokenData.id_token,
-//     booking_details: pendingAuthRequests[data.state].context
-// };
+                    <!--                        const authResponse = {-->
+                    <!--                            success: true,-->
+                    <!--                            state: data.state,-->
+                    <!--                            access_token: tokenData.access_token,-->
+                    <!--                            id_token: tokenData.id_token,-->
+                    <!--                            booking_details: pendingAuthRequests[data.state].context-->
+                    <!--                        };-->
 
-
-// Send the token back through the WebSocket
-// log('Sending token to backend via WebSocket');
-// ws.send(JSON.stringify(authResponse));
-
+                <!--                        // Send the token back through the WebSocket-->
+                    <!--                        log('Sending token to backend via WebSocket');-->
+                    <!--                        ws.send(JSON.stringify(authResponse));-->
                     addSystemMessage("Authorization completed successfully. Processing your booking...");
 
                     // Clean up the pending request
@@ -739,12 +661,6 @@
     ws.onopen = () => {
         log("WebSocket connected", sessionId);
         addSystemMessage("Connected to the server");
-        
-        // addWelcomeMessage();
-        // // Add welcome message
-        // setTimeout(() => {
-        //     addWelcomeMessage();
-        // }, 500);
     };
 
     ws.onmessage = (event) => {
@@ -948,25 +864,6 @@
         timestamp.textContent = getFormattedTimestamp();
         li.appendChild(timestamp);
 
-        document.getElementById("chat").appendChild(li);
-        scrollToBottom();
-    }
-
-    function addWelcomeMessage() {
-        let li = document.createElement("li");
-        li.className = "welcome-message";
-        
-        let contentDiv = document.createElement("div");
-        contentDiv.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                <i class="fas fa-concierge-bell" style="font-size: 22px;"></i>
-                <div>
-                    <div style="font-size: 16px; font-weight: 600;">Welcome to Gardeo Hotel!</div>
-                </div>
-            </div>
-        `;
-        
-        li.appendChild(contentDiv);
         document.getElementById("chat").appendChild(li);
         scrollToBottom();
     }
