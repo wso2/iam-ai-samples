@@ -1,8 +1,6 @@
 # Use an official Python runtime as a base image
 FROM python:3.11-slim
 
-USER 10014
-
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -24,6 +22,8 @@ RUN pip install 'uvicorn[standard]'
 
 # Copy project files
 COPY . .
+
+USER 10014
 
 # Expose port (change if needed)
 EXPOSE 8000
