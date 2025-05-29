@@ -37,7 +37,7 @@ async def _get(base_url: str, path: str, bearer_token: str, params: dict = None)
 
 
 async def fetch_hotels(token: OAuthToken) -> dict:
-    print("**agent token to fetch hotels**", token.access_token)
+    print("\n\nAgent token: ", token.access_token)
     path = "api/hotels"
     return await _get(hotel_api_base_url, path, token.access_token)
 
