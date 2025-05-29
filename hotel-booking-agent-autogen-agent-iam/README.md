@@ -91,22 +91,21 @@ The project consists of:
    - `read_hotels` → GET /api/hotels
    - `read_rooms` → GET /api/hotels/{id}
    - `create_bookings` → POST /api/bookings
+3. Obtain the base URL of the API.
+4. Ensure the API is configured to validate OAuth tokens from your Asgardeo tenant
+5. Confirm the API expects tokens in the format: `Authorization: Bearer <token>`
 
-If you're using a pre-existing Hotel API:
-1. Obtain the base URL of the API
-2. Ensure the API is configured to validate OAuth tokens from your Asgardeo tenant
-3. Confirm the API expects tokens in the format: `Authorization: Bearer <token>`
-
-If you need to set up a Hotel API:
-1. Implement an API with endpoints for:
-   - `/api/hotels` - List all hotels
-   - `/api/hotels/{id}` - Get hotel details and rooms
-   - `/api/bookings` - Create a booking
-
-2. Configure the API to validate OAuth tokens:
-   - Use a middleware to check for valid tokens
-   - Validate tokens against your Asgardeo tenant
-   - Check for appropriate scopes based on the operation
+> If you need to develop your own Hotel API:
+> 
+>    1. Implement an API with endpoints for:
+>       - `/api/hotels` - List all hotels
+>       - `/api/hotels/{id}` - Get hotel details and rooms
+>       - `/api/bookings` - Create a booking
+>    
+>    2. Configure the API to validate OAuth tokens:
+>       - Use a middleware to check for valid tokens
+>       - Validate tokens against your Asgardeo tenant
+>       - Check for appropriate scopes based on the operation
 
 ## Environment Variables
 
