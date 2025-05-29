@@ -1,0 +1,1312 @@
+<!--
+  Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
+
+  This software is the property of WSO2 LLC. and its suppliers, if any.
+  Dissemination of any information or reproduction of any material contained
+  herein is strictly forbidden, unless permitted by WSO2 in accordance with
+  the WSO2 Commercial License available at http://wso2.com/licenses.
+  For specific language governing the permissions and limitations under
+  this license, please see the license as well as any agreement you’ve
+  entered into with WSO2 governing the purchase of this software and any
+-->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gardeo Hotel - Booking Assistant</title>
+    <!-- Include the marked library for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
+    <!-- Include DOMPurify for HTML sanitization -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@2.3.3/dist/purify.min.js"></script>
+    <!-- Include highlight.js for code syntax highlighting -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.3.1/styles/github.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.3.1/lib/highlight.min.js"></script>
+    <!-- UUID generation library -->
+    <script src="https://cdn.jsdelivr.net/npm/uuid@8.3.2/dist/umd/uuidv4.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #2c5f41;
+            --primary-light: #e8f5e8;
+            --secondary-color: #f8f9fa;
+            --accent-gold: #d4af37;
+            --border-color: #e1e8ed;
+            --text-color: #1a202c;
+            --text-light: #718096;
+            --success-color: #38a169;
+            --danger-color: #e53e3e;
+            --warning-color: #d69e2e;
+            --chat-bg: #ffffff;
+            --shadow-light: 0 2px 12px rgba(0, 0, 0, 0.08);
+            --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.12);
+            --shadow-heavy: 0 8px 30px rgba(0, 0, 0, 0.16);
+            --border-radius: 12px;
+            --border-radius-small: 8px;
+            --gradient-primary: linear-gradient(135deg, #2c5f41 0%, #38a169 100%);
+            --gradient-gold: linear-gradient(135deg, #d4af37 0%, #f6e05e 100%);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.1"/><circle cx="20" cy="80" r="0.5" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            pointer-events: none;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 1000px;
+            height: 600px;
+            background: var(--chat-bg);
+            border-radius: 20px;
+            box-shadow: var(--shadow-heavy);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            animation: slideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .chat-header {
+            background: var(--gradient-primary);
+            padding: 20px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chat-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(180deg); }
+        }
+
+        .hotel-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hotel-logo {
+            width: 48px;
+            height: 48px;
+            background: var(--gradient-gold);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .hotel-details h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 22px;
+            font-weight: 600;
+            margin: 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .hotel-subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+
+        .chat-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            background: #4ade80;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
+        }
+
+        .session-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 8px;
+            z-index: 2;
+        }
+
+        .control-btn {
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        #chat {
+            flex: 1;
+            list-style: none;
+            padding: 20px;
+            margin: 0;
+            overflow-y: auto;
+            background: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        #chat li {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: var(--border-radius);
+            position: relative;
+            animation: messageSlide 0.3s ease-out;
+        }
+
+        @keyframes messageSlide {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .user-message {
+            background: var(--gradient-primary);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+            box-shadow: var(--shadow-light);
+        }
+
+        .assistant-message {
+            background: white;
+            color: var(--text-color);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+            box-shadow: var(--shadow-light);
+            border: 1px solid var(--border-color);
+        }
+
+        .system-message {
+            background: rgba(212, 175, 55, 0.1);
+            color: var(--text-light);
+            text-align: center;
+            font-style: italic;
+            font-size: 14px;
+            align-self: center;
+            border-radius: 20px;
+            padding: 8px 16px;
+            border: 1px solid rgba(212, 175, 55, 0.2);
+        }
+
+        .message-input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .message-input-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        #msg {
+            flex: 1;
+            padding: 14px 18px;
+            border: 2px solid var(--border-color);
+            border-radius: 24px;
+            font-family: inherit;
+            font-size: 15px;
+            background: #f8fafc;
+            transition: all 0.2s ease;
+            resize: none;
+            min-height: 24px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        #msg:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(44, 95, 65, 0.1);
+        }
+
+        #sendButton {
+            width: 48px;
+            height: 48px;
+            background: var(--gradient-primary);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-light);
+        }
+
+        #sendButton:hover {
+            transform: scale(1.05);
+            box-shadow: var(--shadow-medium);
+        }
+
+        #sendButton:active {
+            transform: scale(0.95);
+        }
+
+        /* Markdown content styling */
+        .markdown-content {
+            line-height: 1.6;
+        }
+
+        .markdown-content p {
+            margin: 0 0 12px 0;
+        }
+
+        .markdown-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .markdown-content h1, .markdown-content h2, .markdown-content h3 {
+            margin: 16px 0 8px 0;
+            color: var(--primary-color);
+        }
+
+        .markdown-content ul, .markdown-content ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        .markdown-content li {
+            margin: 4px 0;
+            max-width: none;
+            padding: 0;
+            background: none;
+        }
+
+        .markdown-content code {
+            background: rgba(44, 95, 65, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.9em;
+        }
+
+        .markdown-content pre {
+            background: #f1f5f9;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+
+        /* Consent and auth styling */
+        .consent-buttons, .auth-container {
+            margin-top: 12px;
+            padding: 16px;
+            background: rgba(44, 95, 65, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(44, 95, 65, 0.1);
+        }
+
+        .consent-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .accept-button, .reject-button, .auth-button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+        }
+
+        .accept-button, .auth-button {
+            background: var(--gradient-primary);
+            color: white;
+        }
+
+        .reject-button {
+            background: #f7fafc;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .accept-button:hover, .auth-button:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-light);
+        }
+
+        .reject-button:hover {
+            background: #edf2f7;
+        }
+
+        /* Typing indicator */
+        .typing-indicator {
+            align-self: flex-start;
+            background: white;
+            border: 1px solid var(--border-color);
+            padding: 16px 20px;
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+            opacity: 0.4;
+        }
+
+        .typing-indicator span:nth-child(1) { animation-delay: 0s; }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.4;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
+
+        /* Custom scrollbar */
+        #chat::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #chat::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #chat::-webkit-scrollbar-thumb {
+            background: rgba(44, 95, 65, 0.2);
+            border-radius: 3px;
+        }
+
+        #chat::-webkit-scrollbar-thumb:hover {
+            background: rgba(44, 95, 65, 0.4);
+        }
+
+        /* Timestamp styling */
+        .msg-timestamp {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-top: 6px;
+            text-align: right;
+        }
+
+        .assistant-message .msg-timestamp {
+            text-align: left;
+        }
+
+        /* Debug panel (hidden) */
+        #debug-panel {
+            display: none;
+        }
+
+        #debug-toggle {
+            display: none;
+        }
+
+        /* Responsive design */
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
+            .chat-container {
+                height: 100vh;
+                max-height: 100vh;
+                border-radius: 0;
+            }
+            
+            .chat-header {
+                padding: 16px;
+            }
+            
+            .hotel-info {
+                gap: 10px;
+            }
+            
+            .hotel-logo {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+            
+            .hotel-details h1 {
+                font-size: 18px;
+            }
+        }
+
+        /* Welcome animation */
+        .welcome-message {
+            background: var(--gradient-gold);
+            color: white;
+            text-align: center;
+            padding: 16px;
+            border-radius: var(--border-radius);
+            margin-bottom: 16px;
+            animation: welcomeGlow 2s ease-in-out;
+        }
+
+        @keyframes welcomeGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(212, 175, 55, 0.3); }
+            50% { box-shadow: 0 0 30px rgba(212, 175, 55, 0.5); }
+        }
+    </style>
+
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Chat Header -->
+        <div class="chat-header">
+            <div class="hotel-info">
+                <div class="hotel-logo">G</div>
+                <div class="hotel-details">
+                    <h1>Gardeo Hotel</h1>
+                    <div class="hotel-subtitle">Luxury Booking Assistant</div>
+                </div>
+            </div>
+            <div class="chat-status">
+                <div class="status-indicator"></div>
+                <span>AI Assistant Online</span>
+            </div>
+            <div class="session-controls">
+                <button class="control-btn" onclick="startNewSession()" title="New Session">
+                    <i class="fas fa-redo"></i>
+                </button>
+                <button class="control-btn" onclick="toggleDebug()" title="Debug Info">
+                    <i class="fas fa-bug"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Chat Messages -->
+        <ul id="chat"></ul>
+
+        <!-- Message Input -->
+        <div class="message-input-container">
+            <div class="message-input-wrapper">
+                <input id="msg" type="text" placeholder="Ask me about rooms, amenities, or bookings..." autocomplete="off"/>
+                <button id="sendButton" onclick="sendMessage()">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+<!-- Debug panel (hidden by default) -->
+<div id="debug-panel">
+    <h3>Debug Information</h3>
+    <div id="debug-log"></div>
+</div>
+<button id="debug-toggle" onclick="toggleDebug()">Show Debug Panel</button>
+
+<script>
+    // Set up debug logging
+    const debugLog = document.getElementById('debug-log');
+    let debugEnabled = false;
+    let isTyping = false;
+
+    function log(message, data) {
+        if (debugEnabled) {
+            const timestamp = new Date().toISOString().substr(11, 8);
+            let logMessage = `[${timestamp}] ${message}`;
+
+            if (data !== undefined) {
+                if (typeof data === 'object') {
+                    logMessage += '\n' + JSON.stringify(data, null, 2);
+                } else {
+                    logMessage += ': ' + data;
+                }
+            }
+
+            console.log(logMessage);
+            debugLog.innerHTML += logMessage + '\n\n';
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+    }
+
+    function toggleDebug() {
+        const debugPanel = document.getElementById('debug-panel');
+        const debugToggle = document.getElementById('debug-toggle');
+
+        debugEnabled = !debugEnabled;
+        if (debugEnabled) {
+            debugPanel.style.display = 'block';
+            debugToggle.textContent = 'Hide Debug Panel';
+            log('Debug logging enabled');
+        } else {
+            debugPanel.style.display = 'none';
+            debugToggle.textContent = 'Show Debug Panel';
+        }
+    }
+
+    // Global flag for authorization state
+    window.authorizationCompleted = false;
+
+    // Generate or retrieve session ID
+    function getSessionId() {
+        let sessionId = localStorage.getItem('chatSessionId');
+
+        // If no session ID exists or we want a new one each time
+        if (!sessionId) {
+            // Use UUID library if available, otherwise fallback
+            if (typeof uuidv4 === 'function') {
+                sessionId = uuidv4();
+            } else {
+                sessionId = 'session_' + Math.random().toString(36).substring(2, 15);
+            }
+            localStorage.setItem('chatSessionId', sessionId);
+        }
+
+        return sessionId;
+    }
+
+    const sessionId = getSessionId();
+
+    // Configure marked for markdown rendering
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                headerIds: false,
+                mangle: false
+            });
+        }
+    });
+
+    // Track pending authorization requests
+    const pendingAuthRequests = {};
+
+    // Listen for messages from popup windows (for OAuth flow)
+    window.addEventListener('message', function (event) {
+        log('Received message from window', event.data);
+
+        try {
+            const data = event.data;
+
+            // Check for auth_callback message
+            if (data && data.type === 'auth_callback' && data.state) {
+                log('Valid auth callback received', data);
+
+                // Set the global flag to indicate authorization was completed
+                window.authorizationCompleted = true;
+
+                // Parse token if it's a string
+                let tokenData = data.token;
+                if (typeof tokenData === 'string') {
+                    try {
+                        tokenData = JSON.parse(tokenData);
+                    } catch (e) {
+                        log('Error parsing token string', e);
+                    }
+                }
+
+                // We received an OAuth token from the popup
+                if (pendingAuthRequests[data.state]) {
+                    log('Found pending auth request for state', data.state);
+
+// const authResponse = {
+//     success: true,
+//     state: data.state,
+//     access_token: tokenData.access_token,
+//     id_token: tokenData.id_token,
+//     booking_details: pendingAuthRequests[data.state].context
+// };
+
+
+// Send the token back through the WebSocket
+// log('Sending token to backend via WebSocket');
+// ws.send(JSON.stringify(authResponse));
+
+                    addSystemMessage("Authorization completed successfully. Processing your booking...");
+
+                    // Clean up the pending request
+                    delete pendingAuthRequests[data.state];
+                } else {
+                    log('No pending auth request found for state', data.state);
+                }
+            }
+        } catch (error) {
+            log('Error processing window message', error);
+        }
+    });
+
+    // Connect to WebSocket with session ID as query parameter
+    let ws = new WebSocket(`ws://localhost:8000/chat?session_id=${sessionId}`);
+    let lastConsentRequest = null;
+
+    // Configuration
+    const config = {
+        sendJsonMessages: true,
+        receiveJsonMessages: true,
+        renderMarkdown: true
+    };
+
+    ws.onopen = () => {
+        log("WebSocket connected", sessionId);
+        addSystemMessage("Connected to the server");
+        
+        // addWelcomeMessage();
+        // // Add welcome message
+        // setTimeout(() => {
+        //     addWelcomeMessage();
+        // }, 500);
+    };
+
+    ws.onmessage = (event) => {
+        let data = event.data;
+        log("Received WebSocket message", data);
+
+        // Hide typing indicator when a message is received
+        hideTypingIndicator();
+
+        // Try to parse as JSON if configured to receive JSON
+        if (config.receiveJsonMessages) {
+            try {
+                data = JSON.parse(event.data);
+                log("Parsed JSON message", data);
+
+                if (data.type === "message") {
+                    // Regular message
+                    log("Processing regular message");
+                    addAssistantMessage(data.content, data.messageId);
+                } else if (data.type === "consent_request") {
+                    // Consent request
+                    log("Processing consent request");
+                    lastConsentRequest = data;
+                    addConsentRequest(data);
+                } else if (data.type === "auth_request") {
+                    // OAuth authorization request
+                    log("Processing auth request", data);
+                    handleAuthorizationRequest(data);
+                } else {
+                    // Unknown message type, fallback to treating as text
+                    log("Unknown message type", data.type);
+                    addAssistantMessage(data.content || "Unknown message type", "unknown_" + Date.now());
+                }
+                return; // Successfully handled JSON message
+            } catch (error) {
+                // Not JSON or invalid JSON, treat as plain text
+                log("Failed to parse as JSON, treating as text", error);
+                data = event.data; // Reset to original string
+            }
+        }
+
+        // Handle as plain text (either because JSON parsing failed or not configured for JSON)
+        if (typeof data === 'string') {
+            log("Processing as plain text");
+            // Check for legacy consent format with [CONSENT_REQUIRED] tag
+            if (data.includes("[CONSENT_REQUIRED]")) {
+                const content = data.replace("[CONSENT_REQUIRED]", "");
+                // Create a synthetic consent request object
+                const consentData = {
+                    type: "consent_request",
+                    content: content,
+                    messageId: "legacy_consent_" + Date.now(),
+                    consentOptions: {
+                        accept: "Accept",
+                        reject: "Reject"
+                    }
+                };
+                log("Created synthetic consent request", consentData);
+                lastConsentRequest = consentData;
+                addConsentRequest(consentData);
+            } else {
+                // Regular text message
+                log("Adding as regular text message");
+                addAssistantMessage(data, "msg_" + Date.now());
+            }
+        }
+    };
+
+    ws.onerror = (error) => {
+        log("WebSocket error", error);
+        hideTypingIndicator();
+        addSystemMessage("Error connecting to the server. Please try again later.");
+    };
+
+    ws.onclose = (event) => {
+        log("WebSocket closed", event.code);
+        hideTypingIndicator();
+        addSystemMessage("Disconnected from the server");
+
+        // Attempt to reconnect after a delay if connection was closed unexpectedly
+        if (event.code !== 1000) { // 1000 is normal closure
+            addSystemMessage("Attempting to reconnect in 5 seconds...");
+            setTimeout(function () {
+                log("Attempting to reconnect WebSocket");
+                // Create a new WebSocket connection with the same session ID
+                ws = new WebSocket(`ws://localhost:8000/chat?session_id=${sessionId}`);
+                // Re-attach event handlers
+                ws.onopen = () => {
+                    log("WebSocket reconnected", sessionId);
+                    addSystemMessage("Reconnected to the server");
+                };
+                ws.onmessage = onMessageHandler;
+                ws.onerror = (error) => {
+                    log("WebSocket error on reconnect", error);
+                    addSystemMessage("Error reconnecting to the server.");
+                };
+                ws.onclose = onCloseHandler;
+            }, 5000);
+        }
+    };
+
+    function onMessageHandler(event) {
+        // This is just a reference to the main onmessage handler
+        ws.onmessage(event);
+    }
+
+    function onCloseHandler(event) {
+        // This is just a reference to the main onclose handler
+        ws.onclose(event);
+    }
+
+    function simpleMarkdownToHtml(text) {
+        // Basic markdown conversion as fallback
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\n/g, '<br>');
+    }
+
+    function getFormattedTimestamp() {
+        const now = new Date();
+        const hours = now.getHours().toString().padStart(2, '0');
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+    }
+
+    function addUserMessage(text) {
+        log("Adding user message", text);
+
+        // Hide any typing indicator
+        hideTypingIndicator();
+
+        let li = document.createElement("li");
+        li.className = "user-message";
+
+        // Message content
+        let messageText = document.createElement("div");
+        messageText.textContent = text;
+        li.appendChild(messageText);
+
+        // Timestamp
+        let timestamp = document.createElement("div");
+        timestamp.className = "msg-timestamp";
+        timestamp.textContent = getFormattedTimestamp();
+        li.appendChild(timestamp);
+
+        document.getElementById("chat").appendChild(li);
+
+        // Show typing indicator after user message
+        showTypingIndicator();
+
+        scrollToBottom();
+    }
+
+    function addAssistantMessage(text, messageId) {
+        log("Adding assistant message", {id: messageId, text: text.substring(0, 50) + (text.length > 50 ? '...' : '')});
+
+        let li = document.createElement("li");
+        li.className = "assistant-message";
+        li.setAttribute("data-message-id", messageId);
+
+        if (config.renderMarkdown) {
+            // Create a div for markdown content
+            let contentDiv = document.createElement("div");
+            contentDiv.className = "markdown-content";
+
+            // Try using the marked library if available
+            if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+                try {
+                    const htmlContent = marked.parse(text);
+                    contentDiv.innerHTML = DOMPurify.sanitize(htmlContent);
+                } catch (error) {
+                    log("Error rendering markdown", error);
+                    contentDiv.innerHTML = simpleMarkdownToHtml(text);
+                }
+            } else {
+                // Fallback to simple markdown
+                contentDiv.innerHTML = simpleMarkdownToHtml(text);
+            }
+
+            li.appendChild(contentDiv);
+
+            // Apply syntax highlighting to code blocks if available
+            setTimeout(() => {
+                if (typeof hljs !== 'undefined') {
+                    li.querySelectorAll('pre code').forEach((block) => {
+                        hljs.highlightBlock(block);
+                    });
+                }
+            }, 0);
+        } else {
+            // Plain text rendering
+            li.textContent = text;
+        }
+
+        // Timestamp
+        let timestamp = document.createElement("div");
+        timestamp.className = "msg-timestamp";
+        timestamp.textContent = getFormattedTimestamp();
+        li.appendChild(timestamp);
+
+        document.getElementById("chat").appendChild(li);
+        scrollToBottom();
+    }
+
+    function addWelcomeMessage() {
+        let li = document.createElement("li");
+        li.className = "welcome-message";
+        
+        let contentDiv = document.createElement("div");
+        contentDiv.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                <i class="fas fa-concierge-bell" style="font-size: 22px;"></i>
+                <div>
+                    <div style="font-size: 16px; font-weight: 600;">Welcome to Gardeo Hotel!</div>
+                </div>
+            </div>
+        `;
+        
+        li.appendChild(contentDiv);
+        document.getElementById("chat").appendChild(li);
+        scrollToBottom();
+    }
+
+    function addSystemMessage(text) {
+        log("System message", text);
+        let li = document.createElement("li");
+        li.textContent = text;
+        li.className = "system-message";
+        document.getElementById("chat").appendChild(li);
+        scrollToBottom();
+    }
+
+    function addConsentRequest(data) {
+        log("Adding consent request", data);
+        let li = document.createElement("li");
+        li.className = "assistant-message";
+        li.setAttribute("data-message-id", data.messageId);
+
+        // Message content - with markdown support if enabled
+        if (config.renderMarkdown) {
+            let contentDiv = document.createElement("div");
+            contentDiv.className = "markdown-content";
+
+            // Try using the marked library if available
+            if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+                try {
+                    const htmlContent = marked.parse(data.content);
+                    contentDiv.innerHTML = DOMPurify.sanitize(htmlContent);
+                } catch (error) {
+                    log("Error rendering markdown in consent", error);
+                    contentDiv.innerHTML = simpleMarkdownToHtml(data.content);
+                }
+            } else {
+                // Fallback to simple markdown
+                contentDiv.innerHTML = simpleMarkdownToHtml(data.content);
+            }
+
+            li.appendChild(contentDiv);
+        } else {
+            let messageDiv = document.createElement("div");
+            messageDiv.textContent = data.content;
+            li.appendChild(messageDiv);
+        }
+
+        // Optional context information
+        if (data.consentContext && data.consentContext.details) {
+            let contextDiv = document.createElement("div");
+            contextDiv.className = "consent-context";
+
+            const details = data.consentContext.details;
+            let contextText = "";
+
+            for (const [key, value] of Object.entries(details)) {
+                // Convert camelCase or snake_case to readable text
+                const readableKey = key
+                    .replace(/_/g, ' ')
+                    .replace(/([A-Z])/g, ' $1')
+                    .replace(/^./, str => str.toUpperCase());
+
+                contextText += `${readableKey}: ${value}, `;
+            }
+
+            // Remove trailing comma and space
+            contextText = contextText.slice(0, -2);
+            contextDiv.textContent = contextText;
+            li.appendChild(contextDiv);
+        }
+
+        // Consent buttons
+        const consentDiv = document.createElement("div");
+        consentDiv.className = "consent-buttons";
+
+        const acceptButton = document.createElement("button");
+        acceptButton.textContent = data.consentOptions?.accept || "Accept";
+        acceptButton.className = "accept-button";
+        acceptButton.onclick = () => sendConsentResponse("accept", data);
+
+        const rejectButton = document.createElement("button");
+        rejectButton.textContent = data.consentOptions?.reject || "Reject";
+        rejectButton.className = "reject-button";
+        rejectButton.onclick = () => sendConsentResponse("reject", data);
+
+        consentDiv.appendChild(acceptButton);
+        consentDiv.appendChild(rejectButton);
+        li.appendChild(consentDiv);
+
+        // Timestamp
+        let timestamp = document.createElement("div");
+        timestamp.className = "msg-timestamp";
+        timestamp.textContent = getFormattedTimestamp();
+        li.appendChild(timestamp);
+
+        document.getElementById("chat").appendChild(li);
+        scrollToBottom();
+    }
+
+    // New function to handle authorization requests
+    function handleAuthorizationRequest(data) {
+        log("Handling authorization request", data);
+
+        // Store the request for when the popup returns
+        pendingAuthRequests[data.state] = data;
+
+        let li = document.createElement("li");
+        li.className = "assistant-message";
+
+        // Create auth container
+        let authContainer = document.createElement("div");
+        authContainer.className = "auth-container";
+
+        // Add title
+        let titleDiv = document.createElement("div");
+        titleDiv.className = "auth-title";
+        titleDiv.textContent = "Authorization Required";
+        authContainer.appendChild(titleDiv);
+
+        // Add description
+        let descDiv = document.createElement("div");
+        descDiv.className = "auth-description";
+        descDiv.textContent = "To complete your hotel booking, you need to authorize with your Asgardeo account.";
+        authContainer.appendChild(descDiv);
+
+        // Add booking details
+        if (data.context) {
+            let detailsDiv = document.createElement("div");
+            detailsDiv.className = "auth-details";
+
+            let detailsContent = "<strong>Booking Details:</strong><br>";
+            for (const [key, value] of Object.entries(data.context)) {
+                // Format the key name (e.g., "hotel_id" -> "Hotel ID")
+                const formattedKey = key
+                    .replace(/_/g, ' ')
+                    .replace(/([A-Z])/g, ' $1')
+                    .replace(/^./, str => str.toUpperCase());
+
+                detailsContent += `${formattedKey}: ${value}<br>`;
+            }
+
+            detailsDiv.innerHTML = detailsContent;
+            authContainer.appendChild(detailsDiv);
+        }
+
+        // Add authorize button
+        let authButton = document.createElement("button");
+        authButton.className = "auth-button";
+        authButton.textContent = "Authorize Booking";
+
+        // Reset global auth state
+        window.authorizationCompleted = false;
+
+        authButton.onclick = () => {
+            log("Auth button clicked, opening auth window", data.auth_url);
+
+            // Store booking details in the pending request for later use
+            if (data.context) {
+                pendingAuthRequests[data.state] = {
+                    ...data,
+                    booking_details: data.context  // Make sure booking details are stored here
+                };
+            }
+
+            // Open authorization URL in popup
+            const authWindow = window.open(
+                data.auth_url,
+                'OAuthWindow',
+                'width=600,height=700,left=200,top=100'
+            );
+
+            if (!authWindow) {
+                log("Popup blocked");
+                addSystemMessage("Popup was blocked. Please allow popups for this site.");
+            } else {
+                log("Auth window opened");
+                addSystemMessage("Authorization window opened. Please complete the login process.");
+
+                // Monitor if window is closed before completing auth
+                const checkClosed = setInterval(() => {
+                    if (authWindow.closed) {
+                        log("Auth window closed");
+                        clearInterval(checkClosed);
+
+                        // Wait a brief moment to allow any final messages to be processed
+                        setTimeout(() => {
+                            // Only show failure message if auth wasn't completed
+                            if (pendingAuthRequests[data.state] && !window.authorizationCompleted) {
+                                log("Auth window closed without completing authorization");
+                                addSystemMessage("Authorization window was closed. The booking was not completed.");
+
+                                // Send cancellation to backend
+                                log("Sending cancellation to backend", data.state);
+                                ws.send(JSON.stringify({
+                                    success: false,
+                                    state: data.state,
+                                    reason: "window_closed"
+                                }));
+
+                                delete pendingAuthRequests[data.state];
+                            }
+                        }, 500);  // Short delay to ensure messages are processed
+                    }
+                }, 1000);
+            }
+        };
+
+        authContainer.appendChild(authButton);
+        li.appendChild(authContainer);
+
+        // Timestamp
+        let timestamp = document.createElement("div");
+        timestamp.className = "msg-timestamp";
+        timestamp.textContent = getFormattedTimestamp();
+        li.appendChild(timestamp);
+
+        document.getElementById("chat").appendChild(li);
+        scrollToBottom();
+    }
+
+    function sendMessage() {
+        const input = document.getElementById("msg");
+        const message = input.value.trim();
+
+        if (!message) return;
+
+        log("Sending user message", message);
+        addUserMessage(message);
+
+        if (config.sendJsonMessages) {
+            // Send as JSON with session ID included
+            const jsonMsg = {
+                type: "user_message",
+                content: message,
+                sessionId: sessionId
+            };
+            log("Sending as JSON", jsonMsg);
+            ws.send(JSON.stringify(jsonMsg));
+        } else {
+            // Send as plain text
+            log("Sending as plain text");
+            ws.send(message);
+        }
+
+        input.value = "";
+    }
+
+    function sendConsentResponse(decision, consentData) {
+        log("Sending consent response", {decision, consentData});
+        const responseText = decision === "accept"
+            ? (consentData.consentOptions?.accept || "I accept")
+            : (consentData.consentOptions?.reject || "I reject");
+
+        addUserMessage(responseText);
+
+        if (config.sendJsonMessages) {
+            // Send structured response to the server with session ID
+            const jsonResponse = {
+                type: "consent_response",
+                decision: decision,
+                messageId: consentData.messageId,
+                originalRequest: consentData.consentContext,
+                sessionId: sessionId
+            };
+            log("Sending consent response as JSON", jsonResponse);
+            ws.send(JSON.stringify(jsonResponse));
+        } else {
+            // For plain text servers, send a simple response
+            log("Sending consent response as plain text");
+            ws.send(`I ${decision} the proposed action.`);
+        }
+
+        // Find and disable buttons after response is sent
+        document.querySelectorAll(`[data-message-id="${consentData.messageId}"] .consent-buttons`).forEach(buttonDiv => {
+            buttonDiv.querySelectorAll('button').forEach(button => {
+                button.disabled = true;
+                button.style.opacity = "0.5";
+            });
+            // Add message showing what was selected
+            const selectedOption = document.createElement("div");
+            selectedOption.style.fontSize = "0.8em";
+            selectedOption.style.marginTop = "5px";
+            selectedOption.textContent = `You selected: ${responseText}`;
+            buttonDiv.appendChild(selectedOption);
+        });
+    }
+
+    function showTypingIndicator() {
+        if (isTyping) return;
+        isTyping = true;
+
+        const typingDiv = document.createElement("li");
+        typingDiv.className = "typing-indicator";
+        typingDiv.id = "typing-indicator";
+
+        for (let i = 0; i < 3; i++) {
+            const dot = document.createElement("span");
+            typingDiv.appendChild(dot);
+        }
+
+        document.getElementById("chat").appendChild(typingDiv);
+        scrollToBottom();
+    }
+
+    function hideTypingIndicator() {
+        const indicator = document.getElementById("typing-indicator");
+        if (indicator) {
+            indicator.remove();
+            isTyping = false;
+        }
+    }
+
+    function scrollToBottom() {
+        const chatContainer = document.getElementById("chat");
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function startNewSession() {
+        log("Starting new session");
+        // Remove the stored session ID
+        localStorage.removeItem('chatSessionId');
+
+        // Close current WebSocket connection
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.close(1000, "User started a new session");
+        }
+
+        // Reload the page to start fresh
+        location.reload();
+    }
+
+    // Allow sending messages with Enter key
+    document.getElementById("msg").addEventListener("keypress", function (event) {
+        if (event.key === "Enter") {
+            sendMessage();
+        }
+    });
+
+    // Focus the input field when the page loads
+    window.addEventListener('load', () => {
+        document.getElementById('msg').focus();
+    });
+</script>
+</body>
+</html>
