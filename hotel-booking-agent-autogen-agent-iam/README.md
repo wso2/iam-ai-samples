@@ -92,7 +92,7 @@ The project consists of:
    - `read_rooms` → GET /api/hotels/{id}
    - `create_bookings` → POST /api/bookings
 3. Obtain the base URL of the API.
-4. Ensure the API is configured to validate OAuth tokens from your Asgardeo tenant
+4. Ensure the API is configured to validate OAuth tokens from your Asgardeo/WSO2 Identity Server organization.
 5. Confirm the API expects tokens in the format: `Authorization: Bearer <token>`
 
 > If you need to develop your own Hotel API:
