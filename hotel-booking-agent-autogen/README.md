@@ -31,23 +31,26 @@ The project consists of:
     - Select "Standard-Based Application (OAuth/OIDC)"
 
 3. **Configure the Application**:
-    - **Name**: Hotel Booking Assistant
-    - **Grant Types**: Check "Code", "Client Credentials" and "Refresh"
-    - **Callback URLs**: Add `http://localhost:8000/callback` (or your deployment URL)
-    - **Access Token Type**: JWT
-    - **Allowed Origins**: Add your frontend domain for CORS
+   - **Name**: Hotel Booking Assistant
+   - **Grant Types**: Check "Code", "Client Credentials" and "Refresh"
+   - **Callback URLs**: Add `http://localhost:8000/callback` (or your deployment URL)
+   - **Access Token Type**: JWT
+   - **Allowed Origins**: Add your frontend domain for CORS
+   - Navigate to **Roles** tab and set audience as "Organization"
 
-4. **Configure Scopes**:
-    - Navigate to "Scopes" section
-    - Create custom scopes for the Hotel API:
-        - `read_hotels`: Permission to view hotel listings
-        - `read_rooms`: Permission to view room details
-        - `create_bookings`: Permission to make reservations
-    - Assign these scopes to your application
+After creating the app, copy the "Client ID" and "Client Secret". Use these in your environment variables (`ASGARDEO_CLIENT_ID` and `ASGARDEO_CLIENT_SECRET`)
 
-5. **Get Credentials**:
-    - After creating the app, copy the "Client ID" and "Client Secret"
-    - Use these in your environment variables (`ASGARDEO_CLIENT_ID` and `ASGARDEO_CLIENT_SECRET`)
+4. **Configure Hotel Booking API**:
+   - Navigate to "API Resources" and create a new API resource.
+   - Create custom scopes for the Hotel API:
+     - `read_hotels`: Permission to view hotel listings
+     - `read_rooms`: Permission to view room details
+     - `create_bookings`: Permission to make reservations
+     - Authorize this API to the application created in step 3.
+
+5. **Role configuration**:
+   - Navigate to "Roles" and create an organization role "Hotel Staff".
+   - Assign the hotel API created in step 4 and add its scopes to the role.
 
 ### Azure OpenAI Configuration
 
@@ -113,6 +116,7 @@ ASGARDEO_REDIRECT_URI=http://localhost:8000/callback
 AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
 AZURE_OPENAI_DEPLOYMENT_NAME=your_deployment_name
 AZURE_OPENAI_API_KEY=your_api_key
+AZURE_OPENAI_API_VERSION=azure openai version (eg: 2025-01-01-preview)
 
 # API Service
 HOTEL_API_BASE_URL=http://your-hotel-api-url
@@ -204,15 +208,23 @@ The repository includes a complete example of a hotel booking assistant that:
 
 ### Running the Example
 
+1. Create a virtual environment.
+
+```bash
+python3 -m venv .venv
+```
+
 1. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Set up environment variables in a `.env` file
+2. Set up environment variables in a `.env` file.
 
 3. Start the FastAPI service:
+
+> Install `uvicorn[standard]` by running `pip install 'uvicorn[standard]'` if you already haven't.
 
 ```bash
 uvicorn app.service:app --reload
