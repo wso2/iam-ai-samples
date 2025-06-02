@@ -29,24 +29,27 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --primary-color: #2c5f41;
-            --primary-light: #e8f5e8;
-            --secondary-color: #f8f9fa;
-            --accent-gold: #d4af37;
-            --border-color: #e1e8ed;
-            --text-color: #1a202c;
+           --primary-color: #ff6b35;
+            --primary-dark: #e55a2b;
+            --primary-light: #fff4f0;
+            --secondary-color: #ffffff;
+            --accent-orange: #ff8c42;
+            --accent-deep: #cc5429;
+            --border-color: #ffe4d6;
+            --text-color: #2d3748;
             --text-light: #718096;
-            --success-color: #38a169;
+            --success-color: #ff6b35;
             --danger-color: #e53e3e;
-            --warning-color: #d69e2e;
+            --warning-color: #ed8936;
             --chat-bg: #ffffff;
-            --shadow-light: 0 2px 12px rgba(0, 0, 0, 0.08);
-            --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.12);
-            --shadow-heavy: 0 8px 30px rgba(0, 0, 0, 0.16);
+            --shadow-light: 0 2px 12px rgba(255, 107, 53, 0.15);
+            --shadow-medium: 0 4px 20px rgba(255, 107, 53, 0.20);
+            --shadow-heavy: 0 8px 30px rgba(255, 107, 53, 0.25);
             --border-radius: 12px;
             --border-radius-small: 8px;
-            --gradient-primary: linear-gradient(135deg, #2c5f41 0%, #38a169 100%);
-            --gradient-gold: linear-gradient(135deg, #d4af37 0%, #f6e05e 100%);
+            --gradient-primary: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%);
+            --gradient-warm: linear-gradient(135deg, #ff8c42 0%, #ffb366 100%);
+            --gradient-bg: linear-gradient(135deg, #ff6b35 0%, #ff8c42 50%, #ffb366 100%);
         }
 
         * {
@@ -57,7 +60,7 @@
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--gradient-bg);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -73,7 +76,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.1"/><circle cx="20" cy="80" r="0.5" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.2"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.2"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.15"/><circle cx="20" cy="80" r="0.5" fill="white" opacity="0.15"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
             pointer-events: none;
         }
 
@@ -89,6 +92,7 @@
             overflow: hidden;
             position: relative;
             animation: slideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border: 1px solid rgba(255, 107, 53, 0.1);
         }
 
         @keyframes slideUp {
@@ -117,7 +121,7 @@
             right: -50%;
             width: 200%;
             height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
             animation: float 6s ease-in-out infinite;
         }
 
@@ -138,7 +142,7 @@
         .hotel-logo {
             width: 48px;
             height: 48px;
-            background: var(--gradient-gold);
+            background: var(--gradient-warm);
             border-radius: 12px;
             display: flex;
             align-items: center;
@@ -147,6 +151,7 @@
             font-weight: bold;
             color: white;
             text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            border: 2px solid rgba(255, 255, 255, 0.2);
         }
 
         .hotel-details h1 {
@@ -179,6 +184,7 @@
             background: #4ade80;
             border-radius: 50%;
             animation: pulse 2s infinite;
+            box-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
         }
 
         @keyframes pulse {
@@ -423,6 +429,14 @@
             background: #edf2f7;
         }
 
+        .auth-title {
+            font-weight: bold;
+        }
+
+        .auth-description {
+            padding: 1rem  1rem 1rem 0rem;
+        }
+
         /* Typing indicator */
         .typing-indicator {
             align-self: flex-start;
@@ -498,9 +512,13 @@
         }
 
         /* Responsive design */
-        @media (max-width: 480px) {
+        @media (max-width: 600px) {
             body {
-                padding: 10px;
+                padding: 0px;
+            }
+
+            .chat-container {
+                height: 90vh;
             }
             
             .chat-container {
