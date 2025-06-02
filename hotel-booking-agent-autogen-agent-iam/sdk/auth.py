@@ -351,7 +351,7 @@ class AuthManager:
                 AuthConfig(scopes=scopes, token_type=OAuthTokenType.OBO_TOKEN, resource=resource), code=code
             )
             future.set_result(token)
-            print("\n\n*****OBO Token Response*********:", token, "\n\n")
+            print("\n\nOBO Token Response:", token.access_token, "\n\n")
             return token
         except Exception as e:
             future.set_exception(e)
