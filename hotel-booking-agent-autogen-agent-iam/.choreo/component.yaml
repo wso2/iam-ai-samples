@@ -1,0 +1,13 @@
+schemaVersion: 1.1
+
+endpoints:
+
+  - name: hotel-agent
+    displayName: Hotel Agent REST Endpoint
+    service:
+      basePath: /
+      port: 8000
+    type: REST
+    networkVisibilities:
+      - Public
+    schemaFilePath: openapi.yaml
