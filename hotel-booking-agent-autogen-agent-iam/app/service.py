@@ -14,6 +14,9 @@ import logging
 import os
 from typing import Literal, Dict
 
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+
 from autogen_agentchat.agents import AssistantAgent
 from autogen_agentchat.messages import TextMessage
 from autogen_core import CancellationToken
@@ -35,6 +38,8 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
+
+templates = Jinja2Templates(directory="static")
 
 # Asgardeo related configurations
 client_id = os.environ.get('ASGARDEO_CLIENT_ID')
@@ -88,8 +93,12 @@ async def run_agent(assistant: AssistantAgent, websocket: WebSocket):
         await websocket.send_json(TextResponse(content=response.chat_message.content).model_dump())
 
 @app.get('/')
-async def index():
-    return FileResponse('static/index.html')
+async def index(request: Request):
+    WS_BASE_URL = os.getenv("WS_BASE_URL", "ws://localhost:8000")
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "ws_base_url": WS_BASE_URL
+    })
 
 @app.websocket("/chat")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
