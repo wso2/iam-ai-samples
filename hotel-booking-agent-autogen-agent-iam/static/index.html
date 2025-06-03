@@ -743,8 +743,10 @@
         }
     });
 
+    const websocketBaseUrl = "{{ ws_base_url }}";  // Injected from FastAPI
     // Connect to WebSocket with session ID as query parameter
-    let ws = new WebSocket(`ws://localhost:8000/chat?session_id=${sessionId}`);
+    let ws = new WebSocket(`${websocketBaseUrl}/chat?session_id=${sessionId}`);
+
     let lastConsentRequest = null;
 
     // Configuration
@@ -848,7 +850,7 @@
             setTimeout(function () {
                 log("Attempting to reconnect WebSocket");
                 // Create a new WebSocket connection with the same session ID
-                ws = new WebSocket(`ws://localhost:8000/chat?session_id=${sessionId}`);
+                ws = new WebSocket(`${websocketBaseUrl}/chat?session_id=${sessionId}`);
                 // Re-attach event handlers
                 ws.onopen = () => {
                     log("WebSocket reconnected", sessionId);
