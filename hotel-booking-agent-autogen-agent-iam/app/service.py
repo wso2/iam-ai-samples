@@ -99,9 +99,6 @@ async def index(request: Request):
         "request": request,
         "ws_base_url": WS_BASE_URL
     })
-    
-    
-    # return FileResponse('static/index.html')
 
 @app.websocket("/chat")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
