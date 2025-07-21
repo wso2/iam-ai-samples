@@ -490,7 +490,7 @@ class AuthManager:
         auth_config: Optional[AuthConfig] = None
     ):
         """
-        Perform the full OAuth2 authentication flow for an agent using username and password.
+        Perform the full OAuth2 authentication flow for an agent using its agent ID and agent secret.
 
         Args:
             base_url (str): The base URL of the identity server.
