@@ -130,7 +130,7 @@ class AuthManager:
         # Step 01
         self.agent_config = agent_config
         # Obtain the agent token when the auth manager is initialized
-        self.agent_token = self.authenticate_agent_with_username_and_password()
+        self.agent_token = self.authenticate_agent_with_agent_credentials()
 
         # Pending authorization requests
         self._pending_auths: Dict[str, Tuple[List[str], asyncio.Future]] = {}
@@ -230,7 +230,7 @@ class AuthManager:
             elif config.token_type == OAuthTokenType.CLIENT_TOKEN:  # Fetch Client token
                 token = await client.fetch_token(url=self.token_endpoint)
             elif config.token_type == OAuthTokenType.AGENT_TOKEN:
-                token = self.authenticate_agent_with_username_and_password(                    
+                token = self.authenticate_agent_with_agent_credentials(                    
                     config
                 )
             else:
@@ -485,7 +485,7 @@ class AuthManager:
 
         return resp_json
 
-    def authenticate_agent_with_username_and_password(
+    def authenticate_agent_with_agent_credentials(
         self,
         auth_config: Optional[AuthConfig] = None
     ):
