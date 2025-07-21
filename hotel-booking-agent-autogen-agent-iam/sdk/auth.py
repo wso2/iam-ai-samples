@@ -130,7 +130,7 @@ class AuthManager:
         # Step 01
         self.agent_config = agent_config
         # Obtain the agent token when the auth manager is initialized
-        self.agent_token = self.authenticate_agent_with_totp()
+        self.agent_token = self.authenticate_agent_with_username_and_password()
 
         # Pending authorization requests
         self._pending_auths: Dict[str, Tuple[List[str], asyncio.Future]] = {}
@@ -200,11 +200,12 @@ class AuthManager:
 
         return OAuthToken(**token)
 
-    async def _fetch_oauth_token(self, config: AuthConfig, code: Optional[str] = None) -> OAuthToken:
+    async def _fetch_oauth_token(self, config: AuthConfig, code: Optional[str] = None, code_verifier: Optional[str] = None) -> OAuthToken:
         """Fetch Oauth token based on the token type (Client or OBO)"""
+
         client = AsyncOAuth2Client(
             client_id=self.client_id,
-            client_secret=self.client_secret,
+            client_secret=self.client_secret if not code_verifier else None,
             redirect_uri=self.redirect_uri,  # Only applicable for OBO token, else should be None
             scope=config.scopes,
             verify=False,
@@ -222,13 +223,14 @@ class AuthManager:
                 token = await client.fetch_token(
                     url=self.token_endpoint,
                     code=code,
+                    code_verifier=code_verifier if code_verifier else None,
                     grant_type=OAuthTokenType.OBO_TOKEN,
                     actor_token=self.agent_token["access_token"] if self.agent_token else None,
                 )
             elif config.token_type == OAuthTokenType.CLIENT_TOKEN:  # Fetch Client token
                 token = await client.fetch_token(url=self.token_endpoint)
             elif config.token_type == OAuthTokenType.AGENT_TOKEN:
-                token = self.authenticate_agent_with_totp(                    
+                token = self.authenticate_agent_with_username_and_password(                    
                     config
                 )
             else:
@@ -255,10 +257,12 @@ class AuthManager:
             return None
 
         state = self._create_state()
+        code_verifier = self.generate_code_verifier()
+        code_challenge = self.generate_code_challenge(code_verifier)
 
         # Create a future to await authorization completion
         future = asyncio.Future()
-        self._pending_auths[state] = auth_config.scopes, auth_config.resource, future
+        self._pending_auths[state] = auth_config.scopes, auth_config.resource, future, code_verifier
 
         # TODO Support for PKCE
         # Construct authorization URL
@@ -269,7 +273,9 @@ class AuthManager:
             f"scope={scope}",
             f"redirect_uri={self.redirect_uri}",
             f"state={state}",
-            f"requested_actor={self.agent_config.agent_id}"
+            f"requested_actor={self.agent_config.agent_id}",
+            f"code_challenge={code_challenge}",
+            f"code_challenge_method=S256"
         ]
         if auth_config.resource:
             params.append(f"resource={auth_config.resource}")
@@ -340,7 +346,7 @@ class AuthManager:
 
     async def process_callback(self, state: str, code: str) -> OAuthToken:
 
-        scopes, resource, future = self._pending_auths.pop(state, None)
+        scopes, resource, future, code_verifier = self._pending_auths.pop(state, None)
 
         if not future and future.done():
             logger.error(f"No pending authorization for state: {state}")
@@ -348,7 +354,7 @@ class AuthManager:
 
         try:
             token = await self._fetch_oauth_token(
-                AuthConfig(scopes=scopes, token_type=OAuthTokenType.OBO_TOKEN, resource=resource), code=code
+                AuthConfig(scopes=scopes, token_type=OAuthTokenType.OBO_TOKEN, resource=resource), code=code, code_verifier=code_verifier
             )
             future.set_result(token)
             print("\n\nOBO Token Response:", token.access_token, "\n\n")
@@ -478,6 +484,106 @@ class AuthManager:
         #print("\n\n***********Agent Token***************:", resp_json.get("access_token"), "\n\n")
 
         return resp_json
+
+    def authenticate_agent_with_username_and_password(
+        self,
+        auth_config: Optional[AuthConfig] = None
+    ):
+        """
+        Perform the full OAuth2 authentication flow for an agent using username and password.
+
+        Args:
+            base_url (str): The base URL of the identity server.
+            client_id (str): The OAuth2 client ID.
+            redirect_uri (str): Redirect URI registered for the OAuth2 client.
+            agent_name (str): The agent identifier (username).
+
+        Returns:
+            Optional[str]: The access token if successful, otherwise None.
+        """
+        # print("\n\n***********Agent Authentication Started***************\n\n")
+        
+        # print("\n\nAgent Config:", self.agent_config, "\n\n")
+        # print("\n\nAuth Config:", auth_config, "\n\n")
+        
+        scopes = "openid"      
+        if auth_config is not None:
+             scopes = " ".join(auth_config.scopes)
+
+        code_verifier = self.generate_code_verifier()
+        code_challenge = self.generate_code_challenge(code_verifier)
+        
+        # TODO: Allow this to be overriden
+        AGENT_DEFAULT_APP_CLIENT_ID = "8hoplYXeSGaa89px6gpp5L2RnIga"
+
+        # Step 1: Init Authorize
+        authorize_data = {
+            "client_id": AGENT_DEFAULT_APP_CLIENT_ID,
+            "response_type": "code",
+            "redirect_uri": self.redirect_uri,
+            "state": "1234",
+            "scope": scopes,
+            "response_mode": "direct",
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
+            "resource": "booking_api"
+        }
+        
+        # print("\n\nAuthorize Data:", authorize_data, "\n\n")
+        resp = requests.post(self.authorize_endpoint, data=authorize_data, verify=False)
+        # resp.raise_for_status()
+        resp_json = resp.json()
+        # print("\n\nAuthorize Response:", resp_json, "\n\n")
+        
+        flow_id = resp_json.get("flowId")
+        idf_authenticator_id = resp_json.get("nextStep", {}).get("authenticators", [{}])[0].get("authenticatorId")
+
+        # Step 2: Authenticate with IDF
+        idf_body = {
+            "flowId": flow_id,
+            "selectedAuthenticator": {
+                "authenticatorId": idf_authenticator_id,
+                "params": {
+                    "username": self.agent_config.agent_id if self.agent_config else "",
+                    "password": self.agent_config.agent_secret if self.agent_config else ""
+                }
+            }
+        }
+        
+        resp = requests.post(self.authn_url, json=idf_body, verify=False)
+        resp.raise_for_status()
+        resp_json = resp.json()
+
+        code = resp_json.get("authData", {}).get("code")
+        if not code:
+            return None
+
+        # Step 4: Get token
+        token_data = {
+            "grant_type": "authorization_code",
+            "client_id": AGENT_DEFAULT_APP_CLIENT_ID,
+            "code": code,
+            "code_verifier": code_verifier,
+            "redirect_uri": self.redirect_uri,
+            "scope": scopes,
+            "resource": "booking_api"
+        }
+        
+        # print("\n\nToken Data:", token_data, "\n\n")
+        
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        resp = requests.post(self.token_endpoint, data=token_data, headers=headers, verify=False)
+    
+        resp.raise_for_status()
+        resp_json = resp.json()
+        
+        # print(resp_json)
+        
+        # print("\n\nToken Response:", resp_json, "\n\n")
+        #print("\n\n***********Agent Token***************:", resp_json.get("access_token"), "\n\n")
+
+        return resp_json
+
 
     def generate_code_verifier(self, length: int = 64) -> str:
         return secrets.token_urlsafe(length)[:length]
