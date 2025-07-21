@@ -501,10 +501,6 @@ class AuthManager:
         Returns:
             Optional[str]: The access token if successful, otherwise None.
         """
-        # print("\n\n***********Agent Authentication Started***************\n\n")
-        
-        # print("\n\nAgent Config:", self.agent_config, "\n\n")
-        # print("\n\nAuth Config:", auth_config, "\n\n")
         
         scopes = "openid"      
         if auth_config is not None:
@@ -529,11 +525,8 @@ class AuthManager:
             "resource": "booking_api"
         }
         
-        # print("\n\nAuthorize Data:", authorize_data, "\n\n")
         resp = requests.post(self.authorize_endpoint, data=authorize_data, verify=False)
-        # resp.raise_for_status()
         resp_json = resp.json()
-        # print("\n\nAuthorize Response:", resp_json, "\n\n")
         
         flow_id = resp_json.get("flowId")
         idf_authenticator_id = resp_json.get("nextStep", {}).get("authenticators", [{}])[0].get("authenticatorId")
@@ -569,7 +562,6 @@ class AuthManager:
             "resource": "booking_api"
         }
         
-        # print("\n\nToken Data:", token_data, "\n\n")
         
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         resp = requests.post(self.token_endpoint, data=token_data, headers=headers, verify=False)
@@ -577,10 +569,6 @@ class AuthManager:
         resp.raise_for_status()
         resp_json = resp.json()
         
-        # print(resp_json)
-        
-        # print("\n\nToken Response:", resp_json, "\n\n")
-        #print("\n\n***********Agent Token***************:", resp_json.get("access_token"), "\n\n")
 
         return resp_json
 
