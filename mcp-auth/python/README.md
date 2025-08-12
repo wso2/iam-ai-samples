@@ -45,7 +45,7 @@ This project demonstrates how to create an authenticated MCP (Model Context Prot
 ### 1. Create an Asgardeo Application
 
 1. Login to your Asgardeo account.
-2. Navigate to the Applications Tab and selct the **MCP Client Application** as shown in below image.
+2. Navigate to the Applications Tab and select the **MCP Client Application** as shown in below image.
 ![mcp-client-app-selection.png](resources/mcp-client-app-selection.png)
 
 3. Add your application name and callback URL
@@ -97,7 +97,7 @@ auth=AuthSettings(
 
 
 ## Test with MCP Inspector
-** Note **: Currently MCP Inspector doesn't support to get the authorization server information with `.well-known/openid-configuration`. Therefore we gonna use a customize inspector that is supported. Please get it from here: [MCP Inspector](https://github.com/shashimalcse/inspector/tree/fix-auth)
+** Note **: Currently MCP Inspector doesn't support getting the authorization server information with `.well-known/openid-configuration`. Therefore, we are going to use a customized inspector that is supported. Please get it from here: [MCP Inspector](https://github.com/shashimalcse/inspector/tree/fix-auth)
 
 ### Setup MCP Inspector
 1. Clone the MCP Inspector repository:
