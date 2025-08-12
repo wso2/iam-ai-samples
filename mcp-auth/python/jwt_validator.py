@@ -1,8 +1,28 @@
 """
+ Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
+
+  This software is the property of WSO2 LLC. and its suppliers, if any.
+  Dissemination of any information or reproduction of any material contained
+  herein is strictly forbidden, unless permitted by WSO2 in accordance with
+  the WSO2 Commercial License available at http://wso2.com/licenses.
+  For specific language governing the permissions and limitations under
+  this license, please see the license as well as any agreement you’ve
+  entered into with WSO2 governing the purchase of this software and any
+
+
 JWT Token Validation Module
 
 This module handles JWT token validation using JWKS (JSON Web Key Set).
 It provides a clean interface for validating JWT tokens with proper error handling.
+
+### JWT Validation Settings
+
+The JWTTokenVerifier supports the following features:
+- **Algorithm**: RS256 (configurable in JWTValidator)
+- **Expiration**: Verified automatically
+- **Audience**: Verified against CLIENT_ID
+- **Issuer**: Verified against AUTH_ISSUER
+- **Scopes**: Extracted and included in AccessToken
 """
 
 import jwt
@@ -19,7 +39,7 @@ class JWTValidator:
     A class to handle JWT token validation using JWKS.
     Fetches and caches JWKS keys for performance.
     """
-    
+
     def __init__(self, jwks_url: str, issuer: str, audience: str, ssl_verify: bool = True):
         """
         Initialize the JWT validator.
@@ -104,7 +124,7 @@ class JWTValidator:
                     "verify_aud": True
                 }
             )
-            
+
             # Add metadata to the payload
             payload['_validated_by'] = 'JWTValidator'
             payload['_issuer'] = self.issuer

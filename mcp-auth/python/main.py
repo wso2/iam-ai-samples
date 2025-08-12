@@ -1,4 +1,21 @@
+"""
+ Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
+
+  This software is the property of WSO2 LLC. and its suppliers, if any.
+  Dissemination of any information or reproduction of any material contained
+  herein is strictly forbidden, unless permitted by WSO2 in accordance with
+  the WSO2 Commercial License available at http://wso2.com/licenses.
+  For specific language governing the permissions and limitations under
+  this license, please see the license as well as any agreement you’ve
+  entered into with WSO2 governing the purchase of this software and any
+"""
+
+import os
+from dotenv import load_dotenv
 from pydantic import AnyHttpUrl
+
+# Load environment variables from .env file
+load_dotenv()
 
 from mcp.server.auth.provider import AccessToken, TokenVerifier
 from mcp.server.auth.settings import AuthSettings
@@ -48,11 +65,14 @@ class JWTTokenVerifier(TokenVerifier):
             logger.error(f"Unexpected error during token validation: {e}")
             return None
 
-AUTH_ISSUER = "https://api.asgardeo.io/t/<tenant>/oauth2/token"
-CLIENT_ID = "<CLIENT_ID>"  # Replace with your Asgardeo OAuth2 client ID
-JWKS_URL = "https://api.asgardeo.io/t/<tenant>/oauth2/jwks"
 
+AUTH_ISSUER = os.getenv("AUTH_ISSUER")
+CLIENT_ID = os.getenv("CLIENT_ID")
+JWKS_URL = os.getenv("JWKS_URL")
 
+# Validate that required environment variables are set
+if not all([AUTH_ISSUER, CLIENT_ID, JWKS_URL]):
+    raise ValueError("Missing required environment variables: AUTH_ISSUER, CLIENT_ID, or JWKS_URL")
 
 # Create FastMCP instance as a Resource Server
 mcp = FastMCP(
@@ -61,8 +81,8 @@ mcp = FastMCP(
     token_verifier=JWTTokenVerifier(JWKS_URL, AUTH_ISSUER, CLIENT_ID),
     # Auth settings for RFC 9728 Protected Resource Metadata
     auth=AuthSettings(
-        issuer_url=AnyHttpUrl("https://api.asgardeo.io/t/<tenant>/oauth2/token"),
-        resource_server_url=AnyHttpUrl("http://localhost:8000"),# Authorization Server URL # This server's URL
+        issuer_url=AnyHttpUrl(AUTH_ISSUER),
+        resource_server_url=AnyHttpUrl("http://localhost:8000"),  # Authorization Server URL # This server's URL
         # required_scopes=["user"]
     ),
 )
