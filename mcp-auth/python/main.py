@@ -62,7 +62,7 @@ mcp = FastMCP(
     # Auth settings for RFC 9728 Protected Resource Metadata
     auth=AuthSettings(
         issuer_url=AnyHttpUrl("https://api.asgardeo.io/t/<tenant>/oauth2/token"),
-        resource_server_url=AnyHttpUrl("http://localhost:8000"),# Authorization Server URL # This server's URL
+        resource_server_url=AnyHttpUrl("http://localhost:8000"),  # Resource Server URL (this server)
         # required_scopes=["user"]
     ),
 )
