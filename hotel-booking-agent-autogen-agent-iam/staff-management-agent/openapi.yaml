@@ -1,0 +1,174 @@
+openapi: 3.0.0
+info:
+  title: Staff Management Agent API
+  version: 1.0.0
+  description: API for staff management agent to handle contact person assignments based on booking events.
+
+servers:
+  - url: http://localhost:8002
+    description: Local development server
+
+paths:
+  /callback:
+    get:
+      summary: Authentication callback
+      description: Callback endpoint for authentication flow
+      parameters:
+        - in: query
+          name: code
+          schema:
+            type: string
+          required: true
+          description: Authentication code
+        - in: query
+          name: state
+          schema:
+            type: string
+          required: true
+          description: State parameter for verification
+      responses:
+        '200':
+          description: Successfully authenticated
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Invalid state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /health:
+    get:
+      summary: Health check
+      description: Check if the API service is running correctly
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+
+  /v1/invoke:
+    post:
+      summary: Invoke staff management agent for contact person assignment
+      operationId: invokeStaffManagementAgent
+      tags:
+        - Staff Management Agent
+      security:
+        - bearerAuth: [invoke]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignmentRequest'
+      responses:
+        '202':
+          description: Staff management agent task queued successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignmentResponse'
+        '400':
+          description: Invalid assignment request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Failed to spawn background agent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+
+    Error:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: Error message
+
+    AssignmentRequest:
+      type: object
+      required:
+        - event_type
+        - booking_id
+        - user_id
+        - hotel_id
+      properties:
+        event_type:
+          type: string
+          enum: [booking.auto_assign_requested]
+          description: Type of webhook event
+        booking_id:
+          type: integer
+          description: ID of the booking requiring contact person assignment
+        user_id:
+          type: string
+          format: uuid
+          description: User ID to analyze booking history
+        hotel_id:
+          type: integer
+          description: Hotel ID for staff availability check
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+          default: normal
+          description: Assignment priority level
+        timestamp:
+          type: string
+          format: date-time
+          description: When the event was triggered
+        source:
+          type: string
+          default: hotel_api
+          description: Source system that triggered the event
+
+    AssignmentResponse:
+      type: object
+      properties:
+        task_id:
+          type: string
+          format: uuid
+          description: Background task identifier
+        status:
+          type: string
+          enum: [queued, processing]
+          description: Current task status
+        message:
+          type: string
+          description: Response message
+        estimated_completion:
+          type: string
+          format: date-time
+          description: Estimated completion time
+      example:
+        task_id: "123e4567-e89b-12d3-a456-426614174000"
+        status: "queued"
+        message: "Background agent task queued for contact person assignment"
+        estimated_completion: "2025-01-25T10:35:00Z"
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication

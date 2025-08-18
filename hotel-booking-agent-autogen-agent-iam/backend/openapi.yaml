@@ -1,0 +1,1082 @@
+openapi: 3.0.3
+info:
+  title: Hotel API 
+  description: API for managing hotel bookings, reviews, and user interactions.
+  version: 2.1.0
+servers:
+  - url: http://localhost:8001
+    description: Local development server
+
+components:
+  schemas:
+    # === Core Entities ===
+    Hotel:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        brand:
+          type: string
+          enum: [luxury, premium, select, garden_inn, homewood]
+        description:
+          type: string
+        address:
+          type: object
+          properties:
+            street:
+              type: string
+            city:
+              type: string
+            state:
+              type: string
+            country:
+              type: string
+            postal_code:
+              type: string
+        rating:
+          type: number
+          format: float
+        amenities:
+          type: array
+          items:
+            type: string
+        images:
+          type: array
+          items:
+            type: string
+        price_range:
+          type: object
+          properties:
+            min:
+              type: number
+              format: float
+            max:
+              type: number
+              format: float
+
+    Room:
+      type: object
+      properties:
+        id:
+          type: integer
+        hotel_id:
+          type: integer
+        room_type:
+          type: string
+        bed_type:
+          type: string
+        max_occupancy:
+          type: integer
+        size_sqft:
+          type: integer
+        amenities:
+          type: array
+          items:
+            type: string
+        images:
+          type: array
+          items:
+            type: string
+        base_price:
+          type: number
+          format: float
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: integer
+        confirmation_number:
+          type: string
+        user_id:
+          type: string
+          format: uuid
+        hotel_id:
+          type: integer
+        hotel_name:
+          type: string
+        room_id:
+          type: integer
+        room_type:
+          type: string
+        check_in:
+          type: string
+          format: date
+        check_out:
+          type: string
+          format: date
+        guests:
+          type: integer
+        total_amount:
+          type: number
+          format: float
+        status:
+          type: string
+          enum: [confirmed, cancelled, completed]
+        special_requests:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          enum: [user, agent]
+        agent_id:
+          type: string
+          format: uuid
+        assigned_staff:
+          type: array
+          items:
+            $ref: '#/components/schemas/StaffAssignment'
+
+    Review:
+      type: object
+      properties:
+        id:
+          type: integer
+        booking_id:
+          type: integer
+        user_id:
+          type: string
+          format: uuid
+        hotel_id:
+          type: integer
+        staff_id:
+          type: integer
+        review_type:
+          type: string
+          enum: [hotel, staff]
+        rating:
+          type: number
+          format: float
+          minimum: 1
+          maximum: 5
+        title:
+          type: string
+        comment:
+          type: string
+        aspects:
+          type: object
+          properties:
+            cleanliness:
+              type: number
+              format: float
+            service:
+              type: number
+              format: float
+            location:
+              type: number
+              format: float
+            value:
+              type: number
+              format: float
+            professionalism:
+              type: number
+              format: float
+            responsiveness:
+              type: number
+              format: float
+        would_recommend:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        phone:
+          type: string
+        loyalty_tier:
+          type: string
+          enum: [member, silver, gold, diamond]
+        preferences:
+          type: object
+          properties:
+            room_type:
+              type: string
+            amenities:
+              type: array
+              items:
+                type: string
+            budget_range:
+              type: object
+              properties:
+                min:
+                  type: number
+                  format: float
+                max:
+                  type: number
+                  format: float
+
+    Staff:
+      type: object
+      properties:
+        id:
+          type: integer
+        first_name:
+          type: string
+        last_name:
+          type: string
+        role:
+          type: string
+          enum: [concierge, butler, front_desk, housekeeping]
+        hotel_id:
+          type: integer
+        specialties:
+          type: array
+          items:
+            type: string
+        languages:
+          type: array
+          items:
+            type: string
+        average_rating:
+          type: number
+          format: float
+        total_reviews:
+          type: integer
+        availability:
+          type: object
+          properties:
+            is_available:
+              type: boolean
+            current_assignments:
+              type: integer
+
+    StaffAssignment:
+      type: object
+      properties:
+        id:
+          type: integer
+        booking_id:
+          type: integer
+        staff_id:
+          type: integer
+        staff_name:
+          type: string
+        role:
+          type: string
+        assignment_type:
+          type: string
+          enum: [primary_contact, butler_service, concierge_service]
+        assigned_at:
+          type: string
+          format: date-time
+        assigned_by:
+          type: string
+          enum: [admin_agent, user_request, auto_assignment]
+        assignment_reason:
+          type: string
+
+    # === Privacy-Safe Review Schemas ===
+    PublicReview:
+      type: object
+      properties:
+        id:
+          type: integer
+        hotel_id:
+          type: integer
+        review_type:
+          type: string
+          enum: [hotel, staff]
+        rating:
+          type: number
+          format: float
+          minimum: 1
+          maximum: 5
+        title:
+          type: string
+        comment:
+          type: string
+        aspects:
+          type: object
+          properties:
+            cleanliness:
+              type: number
+              format: float
+            service:
+              type: number
+              format: float
+            location:
+              type: number
+              format: float
+            value:
+              type: number
+              format: float
+            professionalism:
+              type: number
+              format: float
+            responsiveness:
+              type: number
+              format: float
+        would_recommend:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        reviewer_name:
+          type: string
+          description: "Anonymized reviewer name (e.g., 'Guest123')"
+
+    # === Agent & Auth ===
+    AgentContext:
+      type: object
+      properties:
+        agent_id:
+          type: string
+          format: uuid
+        agent_type:
+          type: string
+          enum: [booking_agent, admin_agent]
+        user_id:
+          type: string
+          format: uuid
+        permissions:
+          type: array
+          items:
+            type: string
+        spending_limit:
+          type: number
+          format: float
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: integer
+
+    # === Admin Schemas ===
+    BookingUpdate:
+      type: object
+      properties:
+        contact_person_id:
+          type: integer
+          nullable: true
+          description: "Staff ID to assign as contact person, null to remove"
+        assignment_reason:
+          type: string
+          description: "Reason for assignment/removal"
+      additionalProperties: false
+
+    AvailableStaffResponse:
+      type: object
+      properties:
+        staff:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              first_name:
+                type: string
+              last_name:
+                type: string
+              role:
+                type: string
+                enum: [concierge, butler, front_desk, housekeeping]
+              hotel_id:
+                type: integer
+              current_assignments:
+                type: integer
+              is_available:
+                type: boolean
+        total:
+          type: integer
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+
+security:
+  - BearerAuth: []
+
+paths:
+  # === Hotels ===
+  /api/hotels:
+    get:
+      summary: Browse all hotels
+      operationId: getHotels
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: brand
+          in: query
+          schema:
+            type: string
+        - name: amenities
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of hotels
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hotels:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Hotel'
+                  total:
+                    type: integer
+
+  /api/hotels/search:
+    post:
+      summary: Search hotels with availability
+      operationId: searchHotels
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                location:
+                  type: string
+                check_in:
+                  type: string
+                  format: date
+                check_out:
+                  type: string
+                  format: date
+                guests:
+                  type: integer
+                  default: 1
+                rooms:
+                  type: integer
+                  default: 1
+                brand:
+                  type: string
+                amenities:
+                  type: array
+                  items:
+                    type: string
+                price_range:
+                  type: object
+                  properties:
+                    min:
+                      type: number
+                      format: float
+                    max:
+                      type: number
+                      format: float
+              required:
+                - location
+                - check_in
+                - check_out
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hotels:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Hotel'
+                        - type: object
+                          properties:
+                            available_rooms:
+                              type: array
+                              items:
+                                allOf:
+                                  - $ref: '#/components/schemas/Room'
+                                  - type: object
+                                    properties:
+                                      available:
+                                        type: boolean
+                                      price_per_night:
+                                        type: number
+                                        format: float
+                            lowest_rate:
+                              type: number
+                              format: float
+                  search_id:
+                    type: string
+
+  /api/hotels/{hotel_id}:
+    get:
+      summary: Get hotel details
+      operationId: getHotel
+      parameters:
+        - name: hotel_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Hotel details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Hotel'
+                  - type: object
+                    properties:
+                      rooms:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Room'
+        '404':
+          description: Hotel not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/hotels/{hotel_id}/reviews:
+    get:
+      summary: Get hotel reviews
+      operationId: getHotelReviews
+      parameters:
+        - name: hotel_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: rating
+          in: query
+          schema:
+            type: number
+            format: float
+      responses:
+        '200':
+          description: Hotel reviews
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reviews:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PublicReview'
+                  summary:
+                    type: object
+                    properties:
+                      average_rating:
+                        type: number
+                        format: float
+                      total_reviews:
+                        type: integer
+                  total:
+                    type: integer
+
+  # === Bookings ===
+  /api/bookings:
+    post:
+      summary: Create booking
+      operationId: createBooking
+      security:
+        - BearerAuth: [create_bookings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                  description: "Required when agent is booking for user"
+                hotel_id:
+                  type: integer
+                room_id:
+                  type: integer
+                check_in:
+                  type: string
+                  format: date
+                check_out:
+                  type: string
+                  format: date
+                guests:
+                  type: integer
+                special_requests:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - hotel_id
+                - room_id
+                - check_in
+                - check_out
+      responses:
+        '201':
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          description: Invalid booking data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/bookings/{booking_id}:
+    get:
+      summary: Get booking details
+      operationId: getBooking
+      security:
+        - BearerAuth: [read_bookings]
+      parameters:
+        - name: booking_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '404':
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/bookings/{booking_id}/cancel:
+    post:
+      summary: Cancel booking
+      operationId: cancelBooking
+      security:
+        - BearerAuth: [cancel_bookings]
+      parameters:
+        - name: booking_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Booking cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '404':
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Cannot cancel booking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # === Users ===
+  /api/users/{user_id}/bookings:
+    get:
+      summary: Get user's bookings
+      operationId: getUserBookings
+      security:
+        - BearerAuth: [read_bookings]
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [confirmed, cancelled, completed]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: User bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Booking'
+                  total:
+                    type: integer
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/users/{user_id}/bookings/{booking_id}:
+    get:
+      summary: Get specific user booking
+      operationId: getUserBooking
+      security:
+        - BearerAuth: [read_bookings]
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: booking_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User booking details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '404':
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # === Reviews ===
+  /api/reviews:
+    get:
+      summary: Get all reviews with privacy protection
+      operationId: getReviews
+      parameters:
+        - name: hotel_id
+          in: query
+          schema:
+            type: integer
+          description: "Filter reviews by hotel"
+        - name: rating
+          in: query
+          schema:
+            type: number
+            format: float
+            minimum: 1
+            maximum: 5
+          description: "Filter by minimum rating"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of reviews (privacy-safe)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reviews:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PublicReview'
+                  total:
+                    type: integer
+                  summary:
+                    type: object
+                    properties:
+                      average_rating:
+                        type: number
+                        format: float
+                      total_by_rating:
+                        type: object
+                        properties:
+                          "1":
+                            type: integer
+                          "2":
+                            type: integer
+                          "3":
+                            type: integer
+                          "4":
+                            type: integer
+                          "5":
+                            type: integer
+
+    post:
+      summary: Create a review
+      operationId: createReview
+      security:
+        - BearerAuth: [create_bookings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                booking_id:
+                  type: integer
+                hotel_id:
+                  type: integer
+                rating:
+                  type: number
+                  format: float
+                  minimum: 1
+                  maximum: 5
+                title:
+                  type: string
+                comment:
+                  type: string
+                aspects:
+                  type: object
+                would_recommend:
+                  type: boolean
+              required:
+                - booking_id
+                - review_type
+                - rating
+                - title
+                - comment
+      responses:
+        '201':
+          description: Review created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+
+  /api/reviews/{review_id}:
+    get:
+      summary: Get review details
+      operationId: getReview
+      parameters:
+        - name: review_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Review details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicReview'
+        '404':
+          description: Review not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # === Admin APIs ===
+
+  /api/admin/bookings/{booking_id}:
+    get:
+      summary: Get booking details
+      operationId: getBookingAdmin
+      security:
+        - BearerAuth: [admin_read_bookings]
+      parameters:
+        - name: booking_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '404':
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      summary: Update booking (assign/remove contact person)
+      operationId: updateBookingAdmin
+      tags:
+        - Admin - Bookings
+      security:
+        - BearerAuth: [admin_update_bookings]
+      parameters:
+        - name: booking_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingUpdate'
+            examples:
+              assign_contact:
+                summary: "Assign Contact Person"
+                value:
+                  contact_person_id: 1
+                  assignment_reason: "VIP guest service"
+              remove_contact:
+                summary: "Remove Contact Person"
+                value:
+                  contact_person_id: null
+      responses:
+        '200':
+          description: Booking updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/admin/staff/available:
+    get:
+      summary: Get available contact persons
+      operationId: getAvailableContactPersons
+      tags:
+        - Admin - Staff
+      security:
+        - BearerAuth: [admin_read_staff]
+      parameters:
+        - name: hotel_id
+          in: query
+          schema:
+            type: integer
+          description: "Filter by hotel ID"
+      responses:
+        '200':
+          description: List of available contact persons
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailableStaffResponse'
+              example:
+                staff:
+                  - id: 1
+                    first_name: "James"
+                    last_name: "Wilson"
+                    role: "concierge"
+                    hotel_id: 1
+                    current_assignments: 2
+                    is_available: true
+                  - id: 2
+                    first_name: "Sarah"
+                    last_name: "Johnson"
+                    role: "butler"
+                    hotel_id: 1
+                    current_assignments: 1
+                    is_available: true
+                total: 2
+        '403':
+          description: Insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
