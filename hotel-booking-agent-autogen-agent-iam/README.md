@@ -161,8 +161,8 @@ https://api.asgardeo.io/t/{ORG_NAME}
 ```
 
 #### 2. Create Agents
-1. Navigate to the "Agents" section in Asgardeo.
-2. Create a new agent "Gardeo Guest Assistant Agent" (Keep the agent confidential).
+1. Navigate to the "Agents" section in Asgardeo console.
+2. Create a new agent "Gardeo Guest Assistant Agent" (Keep the agent secret confidential).
 3. Create a new agent "Gardeo Staff Management Agent" (Keep the agent confidential).
 
 #### 3. Create Users
