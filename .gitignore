@@ -23,4 +23,20 @@
 hs_err_pid*
 replay_pid*
 
-.env
+# Python virtual environments
+venv/
+.venv/
+*/venv/
+*/.venv/
+
+*# Python cache files
+__pycache__/
+*.py[cod]
+
+*/node_modules/
+
+
+# environment file
+**/.env
+
+.DS_Store

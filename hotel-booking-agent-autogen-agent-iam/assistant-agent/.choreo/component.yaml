@@ -1,0 +1,11 @@
+schemaVersion: "1.2"
+endpoints:
+    - name: ai-agents
+      displayName: AI Agents Endpoint
+      service:
+        basePath: /
+        port: 8000
+      type: REST
+      networkVisibilities:
+        - Public
+      schemaFilePath: openapi.yaml
