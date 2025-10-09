@@ -145,7 +145,7 @@ You can use either Docker or a native setup. For detailed instructions, see [SET
 ### Quick Start
 1. Clone the repository:
    ```bash
-   git clone https://github.com/shashimalcse/iam-ai-samples.git
+   git clone https://github.com/wso2/iam-ai-samples.git
    cd iam-ai-samples/hotel-booking-agent-autogen-agent-iam
    ```
 
