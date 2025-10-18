@@ -47,7 +47,7 @@ class AutogenAuthManager:
         """Initialize the authentication manager.
         
         Args:
-            server_config: OAuth client configuration
+            server_config: OAuth server configuration
             client_config: OAuth client configuration
             agent_config: Agent-specific configuration
             message_handler: Optional handler for authorization request messages

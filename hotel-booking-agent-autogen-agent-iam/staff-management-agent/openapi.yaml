@@ -6,7 +6,7 @@ info:
 
 servers:
   - url: http://localhost:8002
-    description: Local development client
+    description: Local development server
 
 paths:
   /callback:
