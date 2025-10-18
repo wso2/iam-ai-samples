@@ -40,3 +40,6 @@ __pycache__/
 **/.env
 
 .DS_Store
+
+/mcp-auth/client/node_modules
+*.idea/

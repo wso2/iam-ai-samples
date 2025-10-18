@@ -40,11 +40,11 @@ export function WSO2Footer() {
             rel="noopener noreferrer"
             className="hover:text-wso2-primary-500 transition-colors"
           >
-            WSO2.com
+            wso2.com
           </a>
           <span>•</span>
           <a
-            href="https://github.com/wso2"
+            href="https://github.com/wso2/iam-ai-samples"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:text-wso2-primary-500 transition-colors"
