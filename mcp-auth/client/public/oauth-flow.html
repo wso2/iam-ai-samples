@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP OAuth Flow Visualizer</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .flow-diagram {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .step {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            border-radius: 4px;
+        }
+        .step-number {
+            width: 40px;
+            height: 40px;
+            background: #007bff;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 20px;
+            flex-shrink: 0;
+        }
+        .step-content {
+            flex: 1;
+        }
+        .step-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .step-description {
+            color: #666;
+            font-size: 14px;
+        }
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        .endpoint {
+            color: #66d9ef;
+        }
+        .method {
+            color: #a6e22e;
+        }
+        .status {
+            color: #f92672;
+        }
+        .arrow {
+            text-align: center;
+            color: #007bff;
+            font-size: 24px;
+            margin: 10px 0;
+        }
+        .info-box {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .warning-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .success-box {
+            background: #d4edda;
+            border: 1px solid #28a745;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔐 MCP OAuth Authentication Flow</h1>
+    
+    <div class="info-box">
+        <strong>📘 Overview:</strong> This document visualizes how the MCP OAuth client discovers and authenticates with OAuth-protected MCP servers, following the MCP OAuth specification similar to MCP Inspector.
+    </div>
+
+    <div class="flow-diagram">
+        <h2>Discovery Phase</h2>
+        
+        <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+                <div class="step-title">Try Protected Resource</div>
+                <div class="step-description">Attempt to access MCP endpoint without authentication</div>
+                <div class="code-block">
+<span class="method">POST</span> <span class="endpoint">http://localhost:8000/mcp</span>
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 0,
+  "method": "initialize",
+  "params": {...}
+}
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">⬇️</div>
+
+        <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+                <div class="step-title">Server Returns 401 Unauthorized</div>
+                <div class="step-description">Server indicates authentication is required via WWW-Authenticate header</div>
+                <div class="code-block">
+<span class="status">HTTP/1.1 401 Unauthorized</span>
+WWW-Authenticate: Bearer realm="https://auth.example.com"
+Content-Type: application/json
+
+{
+  "error": "unauthorized",
+  "error_description": "OAuth authentication required"
+}
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">⬇️</div>
+
+        <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+                <div class="step-title">Try OAuth Protected Resource Metadata (RFC 8707)</div>
+                <div class="step-description">Check for resource server metadata that points to authorization servers</div>
+                <div class="code-block">
+<span class="method">GET</span> <span class="endpoint">http://localhost:8000/.well-known/oauth-protected-resource</span>
+
+<span class="status">HTTP/1.1 200 OK</span>
+Content-Type: application/json
+
+{
+  "resource": "http://localhost:8000/mcp",
+  "authorization_servers": ["https://auth.example.com"]
+}
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">⬇️</div>
+
+        <div class="step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+                <div class="step-title">Try OAuth Well-Known Endpoints</div>
+                <div class="step-description">Check for OAuth authorization server metadata</div>
+                <div class="code-block">
+<span class="method">GET</span> <span class="endpoint">http://localhost:8000/.well-known/oauth-authorization-server</span>
+<span class="method">GET</span> <span class="endpoint">http://localhost:8000/.well-known/openid-configuration</span>
+
+<span class="comment">// Also tries with resource path:</span>
+<span class="method">GET</span> <span class="endpoint">http://localhost:8000/mcp/.well-known/oauth-authorization-server</span>
+<span class="method">GET</span> <span class="endpoint">http://localhost:8000/mcp/.well-known/openid-configuration</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">⬇️</div>
+
+        <div class="step">
+            <div class="step-number">5</div>
+            <div class="step-content">
+                <div class="step-title">Receive Authorization Server Metadata</div>
+                <div class="step-description">Server returns OAuth endpoints and capabilities</div>
+                <div class="code-block">
+<span class="status">HTTP/1.1 200 OK</span>
+Content-Type: application/json
+
+{
+  "issuer": "https://auth.example.com",
+  "authorization_endpoint": "https://auth.example.com/oauth/authorize",
+  "token_endpoint": "https://auth.example.com/oauth/token",
+  "response_types_supported": ["code"],
+  "grant_types_supported": ["authorization_code", "refresh_token"],
+  "code_challenge_methods_supported": ["S256"]
+}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="success-box">
+        <strong>✅ Discovery Complete!</strong> The client now knows where to send the user for authentication.
+    </div>
+
+    <div class="flow-diagram">
+        <h2>Authorization Phase (PKCE Flow)</h2>
+
+        <div class="step">
+            <div class="step-number">6</div>
+            <div class="step-content">
+                <div class="step-title">Generate PKCE Values</div>
+                <div class="step-description">Create code verifier and challenge for enhanced security</div>
+                <div class="code-block">
+code_verifier = random_string(43)  // <span class="comment">Base64URL encoded random string</span>
+code_challenge = SHA256(code_verifier)  // <span class="comment">Base64URL encoded hash</span>
+state = random_string(32)  // <span class="comment">CSRF protection</span>
+
+<span class="comment">// Example values:</span>
+code_verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+state: "xyzABC123"
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">⬇️</div>
+
+        <div class="step">
+            <div class="step-number">7</div>
+            <div class="step-content">
+                <div class="step-title">Build Authorization URL</div>
+                <div class="step-description">Construct URL to redirect user to authorization server</div>
+                <div class="code-block">
+<span class="endpoint">https://auth.example.com/oauth/authorize</span>?
+  response_type=code&
+  client_id=mcp-client&
+  redirect_uri=http://localhost:3000/api/oauth/callback&
+  state=xyzABC123&
+  code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&
+  code_challenge_method=S256
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">⬇️</div>
+
+        <div class="step">
+            <div class="step-number">8</div>
+            <div class="step-content">
+                <div class="step-title">User Authenticates</div>
+                <div class="step-description">User logs in and grants permissions in popup window</div>
+                <div class="info-box">
+                    User sees the authorization server's login page and approves the application's access request.
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">⬇️</div>
+
+        <div class="step">
+            <div class="step-number">9</div>
+            <div class="step-content">
+                <div class="step-title">Authorization Code Callback</div>
+                <div class="step-description">Authorization server redirects back with authorization code</div>
+                <div class="code-block">
+<span class="method">GET</span> <span class="endpoint">http://localhost:3000/api/oauth/callback</span>?
+  code=AUTH_CODE_HERE&
+  state=xyzABC123
+
+<span class="comment">// Callback page sends message to parent window:</span>
+window.opener.postMessage({
+  type: 'oauth_success',
+  code: 'AUTH_CODE_HERE',
+  state: 'xyzABC123'
+}, window.location.origin);
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">⬇️</div>
+
+        <div class="step">
+            <div class="step-number">10</div>
+            <div class="step-content">
+                <div class="step-title">Exchange Code for Token</div>
+                <div class="step-description">Client exchanges authorization code for access token using PKCE verifier</div>
+                <div class="code-block">
+<span class="method">POST</span> <span class="endpoint">https://auth.example.com/oauth/token</span>
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code&
+code=AUTH_CODE_HERE&
+redirect_uri=http://localhost:3000/api/oauth/callback&
+code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk&
+client_id=mcp-client
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">⬇️</div>
+
+        <div class="step">
+            <div class="step-number">11</div>
+            <div class="step-content">
+                <div class="step-title">Receive Access Token</div>
+                <div class="step-description">Authorization server returns access token and optional refresh token</div>
+                <div class="code-block">
+<span class="status">HTTP/1.1 200 OK</span>
+Content-Type: application/json
+
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIs...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "eyJhbGciOiJSUzI1NiIs...",
+  "scope": "mcp:read mcp:write"
+}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="success-box">
+        <strong>✅ Authentication Complete!</strong> The client now has an access token to use with the MCP server.
+    </div>
+
+    <div class="flow-diagram">
+        <h2>MCP Connection Phase</h2>
+
+        <div class="step">
+            <div class="step-number">12</div>
+            <div class="step-content">
+                <div class="step-title">Connect to MCP Server with Token</div>
+                <div class="step-description">Use the access token to authenticate MCP requests</div>
+                <div class="code-block">
+<span class="method">POST</span> <span class="endpoint">http://localhost:8000/mcp</span>
+Authorization: Bearer eyJhbGciOiJSUzI1NiIs...
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 0,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {"tools": {}},
+    "clientInfo": {"name": "mcp-ai-agent", "version": "1.0.0"}
+  }
+}
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">⬇️</div>
+
+        <div class="step">
+            <div class="step-number">13</div>
+            <div class="step-content">
+                <div class="step-title">Server Accepts Connection</div>
+                <div class="step-description">MCP server validates token and returns initialization response</div>
+                <div class="code-block">
+<span class="status">HTTP/1.1 200 OK</span>
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 0,
+  "result": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {"tools": {}},
+    "serverInfo": {"name": "example-server", "version": "1.0.0"}
+  }
+}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="success-box">
+        <strong>🎉 Success!</strong> The client is now connected to the OAuth-protected MCP server and can call tools.
+    </div>
+
+    <div class="flow-diagram">
+        <h2>Token Management</h2>
+
+        <div class="step">
+            <div class="step-content">
+                <div class="step-title">Token Storage</div>
+                <div class="step-description">Tokens are stored in localStorage with metadata</div>
+                <div class="code-block">
+localStorage.setItem('oauth_tokens_&lt;base64_mcp_url&gt;', JSON.stringify({
+  access_token: "eyJhbGciOiJSUzI1NiIs...",
+  token_type: "Bearer",
+  expires_in: 3600,
+  refresh_token: "eyJhbGciOiJSUzI1NiIs...",
+  timestamp: 1699876543210
+}));
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">⬇️</div>
+
+        <div class="step">
+            <div class="step-content">
+                <div class="step-title">Token Expiration Check</div>
+                <div class="step-description">Automatically checks if token is expired when retrieved</div>
+                <div class="code-block">
+const tokenData = JSON.parse(localStorage.getItem(key));
+const expiresAt = tokenData.timestamp + (tokenData.expires_in * 1000);
+
+if (Date.now() >= expiresAt) {
+  // Token expired, need to refresh or re-authenticate
+  return null;
+}
+                </div>
+            </div>
+        </div>
+
+        <div class="arrow">⬇️</div>
+
+        <div class="step">
+            <div class="step-content">
+                <div class="step-title">Token Refresh (Optional)</div>
+                <div class="step-description">Use refresh token to get new access token without user interaction</div>
+                <div class="code-block">
+<span class="method">POST</span> <span class="endpoint">https://auth.example.com/oauth/token</span>
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=refresh_token&
+refresh_token=eyJhbGciOiJSUzI1NiIs...&
+client_id=mcp-client
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="warning-box">
+        <strong>⚠️ Security Notes:</strong>
+        <ul>
+            <li><strong>PKCE</strong> protects against authorization code interception attacks</li>
+            <li><strong>State parameter</strong> prevents CSRF attacks</li>
+            <li><strong>Tokens in localStorage</strong> - Consider using HttpOnly cookies for production</li>
+            <li><strong>Token expiration</strong> is checked automatically before use</li>
+            <li><strong>HTTPS required</strong> for production OAuth flows</li>
+        </ul>
+    </div>
+
+    <div class="info-box">
+        <strong>🔗 References:</strong>
+        <ul>
+            <li><a href="https://spec.modelcontextprotocol.io/specification/authentication/">MCP OAuth Specification</a></li>
+            <li><a href="https://datatracker.ietf.org/doc/html/rfc6749">OAuth 2.0 (RFC 6749)</a></li>
+            <li><a href="https://datatracker.ietf.org/doc/html/rfc7636">PKCE (RFC 7636)</a></li>
+            <li><a href="https://datatracker.ietf.org/doc/html/rfc8414">OAuth Server Metadata (RFC 8414)</a></li>
+        </ul>
+    </div>
+</body>
+</html>

@@ -57,7 +57,7 @@ class JWTValidator:
         self._jwks_cache: Optional[Dict[str, Any]] = None
 
     async def _fetch_jwks(self) -> Dict[str, Any]:
-        """Fetch JWKS from the authorization server."""
+        """Fetch JWKS from the authorization client."""
         try:
             async with httpx.AsyncClient(verify=self.ssl_verify) as client:
                 response = await client.get(self.jwks_url)

@@ -1,0 +1,55 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Next.js
+.next
+out
+build
+dist
+
+# Environment files
+.env
+.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Testing
+coverage
+.nyc_output
+*.lcov
+
+# IDEs and editors
+.idea
+.vscode
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Misc
+.git
+.gitignore
+README.md
+DEPLOY.md
+CHOREO_DEPLOYMENT.md
+ERROR_FIX_SUMMARY.md
+CORS_FIX_SUMMARY.md
+CLEAR_CACHE_INSTRUCTIONS.md
+REVERT_SUMMARY.md
+
+# Logs
+logs
+*.log
+
+# Temporary files
+.tmp
+temp
+*.tmp

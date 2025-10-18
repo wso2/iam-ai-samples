@@ -82,7 +82,7 @@ mcp = FastMCP(
     # Auth settings for RFC 9728 Protected Resource Metadata
     auth=AuthSettings(
         issuer_url=AnyHttpUrl(AUTH_ISSUER),
-        resource_server_url=AnyHttpUrl("http://localhost:8000"),  # Authorization Server URL # This server's URL
+        resource_server_url=AnyHttpUrl("http://localhost:8000"),  # Authorization Server URL # This client's URL
         # required_scopes=["user"]
     ),
 )
