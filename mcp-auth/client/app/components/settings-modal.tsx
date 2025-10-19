@@ -879,19 +879,30 @@ export default function SettingsModal({
                 </div>
               ))}
 
-              <div className="relative">
+              {localMCPServers.length === 0 ? (
+                // Show enabled button if no servers exist
                 <button
-                  disabled
-                  className="w-full bg-gray-400 dark:bg-gray-700 text-white py-2 px-4 rounded-lg cursor-not-allowed opacity-60 flex items-center justify-center space-x-2"
-                  title="Multiple MCP servers support coming soon"
+                  onClick={addServer}
+                  className="w-full bg-gray-500 dark:bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-600 dark:hover:bg-gray-700 transition-colors"
                 >
-                  <span>+ Add Server</span>
-                  <span className="text-xs bg-wso2-primary-500 px-2 py-0.5 rounded-full">Coming Soon</span>
+                  + Add Server
                 </button>
-                <div className="mt-1 text-xs text-center text-wso2-gray-500 dark:text-wso2-gray-400">
-                  Multiple MCP server support is under development
+              ) : (
+                // Show disabled button with "Coming Soon" if server already exists
+                <div className="relative">
+                  <button
+                    disabled
+                    className="w-full bg-gray-400 dark:bg-gray-700 text-white py-2 px-4 rounded-lg cursor-not-allowed opacity-60 flex items-center justify-center space-x-2"
+                    title="Multiple MCP servers support coming soon"
+                  >
+                    <span>+ Add Another Server</span>
+                    <span className="text-xs bg-wso2-primary-500 px-2 py-0.5 rounded-full">Coming Soon</span>
+                  </button>
+                  <div className="mt-1 text-xs text-center text-wso2-gray-500 dark:text-wso2-gray-400">
+                    Multiple MCP server support is under development
+                  </div>
                 </div>
-              </div>
+              )}
 
               <button
                 onClick={handleSaveMCP}
