@@ -29,6 +29,7 @@ import {
   storeTokens,
   type AuthorizationServerMetadata,
 } from '../lib/oauth-utils';
+import { isLocalUrl } from '../lib/mcp-connection';
 
 export interface MCPServerConfig {
   id: string;
@@ -329,6 +330,14 @@ export default function SettingsModal({
     setDiscoveryInProgress(serverId);
     console.log('🔍 Comprehensive OAuth Discovery');
     console.log('🔍 MCP:', server.url);
+
+    // Check if this is a local URL
+    const isLocal = isLocalUrl(server.url);
+    if (isLocal) {
+      console.log('🔗 Detected local server - using direct browser connection');
+    } else {
+      console.log('🔀 Detected remote server - using proxy');
+    }
     console.log('📡 Trying ALL methods...');
     console.log('');
 
@@ -337,16 +346,20 @@ export default function SettingsModal({
       const baseUrl = `${url.protocol}//${url.host}`;
       const discoveredAuthServers: string[] = [];
       const allResults: Array<{step: string; url: string; status: 'success' | 'failed'; data?: any}> = [];
-      
+
       const tryFetch = async (fetchUrl: string, label: string, method: 'GET' | 'POST' = 'GET', body?: any) => {
         try {
           console.log(`   ${method} ${fetchUrl}`);
+
+          // For local URLs, fetch directly; for remote, use proxy (if needed)
+          // For now, we'll fetch directly for both since OAuth discovery endpoints
+          // are typically public and don't require proxying
           const res = await fetch(fetchUrl, {
             method,
             headers: method === 'POST' ? { 'Content-Type': 'application/json', 'Accept': 'application/json' } : { 'Accept': 'application/json' },
             body: body ? JSON.stringify(body) : undefined,
           });
-          
+
           if (res.ok && method === 'GET') {
             const data = await res.json();
             console.log(`   ✅ ${res.status}`);
@@ -495,27 +508,38 @@ export default function SettingsModal({
       const popup = window.open(authUrl, 'oauth-popup', 'width=600,height=700');
       if (!popup) throw new Error('Popup blocked');
 
+      // Track cleanup state
+      let isCleanedUp = false;
+
+      const cleanup = () => {
+        if (isCleanedUp) return;
+        isCleanedUp = true;
+        window.removeEventListener('message', handleMessage);
+        if (popupCheckInterval) clearInterval(popupCheckInterval);
+        if (timeoutId) clearTimeout(timeoutId);
+      };
+
       const handleMessage = async (event: MessageEvent) => {
         if (event.origin !== window.location.origin) return;
-        
+
         // Handle OAuth error
         if (event.data.type === 'oauth-error') {
-          window.removeEventListener('message', handleMessage);
+          cleanup();
           setOauthInProgress(null);
           const errorMsg = event.data.error_description || event.data.error;
           console.error('   ❌ OAuth error:', errorMsg);
           alert(`OAuth authorization failed: ${errorMsg}`);
           return;
         }
-        
+
         // Handle OAuth success
         if (event.data.type !== 'oauth-callback') return;
-        window.removeEventListener('message', handleMessage);
+        cleanup();
 
         const { code, state: returnedState } = event.data;
         console.log('   ← Received authorization code');
         console.log('   → Exchanging code for token...');
-        
+
         const storedState = retrieveOAuthState();
         if (!storedState || storedState.state !== returnedState) {
           setOauthInProgress(null);
@@ -524,7 +548,7 @@ export default function SettingsModal({
 
         // Exchange code for token - direct call to token endpoint
         console.log('   → POST', server.oauthMetadata!.token_endpoint);
-        
+
         const tokenParams = new URLSearchParams({
           grant_type: 'authorization_code',
           code: code,
@@ -553,13 +577,13 @@ export default function SettingsModal({
         const tokens = await tokenRes.json();
         console.log('   ✅ Tokens received!');
         console.log('   📋 Access token:', tokens.access_token?.substring(0, 20) + '...');
-        
+
         if (tokens.access_token) {
           storeTokens(server.url, tokens);
           // Update server with token AND enable it
-          updateServer(serverId, { 
+          updateServer(serverId, {
             token: tokens.access_token,
-            enabled: true 
+            enabled: true
           });
           clearOAuthState();
           setOauthInProgress(null);
@@ -571,9 +595,21 @@ export default function SettingsModal({
       };
 
       window.addEventListener('message', handleMessage);
-      setTimeout(() => {
-        window.removeEventListener('message', handleMessage);
+
+      // Check if popup is closed every 500ms
+      const popupCheckInterval = setInterval(() => {
+        if (popup.closed) {
+          cleanup();
+          setOauthInProgress(null);
+          console.log('   ❌ OAuth cancelled: Popup window was closed');
+        }
+      }, 500);
+
+      // Fallback timeout after 5 minutes
+      const timeoutId = setTimeout(() => {
+        cleanup();
         setOauthInProgress(null);
+        console.log('   ❌ OAuth timeout: No response received within 5 minutes');
       }, 300000);
     } catch (error) {
       console.error('❌ OAuth flow failed:', error);

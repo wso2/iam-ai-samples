@@ -27,6 +27,7 @@ import SettingsModal, {
   type MCPServerConfig,
   type AIProviderConfig,
 } from './components/settings-modal';
+import { makeMcpRequest } from './lib/mcp-connection';
 
 // Types
 interface Message {
@@ -140,45 +141,38 @@ export default function MCPAgent() {
 
     try {
       // Initialize MCP session - NO session ID on first request
-      const initResponse = await fetch('/api/mcp', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-mcp-url': server.url,
-          // Don't send session ID for initialize - server creates it
-          ...(server.token && { 'x-mcp-token': server.token }),
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'initialize',
-          params: {
-            protocolVersion: '2024-11-05',
-            capabilities: {
-              sampling: {},
-              tools: {},
-            },
-            clientInfo: {
-              name: 'mcp-agent',
-              version: '1.0.0',
-            },
+      const initRequestBody = {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2024-11-05',
+          capabilities: {
+            sampling: {},
+            tools: {},
           },
-        }),
-      });
+          clientInfo: {
+            name: 'mcp-agent',
+            version: '1.0.0',
+          },
+        },
+      };
 
-      if (!initResponse.ok) {
-        throw new Error(`HTTP error! status: ${initResponse.status}`);
-      }
+      const initResponse = await makeMcpRequest(
+        server.url,
+        initRequestBody,
+        undefined, // No session ID for initialize
+        server.token
+      );
 
-      const initResult = await initResponse.json();
+      const initResult = initResponse.data;
       console.log('MCP Initialize result:', initResult);
 
-      // Get session ID from response header
-      const serverSessionId = initResponse.headers.get('x-session-id');
-      const actualSessionId = serverSessionId || newSessionId;
-      
+      // Get session ID from response
+      const actualSessionId = initResponse.sessionId || newSessionId;
+
       console.log('Client session ID:', newSessionId);
-      console.log('Server session ID:', serverSessionId);
+      console.log('Server session ID:', initResponse.sessionId);
       console.log('Using session ID:', actualSessionId);
 
       // Update session with actual session ID
@@ -192,58 +186,45 @@ export default function MCPAgent() {
 
       // Send notifications/initialized to complete the handshake
       console.log('📤 Sending notifications/initialized...');
-      const initializedResponse = await fetch('/api/mcp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-mcp-url': server.url,
-          'x-session-id': actualSessionId,
-          ...(server.token && { 'x-mcp-token': server.token }),
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'notifications/initialized',
-        }),
-      });
+      const initializedRequestBody = {
+        jsonrpc: '2.0',
+        method: 'notifications/initialized',
+      };
 
-      if (!initializedResponse.ok) {
-        console.warn('Failed to send notifications/initialized:', initializedResponse.status);
-      } else {
+      try {
+        await makeMcpRequest(
+          server.url,
+          initializedRequestBody,
+          actualSessionId,
+          server.token
+        );
         console.log('✅ Initialization handshake complete');
+      } catch (error) {
+        console.warn('Failed to send notifications/initialized:', error);
       }
 
       // Get available tools
       console.log('🔧 Requesting tools list...');
       console.log('   Session ID:', actualSessionId);
-      
+
       // MCP protocol requires params field even if empty
-      let toolsRequestBody = {
+      const toolsRequestBody = {
         jsonrpc: '2.0',
         id: 2,
         method: 'tools/list',
         params: {},
       };
-      
-      const toolsResponse = await fetch('/api/mcp', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-mcp-url': server.url,
-          'x-session-id': actualSessionId,
-          ...(server.token && { 'x-mcp-token': server.token }),
-        },
-        body: JSON.stringify(toolsRequestBody),
-      });
 
-      if (!toolsResponse.ok) {
-        const errorText = await toolsResponse.text();
-        console.error('❌ Tools list HTTP error:', toolsResponse.status, errorText);
-        throw new Error(`HTTP error! status: ${toolsResponse.status}`);
-      }
+      const toolsResponse = await makeMcpRequest(
+        server.url,
+        toolsRequestBody,
+        actualSessionId,
+        server.token
+      );
 
-      const toolsResult = await toolsResponse.json();
+      const toolsResult = toolsResponse.data;
       console.log('🔧 Tools list response:', toolsResult);
-      
+
       if (toolsResult.error) {
         console.error('❌ Tools list error:', toolsResult.error);
         throw new Error(`MCP error: ${toolsResult.error.message}`);
@@ -280,31 +261,24 @@ export default function MCPAgent() {
     try {
       const server = mcpServers.find(s => s.url === session.mcpUrl);
 
-      const response = await fetch('/api/mcp', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-mcp-url': session.mcpUrl,
-          'x-session-id': session.sessionId,
-          ...(server?.token && { 'x-mcp-token': server.token }),
+      const requestBody = {
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method: 'tools/call',
+        params: {
+          name: toolName,
+          arguments: toolInput,
         },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: Date.now(),
-          method: 'tools/call',
-          params: {
-            name: toolName,
-            arguments: toolInput,
-          },
-        }),
-      });
+      };
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      const response = await makeMcpRequest(
+        session.mcpUrl,
+        requestBody,
+        session.sessionId,
+        server?.token
+      );
 
-      const result = await response.json();
-      return result.result;
+      return response.data.result;
     } catch (error) {
       console.error('Error calling MCP tool:', error);
       throw error;

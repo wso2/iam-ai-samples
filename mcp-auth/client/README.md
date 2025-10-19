@@ -20,6 +20,18 @@
 
 A Next.js web client for connecting to MCP (Model Context Protocol) servers with OAuth 2.0 authentication support. Chat with AI models that can automatically discover and use tools from your MCP server. Features WSO2's modern design system and branding.
 
+
+### How It Works
+
+**Hybrid Connection Approach:**
+- **Local MCP servers** (localhost, 127.0.0.1, 192.168.x.x): Direct connection from your browser
+- **Remote MCP servers**: Proxied through the backend
+
+When deployed to the cloud and you enter `http://localhost:8000/mcp`, the app connects directly from your browser to your local machine (not the cloud server). This means:
+- ✅ Works from any cloud deployment
+- ✅ Users can connect to their local MCP servers
+- ⚠️ Requires CORS enabled on local MCP servers (see [CORS Requirements](#connecting-to-local-mcp-server-cors-requirements))
+
 ## Quick Start with Docker
 
 ### Build and Run
@@ -60,9 +72,13 @@ npm run dev
 
 2. **Connect to MCP Server**
    - Enter your MCP server URL
-     - **When running in Docker**: `http://host.docker.internal:8000/mcp`
-     - **Local development**: `http://localhost:8000/mcp`
+     - **Local MCP server**: `http://localhost:8000/mcp`
      - **Remote server**: `https://your-server.com/mcp`
+
+   **Important for Cloud Deployments:**
+   - The app automatically detects if you're connecting to a local server (localhost, 127.0.0.1, 192.168.x.x, etc.)
+   - **Local servers**: Direct connection from your browser (requires CORS - see below)
+   - **Remote servers**: Proxied through the backend server
 
 3. **Optional: OAuth Authentication**
    - Enable OAuth Authentication checkbox
@@ -145,18 +161,83 @@ Or change the port:
 docker run -p 8080:3000 wso2-mcp-client
 ```
 
-### Can't Connect to Localhost MCP Server (503 Error)
+### Connecting to Local MCP Server (CORS Requirements)
 
-**Problem**: Getting 503 errors when trying to connect to your local MCP server.
+**Important**: When you connect to a local MCP server (localhost, 127.0.0.1, 192.168.x.x, etc.) from the browser, your MCP server **must have CORS enabled**.
 
-**Solution**: When running the client in Docker, use `http://host.docker.internal:8000/mcp` instead of `http://localhost:8000/mcp`.
+#### Why CORS is Required
 
-**Why**: Docker containers can't access `localhost` on the host machine directly. `host.docker.internal` is Docker's special hostname that resolves to the host machine's IP address.
+This app uses a **hybrid connection approach**:
+- **Local servers** (localhost, 127.0.0.1, local IPs): Direct connection from browser
+- **Remote servers**: Proxied through the backend
 
-**Examples**:
-- ❌ Wrong: `http://localhost:8000/mcp`
-- ✅ Correct: `http://host.docker.internal:8000/mcp`
-- ✅ Also works: `http://host.docker.internal:3001/mcp` (if your MCP server runs on port 3001)
+When the app is deployed to the cloud and you connect to `http://localhost:8000/mcp`, the browser connects directly to YOUR local machine (not the cloud server's localhost). This requires CORS.
+
+#### Required CORS Headers
+
+Your MCP server must send these headers:
+
+```
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: POST, OPTIONS
+Access-Control-Allow-Headers: Content-Type, Authorization, mcp-session-id
+Access-Control-Expose-Headers: mcp-session-id
+```
+
+#### Example: Python Flask Server
+
+```python
+from flask import Flask
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app,
+     origins="*",
+     methods=["POST", "OPTIONS"],
+     allow_headers=["Content-Type", "Authorization", "mcp-session-id"],
+     expose_headers=["mcp-session-id"])
+```
+
+#### Example: Node.js Express Server
+
+```javascript
+const cors = require('cors');
+
+app.use(cors({
+  origin: '*',
+  methods: ['POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'mcp-session-id'],
+  exposedHeaders: ['mcp-session-id']
+}));
+```
+
+#### CORS Error Messages
+
+If you see errors like:
+- `"CORS error"`
+- `"Failed to fetch"`
+- `"Network request failed"`
+- `"OPTIONS /mcp 401 Unauthorized"`
+
+Check that your MCP server has CORS enabled with the headers above.
+
+**Important**: If you see `OPTIONS 401`, your server is requiring authentication for OPTIONS requests. OPTIONS requests (CORS preflight) **must not require authentication** and should return `200 OK`. See [CORS_FIX_EXAMPLES.md](CORS_FIX_EXAMPLES.md) for detailed fixes for Flask, Express, and FastAPI.
+
+### Can't Connect to Local MCP Server (Other Issues)
+
+If CORS is enabled but you still can't connect:
+
+1. **Check if your MCP server is running**:
+   ```bash
+   curl http://localhost:8000/mcp
+   ```
+
+2. **Check firewall**: Ensure your firewall allows connections on port 8000
+
+3. **Try different URL formats**:
+   - `http://localhost:8000/mcp`
+   - `http://127.0.0.1:8000/mcp`
+   - Your local IP: `http://192.168.1.x:8000/mcp`
 
 ### Google Gemini CORS Error
 
