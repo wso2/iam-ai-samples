@@ -689,9 +689,9 @@ export default function SettingsModal({
                   }
                   className="input-wso2"
                 >
-                  <option value="openai">OpenAI</option>
                   <option value="google">Google Gemini</option>
-                  <option value="azure">Azure OpenAI</option>
+                  <option value="openai" disabled>OpenAI (Available Soon)</option>
+                  <option value="azure" disabled>Azure OpenAI (Available Soon)</option>
                 </select>
               </div>
 

@@ -68,9 +68,9 @@ export default function MCPAgent() {
   
   // AI Configuration
   const [aiConfig, setAiConfig] = useState<AIProviderConfig>({
-    provider: 'openai',
+    provider: 'google',
     apiKey: '',
-    modelName: 'gpt-4o-mini',
+    modelName: 'gemini-2.0-flash-exp',
   });
   
   // MCP Servers Configuration
