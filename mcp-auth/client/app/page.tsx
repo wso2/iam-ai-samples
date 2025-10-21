@@ -191,13 +191,22 @@ export default function MCPAgent() {
         method: 'notifications/initialized',
       };
 
+      let currentSessionId = actualSessionId;
       try {
-        await makeMcpRequest(
+        const initializedResponse = await makeMcpRequest(
           server.url,
           initializedRequestBody,
           actualSessionId,
           server.token
         );
+        // Update session ID if server returned a new one
+        if (initializedResponse.sessionId && initializedResponse.sessionId !== actualSessionId) {
+          console.warn('⚠️  Session ID changed after notifications/initialized!', {
+            before: actualSessionId,
+            after: initializedResponse.sessionId
+          });
+          currentSessionId = initializedResponse.sessionId;
+        }
         console.log('✅ Initialization handshake complete');
       } catch (error) {
         console.warn('Failed to send notifications/initialized:', error);
@@ -205,7 +214,7 @@ export default function MCPAgent() {
 
       // Get available tools
       console.log('🔧 Requesting tools list...');
-      console.log('   Session ID:', actualSessionId);
+      console.log('   Session ID:', currentSessionId);
 
       // MCP protocol requires params field even if empty
       const toolsRequestBody = {
@@ -218,12 +227,22 @@ export default function MCPAgent() {
       const toolsResponse = await makeMcpRequest(
         server.url,
         toolsRequestBody,
-        actualSessionId,
+        currentSessionId,
         server.token
       );
 
       const toolsResult = toolsResponse.data;
       console.log('🔧 Tools list response:', toolsResult);
+
+      // Update session ID if server returned a new one
+      const finalSessionId = toolsResponse.sessionId || currentSessionId;
+      console.log('🆔 Final session ID after tools/list:', finalSessionId);
+      if (finalSessionId !== currentSessionId) {
+        console.warn('⚠️  Session ID changed after tools/list!', {
+          before: currentSessionId,
+          after: finalSessionId
+        });
+      }
 
       if (toolsResult.error) {
         console.error('❌ Tools list error:', toolsResult.error);
@@ -232,11 +251,12 @@ export default function MCPAgent() {
 
       const toolsList = toolsResult.result?.tools || [];
 
-      // Update session with tools using actual session ID
+      // Update session with tools using the final session ID
+      // Match by newSessionId (initial), actualSessionId (from initialize), or finalSessionId (from tools/list)
       setMcpSessions(prev =>
         prev.map(s =>
-          s.sessionId === actualSessionId
-            ? { ...s, status: 'connected', tools: toolsList }
+          (s.sessionId === newSessionId || s.sessionId === actualSessionId || s.sessionId === currentSessionId || s.sessionId === finalSessionId)
+            ? { ...s, sessionId: finalSessionId, status: 'connected', tools: toolsList }
             : s
         )
       );
@@ -260,6 +280,13 @@ export default function MCPAgent() {
   ): Promise<any> => {
     try {
       const server = mcpServers.find(s => s.url === session.mcpUrl);
+
+      console.log('🔧 Calling MCP tool:', {
+        toolName,
+        sessionId: session.sessionId,
+        mcpUrl: session.mcpUrl,
+        serverName: session.serverName,
+      });
 
       const requestBody = {
         jsonrpc: '2.0',
@@ -364,6 +391,7 @@ export default function MCPAgent() {
           // Find which session has this tool
           const toolInfo = allTools.find(t => t.name === toolName);
           if (!toolInfo) {
+            console.error('❌ Tool not found:', toolName);
             return {
               tool_call_id: toolCall.id,
               role: 'tool',
@@ -372,8 +400,19 @@ export default function MCPAgent() {
             };
           }
 
+          console.log('🔍 Looking up session for tool:', {
+            toolName,
+            toolInfoSessionId: toolInfo.sessionId,
+            availableSessions: mcpSessions.map(s => ({ id: s.sessionId, name: s.serverName, status: s.status })),
+          });
+
           const session = mcpSessions.find(s => s.sessionId === toolInfo.sessionId);
           if (!session) {
+            console.error('❌ Session not found for tool:', {
+              toolName,
+              expectedSessionId: toolInfo.sessionId,
+              availableSessionIds: mcpSessions.map(s => s.sessionId),
+            });
             return {
               tool_call_id: toolCall.id,
               role: 'tool',
@@ -460,8 +499,8 @@ export default function MCPAgent() {
     // Recursively resolve refs in the schema
     const result: any = Array.isArray(schema) ? [] : {};
     for (const key in schema) {
-      if (key === '$defs') {
-        // Skip $defs in the output, but keep for resolution
+      // Skip JSON Schema metadata fields that Gemini doesn't accept
+      if (key === '$defs' || key === '$schema' || key === 'additionalProperties') {
         continue;
       }
       result[key] = resolveSchemaRefs(schema[key]);
@@ -554,6 +593,7 @@ export default function MCPAgent() {
             // Find which session has this tool
             const toolInfo = allTools.find(t => t.name === toolName);
             if (!toolInfo) {
+              console.error('❌ Tool not found:', toolName);
               return {
                 functionResponse: {
                   name: toolName,
@@ -562,8 +602,19 @@ export default function MCPAgent() {
               };
             }
 
+            console.log('🔍 Looking up session for tool (Gemini):', {
+              toolName,
+              toolInfoSessionId: toolInfo.sessionId,
+              availableSessions: mcpSessions.map(s => ({ id: s.sessionId, name: s.serverName, status: s.status })),
+            });
+
             const session = mcpSessions.find(s => s.sessionId === toolInfo.sessionId);
             if (!session) {
+              console.error('❌ Session not found for tool (Gemini):', {
+                toolName,
+                expectedSessionId: toolInfo.sessionId,
+                availableSessionIds: mcpSessions.map(s => s.sessionId),
+              });
               return {
                 functionResponse: {
                   name: toolName,

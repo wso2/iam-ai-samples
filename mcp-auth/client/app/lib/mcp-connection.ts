@@ -85,6 +85,9 @@ export async function makeMcpRequest(
 
     if (sessionId) {
       headers['mcp-session-id'] = sessionId;
+      console.log('📤 Sending mcp-session-id header to local server:', sessionId);
+    } else {
+      console.log('⚠️  No session ID to send (this should only happen on initialize)');
     }
 
     try {
@@ -156,6 +159,9 @@ export async function makeMcpRequest(
       // Get session ID from response
       const responseSessionId = response.headers.get('mcp-session-id') || response.headers.get('x-session-id');
 
+      console.log('📥 Received session ID from server:', responseSessionId);
+      console.log('📋 Final session ID to use:', responseSessionId || sessionId);
+
       return {
         data,
         sessionId: responseSessionId || sessionId,
@@ -192,7 +198,18 @@ export async function makeMcpRequest(
 
     if (sessionId) {
       headers['x-session-id'] = sessionId;
+      console.log('📤 Sending x-session-id header to proxy:', sessionId);
+    } else {
+      console.log('⚠️  No session ID to send to proxy (this should only happen on initialize)');
     }
+
+    console.log('🌐 Making proxy request to /api/mcp:', {
+      mcpUrl: mcpUrl,
+      method: requestBody.method,
+      headers: headers,
+      hasSessionId: !!sessionId,
+      sessionIdValue: sessionId,
+    });
 
     const response = await fetch('/api/mcp', {
       method: 'POST',
@@ -208,6 +225,9 @@ export async function makeMcpRequest(
     }
 
     const responseSessionId = response.headers.get('x-session-id');
+
+    console.log('📥 Received session ID from proxy:', responseSessionId);
+    console.log('📋 Final session ID to use:', responseSessionId || sessionId);
 
     return {
       data,
