@@ -86,6 +86,25 @@ npm run dev
    - Enter your OAuth Client ID
    - Complete the OAuth flow in the popup
 
+   **OAuth Callback URI Configuration:**
+
+   You must configure the following callback URI in your Authorization Server (OAuth Provider):
+
+   ```
+   http://localhost:3000/api/oauth/callback
+   ```
+
+   If you're deploying to production or using a different port/domain, update the callback URI accordingly:
+   - Production: `https://your-domain.com/api/oauth/callback`
+   - Different port: `http://localhost:8080/api/oauth/callback`
+
+   **Steps to configure in your Authorization Server:**
+   - **Asgardeo/WSO2 Identity Server**: Add the callback URI to your application's "Authorized redirect URIs"
+   - **Auth0**: Add to "Allowed Callback URLs" in your application settings
+   - **Okta**: Add to "Sign-in redirect URIs" in your application configuration
+   - **Azure AD**: Add to "Redirect URIs" in your app registration
+   - **Keycloak**: Add to "Valid Redirect URIs" in your client configuration
+
 4. **Start Chatting**
    - Click "Connect"
    - Available tools appear in the sidebar
