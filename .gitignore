@@ -33,8 +33,42 @@ venv/
 __pycache__/
 *.py[cod]
 
+# Node.js dependencies
+node_modules/
 */node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
+# Node.js build outputs
+dist/
+build/
+out/
+.next/
+.nuxt/
+.output/
+
+# Node.js cache directories
+.npm/
+.yarn/
+.pnp.*
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# TypeScript cache
+*.tsbuildinfo
+
+# ESLint cache
+.eslintcache
+
+# Parcel cache
+.cache/
+.parcel-cache/
+
+# Webpack bundle analyzer
+bundle-analyzer-report.html
 
 # environment file
 **/.env
