@@ -1,12 +1,12 @@
 # MCP Auth Quickstart
 
-A Node.js MCP (Model Context Protocol) server with Asgardeo authentication, featuring a simple addition tool and greeting resource.
+A TypeScript MCP (Model Context Protocol) server with Asgardeo authentication, featuring a simple addition tool and greeting resource.
 
 ## Prerequisites
 
 - Node.js (v16 or higher)
 - npm or yarn
-- Asgardeo account with an MCP Client application configured
+- Asgardeo account with an [MCP Client application configured](https://wso2.com/asgardeo/docs/guides/agentic-ai/mcp/register-mcp-client-app/#register-an-mcp-client-application)
 
 ## Setup
 
@@ -26,7 +26,8 @@ A Node.js MCP (Model Context Protocol) server with Asgardeo authentication, feat
      ```
 
 4. **Configure Asgardeo Application:**
-   - Ensure you have an MCP Client application in Asgardeo
+   - Ensure you have an MCP Client application registered in Asgardeo
+   - Use MCP inspector callback (`http://localhost:6274/oauth/callback`) as the Authorized Redirect URL
    - Note the `client-id` for testing
 
 ## Running the Server
@@ -53,27 +54,29 @@ The server will run on `http://localhost:3000/mcp` (or the port specified in `.e
 
         You need to create a test user in Asgardeo by following the instructions in the [Onboard a Single User guide](https://wso2.com/asgardeo/docs/guides/users/onboard-users/#onboard-single-user) to authenticate.
 
+   <img width="2992" height="2125" alt="screencapture-localhost-6274-2025-10-28-17_00_36" src="https://github.com/user-attachments/assets/f53ec739-bc6d-4269-a18c-af29b1a80bb8" />
+
 3. **Test the server:**
    - List available tools and resources
-   - Try the "add" tool with inputs like `{"a": 5, "b": 3}`
+   - Try the "add" tool with sample values
    - Query the "greeting" resource with URIs like `greeting://world`
 
-## API Endpoints
+## MCP Endpoints
 
 - `POST /mcp` - MCP protocol endpoint (requires authentication)
-- OAuth endpoints are automatically handled by the Asgardeo middleware
+- OAuth is automatically handled by the Asgardeo MCP SDK middleware
 
 ## Security
 
-- All MCP requests require valid Asgardeo authentication
-- CORS is enabled for development (restrict in production)
+- All MCP requests require a valid authentication (Bearer token)
+- CORS is enabled for development (Make sure to restrict in production)
 - Unauthorized requests return 401 with WWW-Authenticate headers
 
 ## Development
 
 - Built with TypeScript and Express
 - Uses `@modelcontextprotocol/sdk` for MCP implementation
-- Authentication via `@asgardeo/mcp-express`
+- Auth support via `@asgardeo/mcp-express`
 
 ## Troubleshooting
 
