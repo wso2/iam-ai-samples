@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pawsome Pet Care</title>
+    <!-- Modern Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4F46E5; /* Indigo 600 */
+            --primary-hover: #4338ca;
+            --bg-color: #F3F4F6;
+            --chat-bg: #FFFFFF;
+            --user-msg-bg: #4F46E5;
+            --user-msg-text: #FFFFFF;
+            --agent-msg-bg: #F3F4F6;
+            --agent-msg-text: #1F2937;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Main Card Container */
+        .main-container {
+            width: 100%;
+            max-width: 500px;
+            height: 90vh; /* 90% of viewport height */
+            background-color: var(--chat-bg);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Header */
+        header {
+            background-color: var(--chat-bg);
+            padding: 20px;
+            border-bottom: 1px solid #E5E7EB;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            z-index: 10;
+        }
+
+        /* Avatar Image Style */
+        .avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            object-fit: cover; /* Ensures the image fills the circle perfectly */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header-info h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .header-info p {
+            font-size: 13px;
+            color: #10B981; /* Green for active */
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #10B981;
+            border-radius: 50%;
+        }
+
+        /* Chat Area */
+        #chat-box {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background-color: #ffffff;
+            scroll-behavior: smooth;
+        }
+
+        /* Scrollbar Styling */
+        #chat-box::-webkit-scrollbar { width: 6px; }
+        #chat-box::-webkit-scrollbar-track { background: transparent; }
+        #chat-box::-webkit-scrollbar-thumb { background-color: #D1D5DB; border-radius: 20px; }
+
+        /* Message Bubbles */
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            font-size: 15px;
+            line-height: 1.5;
+            position: relative;
+            word-wrap: break-word;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .agent {
+            align-self: flex-start;
+            background-color: var(--agent-msg-bg);
+            color: var(--agent-msg-text);
+            border-radius: 18px 18px 18px 4px;
+        }
+
+        .user {
+            align-self: flex-end;
+            background-color: var(--user-msg-bg);
+            color: var(--user-msg-text);
+            border-radius: 18px 18px 4px 18px;
+            box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 20px;
+            background-color: white;
+            border-top: 1px solid #E5E7EB;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input {
+            flex: 1;
+            padding: 14px 18px;
+            border: 1px solid #E5E7EB;
+            border-radius: 30px;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.2s;
+            background-color: #F9FAFB;
+        }
+
+        input:focus {
+            border-color: var(--primary-color);
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        button {
+            width: 45px;
+            height: 45px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s, transform 0.1s;
+            flex-shrink: 0;
+        }
+
+        button:hover { background-color: var(--primary-hover); }
+        button:active { transform: scale(0.95); }
+        button:disabled { background-color: #9CA3AF; cursor: not-allowed; }
+
+        button svg { width: 20px; height: 20px; fill: white; margin-left: 2px; }
+
+        /* Typing Indicator */
+        .typing-indicator {
+            align-self: flex-start;
+            background-color: var(--agent-msg-bg);
+            padding: 12px 16px;
+            border-radius: 18px 18px 18px 4px;
+            display: none; /* Hidden by default */
+            gap: 5px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: #9CA3AF;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 600px) {
+            .main-container {
+                height: 100vh;
+                max-width: 100%;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <!-- Header -->
+        <header>
+            <!-- Updated Avatar to Image -->
+            <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBwgHBgkIBwgKCgkLDRYPDQwMDRsUFRAWIB0iIiAdHx8kKDQsJCYxJx8fLT0tMTU3Ojo6Iys/RD84QzQ5OjcBCgoKDQwNGg8PGjclHyU3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3N//AABEIAJQAlAMBIgACEQEDEQH/xAAcAAABBQEBAQAAAAAAAAAAAAAEAAEDBQYCBwj/xAA7EAACAQMDAgQDBgQDCQAAAAABAgMABBEFEiExQQYTUWEicYEUMpGhwdEHI0KxM1JiFSQ0Q1Ny4fDx/8QAGAEBAQEBAQAAAAAAAAAAAAAAAAECAwT/xAAcEQEBAQEAAwEBAAAAAAAAAAAAARECAyExElH/2gAMAwEAAhEDEQA/AKK23cNG6HHZlx/7+NNIZEcyEsCOxOfzrryzFI6NJsKkggigLm5Bk2KxGPXiuboivZF8wDbhjzkdKm0fUZbC4LqSQvVT0Kmu7eNZRtmxx0btTOY45C6fGFHTqR8vUUo2K6tbNbRTpgq5GPY9wae4k0xptjJCxfocDpx+9Z3TYHeMgIWhkAEir/T/AKvp+9FR6HIr/Z0JaRHLIR0ZCf3/AL0xF5bWFvKgMEk0f/ZKwH4ZxUos7xD/ACr9j7Sxq37VFoemXhvtuxooj3I6e1bAaSpUDfg+uKmDKE6lH1S2mHsSh/WqTWdOe8Z5JFwzdhzj2re3OjSqpMbBvagjpFzICTHtx2NPisP4IsvI1G5kIwUQKfr/APK1s1wkeATlz0RepqGLSZLaaZlcxiUjcNvpR1vaxxfcXk9SeprNXQzwzXD4kPlx9Nq9T9amhhjiACKFA7Cp53it4XnmYIq8sxPAFZyHxVa3V+ttbxuVY48w8A/SmL6aHAPamKA9q728U4WomITGKbZRGym2UEG2nqQqaVVGQ8Waa2m6mGY5E678AcZHB/SqGWF97TRhWA64GfxFeo+M7SC50jzJSVkhfMbAfiPqP7V5rdlQ48sAgHt1rQgZ4xGfLRVBH9OamtkhaUJKvI+654wPrSgTamSqFVPIJxTjVbK3+G4jKr2G7dt+QNVGj0uxlTZsww64Xq3vjvWs00QDaGVTIn3WH9qwml+LNIikVftDoMchuV+npW2sdQsdUgEltMjv3KnmqLpJFxwRUqSc9apUdlyQe/IqZbnbQXaNmnbrQ1pKHX3og80HMkUUgxIgYfKqeTTJUnlaOVTG3KKRypq4bgUO7HNTB574l0jVr2dkkbFuvIQdP/Jqn0nTI4b+AyERIrjC5yzkf2FeqzRiRCGxyMVkNU0tIbz7QCARyC7Z6enYUotgcjNdrQ1hI0sIJx9DmigKw2fHFMa6FMetEcbSaVTDGKVEC+NrgwaVG2zcC/pntXl08qG4ViDnr0zmvUvHEJk0KQqWLRHf8P5/lXjd7dfz8LI2eOP2rog+9uRFGyxkA47frWa8ua7cytnGeKvJLKdbJZ5B8DevU1Jd2gtdLikCjLdfYYqypVBHZM5wrAH3oyBtS0WVJ7eV1Gc5Rjj60HHcN5u5Wxg1b3Ouy31oLW4trbKjakkaYf688/hXXGJa9F8KeI49ZjUSfDNjD+5rUzQ7oztGa8S8Ozy2GtWxQsA77SK94tSs1uGHcVxro5sG2jmrINkVXRrtJ+dFI+OT0qCZuRQN7OlrC80jBVQZYmjQ2enSsL/F65uLfw9EkGVWeYRuw7DBP6VZ7GX8RfxGu5Znh0RVCqceayk5+VUEfjTXY50GoOHjY9StVen3EMEy+ahMK/e2jk1cqmm6vNcW1mspQxF081AGUj5Eitdc5NZ323Wh6uLmFHCkoRzgVoUYEZFed6Nci1ZLZh8XHTuK39q26FSM9O9cq6xOTiuC3NOTUeOc1ExJmmpqegh8dXKR6O6FdzN8Iw2Dn9a8w03Sree682552nADdjW+/iNEGs7VyCQsnLfMVmtNO7Bceeg4GBgitsp9X0xr7SnS3UqV+JcdMiqgJ/tDRBbsQs8A2SIeqkdG+Vb3RLVWPwn4Mdz1q0m8N6ZeMJZbVRLj/EjJRvxFTLPhXz7LZT20hSaMg569j9asdI057qZCwKxgglsdfYV7U3gvRnOXt3b5yGrGy0PT7BcWtrGmO5GT+dbvVsZx5xonhS6uNSjubmIRIMsu7v6V6VEvkQrD3HBxXZTaxJrh+CSKjTqMZbFShlH7UFJP5PcYPSukmDc+vrUWQcjgn0qs8W6Kuv6JPYscOcPE3o46UUjgHrRKOCBk1YWPmzU7C4sLl4LiNkmjO11btVz4LtnWW5v5eIo4mVT2J717RrfhfStdxJe2480DCyrw2PT3qqk8BWrxiA3c62+QTGoA3exNa662YzjIWumPrFg8sGEkgmIR8cMvHU1tLVPJto06kLyauI9Mt7SyW2tYhHEg4FV82NxA6VyrcqMHmnPrXNP1rLR80qcKKVEx5dJ4u1HWQttqDxPCTkYQAg1caEAUJxnB57VeL/D3TYhugknRx0JbI/Cq3TrWe0ubiCZBlG64xmutxzjRWM6jG7K+9XkFwnHJ+lZESmM5BoqDUmUD4iPmalVrluB/SePeuzOO5qitLx5SMgYq0CttHwD8aQSBw2cVDeMVhZ1HQdKkjZFI3EDPFPKm9GBU4PFUZZ7wXM4IclRVlBJx1rHa7FdaHfSPEhe3Y5256fWodB8Q3V1fNb3UOxSpKMDnp2NZejmbG9D9Dmp0n7Zqhjvh0Jpv9pSfbFt4Yi/Tc3Ye1SVby2VnJvj5qYmgdNV1hG8/EeT7UZLwhI61t5r9RTvtQk+lULnJPzqwuZf5LA9TVaTWOlhU4GBSFPWV04NKlTVV1bjNVGqQSLOJYwW3DkcVc7gKzXi/UZLNLdk8raW58xiK2w4MdwetvGR/q2ftXPlzg/8AAwH5FR/ahFuxKiyRtEVI6qoNMbwj+s/RQP0oLqxDZzLaxx4/yvmrBp4l+8ufnWctLti3PmMO+aOj1BEbmMk0gsXv0EfEIwOgBqWLURO+CpRsZw1Vz6nAY8NCGOehGK7XUbVXVWQRu4wu0Z/OqC7y1ivYXSdA271FefXGnnTNRlbbgMMLW3TUFHmKY3JQ8FhgNVfdmPUov5kQUjnk9Kjr47YzEN2ftGCeM81r9GgjaRpSuc9DWQt4YjfTRPjG44wa1+mXkUSpFsYccEcgUkdPL1saVHwOBxT+dk47etV8V0hGfi49qnS53EbVxVeYHfyYmIWMMvrzQhdT/wAvb8jRdzIzSE7XHywRQ/n9sofmMVzqo8r6kU+fQ10SjckD6NTFEPQ4+lAuaVLYezp+NKirR5FTlulYH+Icyz+R/LkkK52xx9TWuu5g7eqjsKyXi5LyW1X7HlAD8RU4wPc9hW4yptL1D7ARHqBgtoiBtjZtz/h++K0kEyzp5lkoeP8A6r42ivOhHZWeHmIvJV67iREv6v8AkK23hmaW+s2a4OIgB5aKMAD2HarRYpIS5HmGYrz12xr+9EfaUAwq8+uMY+Q/ehLgbMBcYHTHQfufeuNxC4J+NvXsP3qKnmvY1QAoXcHjsKdb18I6KkZzycc4oCbO3P51TX97LBkqSao0ct/E7MzOc9OT+ldy3TyW5SBSCR96sTb3zC6R5smMdc1sLeZWVShyCOMUejjj9RnrfSby0uvNjnZ+SWDHrmr20uJUGJImAHOR613O2OcflTQSgnmjd4q7sr/eFORkdvWre0EkyEsAKrNHsonxLt960MShBgdKPJ1MqjnlmjnOTlR2P71z5iydRu+fB/GpdTGy4cYwDQHbisCYhSTtOD6GuTuU88Vzvz97mkH/AMpB9jUHe8+ppq5U5HxKc0qNaU0yooMrbF7L3NUWu3BvLR41TK4+FfU/rR5jaRmklOSa4dQq4Uhc9TitMPOJ7fyvhIVpxyVb7sfu3yrU+BZ0ltrhQzu+74pG/qPtVR4hszG7eV/htyfc0V/D+4/3i4g5wVyK0NfIgGXPIHQepoCYEZbqSetWcoyc9vSg5hnrUAgbI2t6UFfWgbBAyPSjWTD5Nd5DLg8mjTMT2eCcij9HuzbnyZCdn9JPairm1JNRw2JYgUb57/K2LpKAAc5FPa2czy4VDRelWabVLDJFX1sipygwKrp15/4I0yAwwAN19KsVHFCxmiQcUea1S6yR9p69qrCcGjdUbddt88UGVPU8CudVyTTgHrTFgvQZ9zXBfPWgk3H1pVHkUqCJ2/D0oV0LHpxRcvkwqWkYfWqm71NmGyzTJP8AV2FXUQ31rDtb7SwBxwBQmi2X2DUknjbcJfhPsK6MDFt9xIWb0qWCcxyglcKK1Bo5OlCTCiFlEsYdehqGQZOKAVhk08aY5bpXRXDfKpY8eapbp2FBJBbhkO8c5qdLVAwwvU4p1b4QF6k1NC2ZSOynj3qgmGMISijpRdvnp70Ikg+0P6Y4ouI/zMYoC4zzRDOAhPpQitg01w/8psH50RUXbbpWbrzQpY9zRE+NxoNzzWa1CLZpia53VyxrI7zSqPdSoqnQtdtunZm9s8VMUVfhUYHtSpUZcFBjPeh5eGpUq0LTSXLQEHtR6daVKqIpVHxcVDjdcKp6BcilSoComPT05qW04j/H+1KlVBcaguM+pqwRB5p+dKlRBPlrgGh5DskJHrilSqVVLcSM0shP+ahmNKlWKsRg80j1pUqKampUqD//2Q==" 
+                 alt="Pawsome Avatar" 
+                 class="avatar">
+            
+            <div class="header-info">
+                <h1>Pawsome Assistant</h1>
+                <p><span class="status-dot"></span> Online</p>
+            </div>
+        </header>
+
+        <!-- Chat Area -->
+        <div id="chat-box">
+            <div class="message agent">
+                Hello! 🐾 I'm your Pawsome assistant. How can I help you with your pet today?
+            </div>
+        </div>
+
+        <!-- Typing Indicator (Hidden by default) -->
+        <div class="typing-indicator" id="typing-indicator">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="Ask about vaccines, booking..." autocomplete="off">
+            <button onclick="sendMessage()" id="send-btn">
+                <!-- Send Icon SVG -->
+                <svg viewBox="0 0 24 24">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const typingIndicator = document.getElementById('typing-indicator');
+
+        // Focus input on load
+        userInput.focus();
+
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            // 1. Add User Message
+            addMessage(message, 'user');
+            userInput.value = '';
+            
+            // 2. Show Typing Indicator & Disable Input
+            showTyping(true);
+            sendBtn.disabled = true;
+            userInput.disabled = true;
+
+            try {
+                // 3. Send to API
+                const response = await fetch('http://localhost:8080/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const data = await response.json();
+                
+                // 4. Hide Typing & Add Agent Response
+                showTyping(false);
+                
+                if (data.error) {
+                    addMessage("Sorry, something went wrong on the server.", 'agent');
+                } else {
+                    // Simple formatting: Convert newlines to <br>
+                    const formattedResponse = data.response.replace(/\n/g, '<br>');
+                    addMessage(formattedResponse, 'agent', true);
+                }
+
+            } catch (error) {
+                showTyping(false);
+                addMessage("Error connecting to the agent. Is the server running?", 'agent');
+                console.error(error);
+            } finally {
+                sendBtn.disabled = false;
+                userInput.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        function addMessage(text, sender, isHtml = false) {
+            const div = document.createElement('div');
+            div.className = `message ${sender}`;
+            
+            if (isHtml) {
+                div.innerHTML = text;
+            } else {
+                div.textContent = text;
+            }
+            
+            // Append before the typing indicator
+            chatBox.appendChild(div);
+            scrollToBottom();
+        }
+
+        function showTyping(show) {
+            if (show) {
+                typingIndicator.style.display = 'flex';
+                // Move typing indicator to the bottom visually
+                chatBox.parentNode.insertBefore(typingIndicator, document.querySelector('.input-area'));
+            } else {
+                typingIndicator.style.display = 'none';
+            }
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            const container = document.querySelector('.main-container');
+            // We scroll the chatBox, not the container
+            chatBox.scrollTop = chatBox.scrollHeight;
+            
+            // If using a flex layout where chatBox is the scroller
+            chatBox.scrollTo({
+                top: chatBox.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+
+        // Handle Enter Key
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+    </script>
+</body>
+</html>
