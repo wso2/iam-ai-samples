@@ -24,6 +24,8 @@ This project demonstrates an AI agent that acts as an assistant for a vet clinic
 ├── main.py              # FastMCP server with secured endpoints
 ├── agent.py            # LangGraph agent with dynamic context logic
 ├── jwt_validator.py    # JWT validation module for Asgardeo tokens
+├── database.py         # Database helper functions
+├── init_database.py    # Database initialization script
 ├── index.html          # Web interface for chat
 ├── .env                # Environment variables configuration
 ├── requirements.txt    # Python dependencies
@@ -55,7 +57,19 @@ This project demonstrates an AI agent that acts as an assistant for a vet clinic
    - `aiohttp` - Async HTTP server
    - `httpx` - HTTP client
 
-4. **Configure environment variables**
+4. **Initialize the SQLite database**
+   ```bash
+   python init_database.py
+   ```
+   
+   This will create `pet_clinic.db` with sample data including:
+   - Users table (2 sample users)
+   - Pets table (3 sample pets)
+   - Vaccinations table
+   - Upcoming vaccinations table
+   - Appointments table
+
+5. **Configure environment variables**
    
    Create a `.env` file in the project root directory:
    
