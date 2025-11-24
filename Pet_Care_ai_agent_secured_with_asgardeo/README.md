@@ -84,8 +84,8 @@ This project demonstrates an AI agent that acts as an assistant for a vet clinic
 
 ### 1. Create an MCP Client Application in Asgardeo
 
-1. Login to your **Asgardeo** account at [https://console.asgardeo.io](https://console.asgardeo.io)
-2. Navigate to the **Applications** tab and select **MCP Client Application** template
+1. Login to your **Asgardeo** account at [https://console.asgardeo.io](https://console.asgardeo.io).
+2. Navigate to the **Applications** tab and select **MCP Client Application** template.
 
    ![MCP Client App Selection](images/mcp-client-app-selection.png)
 
