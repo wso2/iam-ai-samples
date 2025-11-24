@@ -9,7 +9,6 @@ This project demonstrates an AI agent that acts as an assistant for a vet clinic
 - **Multi-Pet Context Handling** with automatic pet selection logic
 - **JWT Token Validation** with JWKS endpoint integration
 - **OpenAI Integration** for AI-powered pet name suggestions
-- **RESTful Web Interface** with CORS support
 - **Real-time Chat** with conversation memory
 
 ## Prerequisites
