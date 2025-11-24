@@ -1,6 +1,6 @@
 # Pawsome Pet Care - AI-Powered Veterinary Assistant with Asgardeo Authentication
 
-This project demonstrates a sophisticated AI-powered pet care chatbot system that integrates a secured MCP (Model Context Protocol) server with an intelligent LangGraph agent, using **Asgardeo** as the OAuth2/OIDC provider for authentication and authorization.
+This project demonstrates an AI agent that acts as an assistant for a vet clinic that connects to an MCP (Model Context Protocol) server, secured with **Asgardeo** as the identity provider.
 
 ## 🌟 Key Features
 
