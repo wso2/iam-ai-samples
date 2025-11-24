@@ -534,8 +534,12 @@ async def run_interactive_chat():
             app['mcp_tools'] = tools
             app['user_email'] = user_email
             
+            # Get the absolute path to index.html
+            import pathlib
+            html_path = pathlib.Path(__file__).parent / 'index.html'
+            
             app.router.add_post('/chat', handle_chat_request)
-            app.router.add_get('/', lambda r: web.FileResponse('index.html'))
+            app.router.add_get('/', lambda r: web.FileResponse(html_path))
             
             import aiohttp_cors
             cors = aiohttp_cors.setup(app, defaults={
