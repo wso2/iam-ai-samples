@@ -14,90 +14,15 @@ from mcp.server.fastmcp import FastMCP
 from jwt_validator import JWTValidator
 import logging
 
+# Import database functions
+import database as db
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- MOCK DATA STORE ---
-
-# Table 1: Users (Key: Email)
-USERS_DB = {
-    "pasansanjiiwa2022@gmail.com": {
-        "user_id": "USER-PS2022",
-        "name": "Pasan Sanjiiwa",
-        "account_status": "active",
-        "registered_since": "2022-05-10"
-    },
-    "john.doe@example.com": {
-        "user_id": "USER-JD1234",
-        "name": "John Doe",
-        "account_status": "active",
-        "registered_since": "2023-01-15"
-    }
-}
-
-# Table 2: Pets (Key: Pet ID) - Contains basic info and Owner Foreign Key
-PETS_DB = {
-    "123": {
-        "pet_id": "123",
-        "pet_name": "Buddy",
-        "type": "Dog",
-        "owner_email": "pasansanjiiwa2022@gmail.com"
-    },
-    "455": {
-        "pet_id": "455",
-        "pet_name": "Spot",
-        "type": "Dog",
-        "owner_email": "pasansanjiiwa2022@gmail.com"
-    },
-    "456": {
-        "pet_id": "456",
-        "pet_name": "Luna",
-        "type": "Cat",
-        "owner_email": "john.doe@example.com"
-    }
-}
-
-# Table 3: Vaccination Records (Key: Pet ID)
-VACCINATIONS_DB = {
-    "123": {
-        "history": [
-            {
-                "vaccine_name": "Rabies",
-                "date_administered": "2024-01-15",
-                "veterinarian": "Dr. Smith",
-                "next_due_date": "2025-01-15"
-            },
-            {
-                "vaccine_name": "DHPP",
-                "date_administered": "2024-03-20",
-                "veterinarian": "Dr. Johnson",
-                "next_due_date": "2025-03-20"
-            },
-            {
-                "vaccine_name": "Bordetella",
-                "date_administered": "2024-06-10",
-                "veterinarian": "Dr. Smith",
-                "next_due_date": "2024-12-10"
-            }
-        ],
-        "upcoming": [
-            {
-                "vaccine_name": "Bordetella",
-                "due_date": "2024-12-10",
-                "status": "upcoming"
-            }
-        ]
-    },
-    "456": {
-        "history": [],
-        "upcoming": []
-    }
-}
-
 class JWTTokenVerifier(TokenVerifier):
     """JWT token verifier using Asgardeo JWKS."""
-    
     
     def __init__(self, jwks_url: str, issuer: str, client_id: str):
         self.jwt_validator = JWTValidator(
@@ -153,7 +78,7 @@ mcp = FastMCP(
     # Auth settings for RFC 9728 Protected Resource Metadata
     auth=AuthSettings(
         issuer_url=AnyHttpUrl(AUTH_ISSUER),
-        resource_server_url=AnyHttpUrl("http://localhost:8000"),  # Authorization Server URL # This server's URL
+        resource_server_url=AnyHttpUrl("http://localhost:8000"),
         # required_scopes=["user"]
     ),
 )
@@ -167,8 +92,8 @@ async def get_user_id_by_email(email: str) -> dict[str, Any]:
 
         email_clean = email.lower().strip()
         
-        # LOOKUP IN USERS_DB
-        user_record = USERS_DB.get(email_clean)
+        # Query database for user
+        user_record = db.get_user_by_email(email_clean)
         
         if user_record:
             return {
@@ -200,28 +125,25 @@ async def get_pets_by_user_id(user_id: str) -> dict[str, Any]:
     try:
         user_id = user_id.strip()
         
-        # 1. Find Email from USERS_DB
-        target_email = None
-        user_name = None
+        # Find user by user_id
+        user_record = db.get_user_by_user_id(user_id)
         
-        for email, user_data in USERS_DB.items():
-            if user_data["user_id"] == user_id:
-                target_email = email
-                user_name = user_data.get("name")
-                break
-        
-        if not target_email:
+        if not user_record:
             raise ValueError(f"User with ID '{user_id}' not found.")
-
-        # 2. Find Pets in PETS_DB (Join on owner_email)
+        
+        target_email = user_record["email"]
+        user_name = user_record.get("name")
+        
+        # Find pets owned by this user
+        pets = db.get_pets_by_owner_email(target_email)
+        
         found_pets = []
-        for pet_id, pet_data in PETS_DB.items():
-            if pet_data.get("owner_email") == target_email:
-                found_pets.append({
-                    "pet_id": pet_id,
-                    "pet_name": pet_data.get("pet_name"),
-                    "type": pet_data.get("type", "Unknown")
-                })
+        for pet in pets:
+            found_pets.append({
+                "pet_id": pet["pet_id"],
+                "pet_name": pet["pet_name"],
+                "type": pet.get("type", "Unknown")
+            })
 
         return {
             "user_id": user_id,
@@ -231,29 +153,28 @@ async def get_pets_by_user_id(user_id: str) -> dict[str, Any]:
         }
 
     except Exception as error:
-
         logger.error(f"System error retrieving pets: {error}")
-
         raise ValueError(f"Failed to retrieve pets: {str(error)}")
     
 @mcp.tool()
 async def get_pet_vaccination_info(pet_id: str) -> dict[str, Any]:
     """Retrieves the vaccination history for a specific pet."""
     try:
-        # 1. Get Basic Pet Info
-        pet_basic = PETS_DB.get(pet_id)
+        # Get basic pet info
+        pet_basic = db.get_pet_by_id(pet_id)
         if not pet_basic:
             raise ValueError(f"Pet with ID '{pet_id}' not found.")
 
-        # 2. Get Medical Records
-        vac_records = VACCINATIONS_DB.get(pet_id, {"history": [], "upcoming": []})
+        # Get vaccination records
+        vaccination_history = db.get_vaccination_history(pet_id)
+        upcoming_vaccinations = db.get_upcoming_vaccinations(pet_id)
 
-        # 3. Merge Data
+        # Build response
         response = {
             "pet_id": pet_id,
             "pet_name": pet_basic["pet_name"],
-            "vaccination_history": vac_records["history"],
-            "upcoming_vaccinations": vac_records["upcoming"],
+            "vaccination_history": vaccination_history,
+            "upcoming_vaccinations": upcoming_vaccinations,
             "last_updated": datetime.now().isoformat(),
             "token_status": "Token was present and validated"
         }
@@ -286,34 +207,43 @@ async def book_vet_appointment(
         Dictionary containing appointment confirmation details
     """
     try:
+        # Validate pet exists
+        pet = db.get_pet_by_id(pet_id)
+        if not pet:
+            raise ValueError(f"Pet with ID '{pet_id}' not found.")
+        
         # Validate date format
         try:
             datetime.strptime(date, "%Y-%m-%d")
         except ValueError:
             raise ValueError("Invalid date format. Please use YYYY-MM-DD format.")
         
-        # Simulate appointment booking
-        # In a real application, you would:
-        # 1. Check vet availability
-        # 2. Insert into appointments database
-        # 3. Send confirmation email/SMS
-        
+        # Generate appointment ID
         appointment_id = f"APT-{pet_id}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
+        # Create appointment in database
+        appointment = db.create_appointment(
+            appointment_id=appointment_id,
+            pet_id=pet_id,
+            date=date,
+            time=time,
+            reason=reason
+        )
+        
         appointment_details = {
-            "appointment_id": appointment_id,
-            "pet_id": pet_id,
-            "date": date,
-            "time": time,
-            "reason": reason,
-            "status": "confirmed",
-            "veterinarian": "Dr. Smith",
-            "clinic_name": "Happy Paws Veterinary Clinic",
-            "clinic_address": "123 Main Street, City, State 12345",
+            "appointment_id": appointment["appointment_id"],
+            "pet_id": appointment["pet_id"],
+            "date": appointment["date"],
+            "time": appointment["time"],
+            "reason": appointment["reason"],
+            "status": appointment["status"],
+            "veterinarian": appointment["veterinarian"],
+            "clinic_name": appointment["clinic_name"],
+            "clinic_address": appointment["clinic_address"],
             "confirmation_message": f"Appointment successfully booked for pet ID: {pet_id} on {date} at {time}",
             "reminder": "Please arrive 10 minutes early for check-in",
             "cancellation_policy": "Please cancel at least 24 hours in advance",
-            "booked_at": datetime.now().isoformat(),
+            "booked_at": appointment["booked_at"],
             "token_status": "Token was present and validated"
         }
         
@@ -333,26 +263,34 @@ async def book_vet_appointment(
         raise ValueError(f"Failed to book appointment: {error_message}")
 
 @mcp.tool()
-async def cancel_appinment(appointment_id: str, reason: str) -> dict[str, Any]:
+async def cancel_appointment(appointment_id: str, reason: str) -> dict[str, Any]:
     """
     Cancels an existing veterinary appointment.
     Requires user authentication and explicit consent via an authorization token.
     
     Args:
         appointment_id: The unique identifier for the appointment to be canceled
+        reason: The reason for cancellation
     """
     try:
-        cancelllation_details = {
-            "appointment_id": appointment_id,
-            "status": "canceled",
-            "cancellation_reason": reason,
-            "canceled_at": datetime.now().isoformat(),
+        # Cancel appointment in database
+        canceled_appointment = db.cancel_appointment(appointment_id, reason)
+        
+        if not canceled_appointment:
+            raise ValueError(f"Appointment with ID '{appointment_id}' not found.")
+        
+        cancellation_details = {
+            "appointment_id": canceled_appointment["appointment_id"],
+            "status": canceled_appointment["status"],
+            "cancellation_reason": canceled_appointment["cancellation_reason"],
+            "canceled_at": canceled_appointment["canceled_at"],
             "confirmation_message": f"Appointment {appointment_id} has been successfully canceled.",
             "refund_policy": "Refunds will be processed within 5-7 business days if applicable.",
         }
         
         logger.info(f"Canceled appointment ID: {appointment_id} for reason: {reason}")
-        return cancelllation_details
+        return cancellation_details
+        
     except Exception as error:
         error_message = str(error)
         logger.error(f"Failed to cancel appointment: {error_message}")
