@@ -16,7 +16,7 @@ This project demonstrates an AI agent that acts as an assistant for a vet clinic
 - Python 3.12 or higher
 - **Asgardeo account** and application setup
 - OpenAI API key (for pet name suggestions)
-- pip (Python package installer)
+- pip (Python package manager)
 
 ## Project Structure
 
