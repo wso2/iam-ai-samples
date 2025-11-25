@@ -37,6 +37,7 @@ This project demonstrates an AI agent that acts as an assistant for a vet clinic
 1. **Clone or download this project**
 
 2. **Create a virtual environment (recommended)**
+
    ```bash
    python -m venv .venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
