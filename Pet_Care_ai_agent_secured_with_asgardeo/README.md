@@ -43,6 +43,7 @@ This project demonstrates an AI agent that acts as an assistant for a vet clinic
    ```
 
 3. **Install required dependencies**
+
    ```bash
    pip install -r requirements.txt
    ```
