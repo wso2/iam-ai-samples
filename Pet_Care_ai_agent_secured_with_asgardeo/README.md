@@ -29,7 +29,7 @@ This project demonstrates an AI agent that acts as an assistant for a vet clinic
 ├── index.html          # Web interface for chat
 ├── .env                # Environment variables configuration
 ├── requirements.txt    # Python dependencies
-└── README.md          # This file
+└── README.md
 ```
 
 ## Installation
