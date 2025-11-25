@@ -87,7 +87,7 @@ This project demonstrates an AI agent that acts as an assistant for a vet clinic
    ```bash
    # Asgardeo OAuth2 Configuration
    AUTH_ISSUER=https://api.asgardeo.io/t/pawsomepets
-   CLIENT_ID=abc123xyz789_client_id_from_asgardeo
+   CLIENT_ID=<client_id_of_the_application_registered_in_asgardeo>
    JWKS_URL=https://api.asgardeo.io/t/pawsomepets/oauth2/jwks
    
    # OpenAI Configuration
