@@ -49,8 +49,13 @@ class JWTTokenVerifier(TokenVerifier):
             scopes = payload.get("scope", "").split() if payload.get("scope") else []
             subject = payload.get("sub")
             audience = payload.get("aud")
+            aut = payload.get("aut")
+            act = payload.get("act")
 
-            logger.info(f"Token validated successfully for subject: {subject}")
+            logger.info("[JWT VALID] " + ", ".join(
+                [f"sub={subject}", f"aut={aut}", f"scopes={scopes}"] +
+                ([f"act={act}"] if act else [])
+            ))
 
             return AccessToken(
                 token=token,
@@ -76,7 +81,7 @@ if not all([AUTH_ISSUER, CLIENT_ID, JWKS_URL]):
 
 # Create FastMCP instance as a Resource Server
 mcp = FastMCP(
-    "Weather Service",
+    "Addition Tool",
     # Token verifier for authentication
     token_verifier=JWTTokenVerifier(JWKS_URL, AUTH_ISSUER, CLIENT_ID),
     # Auth settings for RFC 9728 Protected Resource Metadata
@@ -89,13 +94,12 @@ mcp = FastMCP(
 
 
 @mcp.tool()
-async def get_weather(city: str = "London") -> dict[str, str]:
-    """Get weather data for a city"""
+async def add(a: float, b: float) -> dict[str, float]:
+    """Add two numbers and return the result."""
     return {
-        "city": city,
-        "temperature": "22",
-        "condition": "Partly cloudy",
-        "humidity": "65%",
+        "a": a,
+        "b": b,
+        "result": a + b,
     }
 
 
