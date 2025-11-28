@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pawsome Pet Care</title>
+    <!-- Modern Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4F46E5; /* Indigo 600 */
+            --primary-hover: #4338ca;
+            --bg-color: #F3F4F6;
+            --chat-bg: #FFFFFF;
+            --user-msg-bg: #4F46E5;
+            --user-msg-text: #FFFFFF;
+            --agent-msg-bg: #F3F4F6;
+            --agent-msg-text: #1F2937;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Main Card Container */
+        .main-container {
+            width: 100%;
+            max-width: 500px;
+            height: 90vh; /* 90% of viewport height */
+            background-color: var(--chat-bg);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Header */
+        header {
+            background-color: var(--chat-bg);
+            padding: 20px;
+            border-bottom: 1px solid #E5E7EB;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            z-index: 10;
+        }
+
+        /* Avatar Image Style */
+        .avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            object-fit: cover; /* Ensures the image fills the circle perfectly */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header-info h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .header-info p {
+            font-size: 13px;
+            color: #10B981; /* Green for active */
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #10B981;
+            border-radius: 50%;
+        }
+
+        /* Chat Area */
+        #chat-box {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background-color: #ffffff;
+            scroll-behavior: smooth;
+        }
+
+        /* Scrollbar Styling */
+        #chat-box::-webkit-scrollbar { width: 6px; }
+        #chat-box::-webkit-scrollbar-track { background: transparent; }
+        #chat-box::-webkit-scrollbar-thumb { background-color: #D1D5DB; border-radius: 20px; }
+
+        /* Message Bubbles */
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            font-size: 15px;
+            line-height: 1.5;
+            position: relative;
+            word-wrap: break-word;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .avatar-emoji-simple {
+            font-size: 80px;
+            margin-right: 15px;
+            line-height: 1;
+        }
+
+        .agent {
+            align-self: flex-start;
+            background-color: var(--agent-msg-bg);
+            color: var(--agent-msg-text);
+            border-radius: 18px 18px 18px 4px;
+        }
+
+        .user {
+            align-self: flex-end;
+            background-color: var(--user-msg-bg);
+            color: var(--user-msg-text);
+            border-radius: 18px 18px 4px 18px;
+            box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 20px;
+            background-color: white;
+            border-top: 1px solid #E5E7EB;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input {
+            flex: 1;
+            padding: 14px 18px;
+            border: 1px solid #E5E7EB;
+            border-radius: 30px;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.2s;
+            background-color: #F9FAFB;
+        }
+
+        input:focus {
+            border-color: var(--primary-color);
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        button {
+            width: 45px;
+            height: 45px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s, transform 0.1s;
+            flex-shrink: 0;
+        }
+
+        button:hover { background-color: var(--primary-hover); }
+        button:active { transform: scale(0.95); }
+        button:disabled { background-color: #9CA3AF; cursor: not-allowed; }
+
+        button svg { width: 20px; height: 20px; fill: white; margin-left: 2px; }
+
+        /* Typing Indicator */
+        .typing-indicator {
+            align-self: flex-start;
+            background-color: var(--agent-msg-bg);
+            padding: 12px 16px;
+            border-radius: 18px 18px 18px 4px;
+            display: none; /* Hidden by default */
+            gap: 5px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: #9CA3AF;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 600px) {
+            .main-container {
+                height: 100vh;
+                max-width: 100%;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <!-- Header -->
+
+        <header>
+            <div class="avatar-emoji-simple">🐾</div>
+            <div class="header-info">
+                <h1>Pawsome Assistant</h1>
+                <p><span class="status-dot"></span> Online</p>
+            </div>
+        </header>
+
+        <!-- Chat Area -->
+        <div id="chat-box">
+            <div class="message agent">
+                Hello! 🐾 I'm your Pawsome assistant. How can I help you with your pet today?
+            </div>
+        </div>
+
+        <!-- Typing Indicator (Hidden by default) -->
+        <div class="typing-indicator" id="typing-indicator">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="Ask about vaccines, booking..." autocomplete="off">
+            <button onclick="sendMessage()" id="send-btn">
+                <!-- Send Icon SVG -->
+                <svg viewBox="0 0 24 24">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const typingIndicator = document.getElementById('typing-indicator');
+
+        // Focus input on load
+        userInput.focus();
+
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            // 1. Add User Message
+            addMessage(message, 'user');
+            userInput.value = '';
+            
+            // 2. Show Typing Indicator & Disable Input
+            showTyping(true);
+            sendBtn.disabled = true;
+            userInput.disabled = true;
+
+            try {
+                // 3. Send to API
+                const response = await fetch('http://localhost:8080/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const data = await response.json();
+                
+                // 4. Hide Typing & Add Agent Response
+                showTyping(false);
+                
+                if (data.error) {
+                    addMessage("Sorry, something went wrong on the server.", 'agent');
+                } else {
+                    // Simple formatting: Convert newlines to <br>
+                    const formattedResponse = data.response.replace(/\n/g, '<br>');
+                    addMessage(formattedResponse, 'agent', true);
+                }
+
+            } catch (error) {
+                showTyping(false);
+                addMessage("Error connecting to the agent. Is the server running?", 'agent');
+                console.error(error);
+            } finally {
+                sendBtn.disabled = false;
+                userInput.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        function addMessage(text, sender, isHtml = false) {
+            const div = document.createElement('div');
+            div.className = `message ${sender}`;
+            
+            if (isHtml) {
+                div.innerHTML = text;
+            } else {
+                div.textContent = text;
+            }
+            
+            // Append before the typing indicator
+            chatBox.appendChild(div);
+            scrollToBottom();
+        }
+
+        function showTyping(show) {
+            if (show) {
+                typingIndicator.style.display = 'flex';
+                // Move typing indicator to the bottom visually
+                chatBox.parentNode.insertBefore(typingIndicator, document.querySelector('.input-area'));
+            } else {
+                typingIndicator.style.display = 'none';
+            }
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            const container = document.querySelector('.main-container');
+            // We scroll the chatBox, not the container
+            chatBox.scrollTop = chatBox.scrollHeight;
+            
+            // If using a flex layout where chatBox is the scroller
+            chatBox.scrollTo({
+                top: chatBox.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+
+        // Handle Enter Key
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+    </script>
+</body>
+</html>
