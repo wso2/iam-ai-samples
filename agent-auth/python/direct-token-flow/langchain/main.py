@@ -16,7 +16,7 @@ import asyncio
 from dotenv import load_dotenv
 from pathlib import Path
 
-from asgardeo import AsgardeoConfig, AsgardeoNativeAuthClient
+from asgardeo import AsgardeoConfig
 from asgardeo_ai import AgentConfig, AgentAuthManager
 
 from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -28,13 +28,13 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 ROOT_DIR = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT_DIR / ".env")
 
-config = AsgardeoConfig(
+ASGARDEO_CONFIG = AsgardeoConfig(
     base_url=os.getenv("ASGARDEO_BASE_URL"),
     client_id=os.getenv("CLIENT_ID"),
     redirect_uri=os.getenv("REDIRECT_URI")
 )
 
-agent_config = AgentConfig(
+AGENT_CONFIG = AgentConfig(
     agent_id=os.getenv("AGENT_ID"),
     agent_secret=os.getenv("AGENT_SECRET")
 )
@@ -42,7 +42,7 @@ agent_config = AgentConfig(
 
 async def main():
 
-    async with AgentAuthManager(config, agent_config) as auth_manager:
+    async with AgentAuthManager(ASGARDEO_CONFIG, AGENT_CONFIG) as auth_manager:
         # Get agent token
         agent_token = await auth_manager.get_agent_token(["openid"])
 
@@ -52,7 +52,7 @@ async def main():
         {
             "mcp_server": {
                 "transport": "streamable_http",
-                "url": "http://127.0.0.1:8000/mcp",
+                "url":os.getenv("MCP_SERVER_URL"),
                 "headers": {
                     "Authorization": f"Bearer {agent_token.access_token}"
                 }

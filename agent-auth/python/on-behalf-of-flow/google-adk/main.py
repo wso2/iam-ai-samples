@@ -12,16 +12,17 @@
 
 import os
 import asyncio
-
-from dotenv import load_dotenv
 from pathlib import Path
+from dotenv import load_dotenv
 
 from asgardeo import AsgardeoConfig
 from asgardeo_ai import AgentConfig, AgentAuthManager
 
-from langchain_mcp_adapters.client import MultiServerMCPClient
-from langchain.agents import create_agent
-from langchain_google_genai import ChatGoogleGenerativeAI
+from google.adk.agents.llm_agent import LlmAgent
+from google.adk.runners import InMemoryRunner
+from google.adk.tools.mcp_tool import McpToolset
+from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams
+from google.genai import types
 
 from oauth_callback import OAuthCallbackServer
 
@@ -41,9 +42,7 @@ AGENT_CONFIG = AgentConfig(
     agent_secret=os.getenv("AGENT_SECRET")
 )
 
-
-async def main():
-
+async def build_toolset():
     async with AgentAuthManager(ASGARDEO_CONFIG, AGENT_CONFIG) as auth_manager:
         # Get agent token
         agent_token = await auth_manager.get_agent_token(["openid", "email"])
@@ -72,39 +71,54 @@ async def main():
         # Exchange auth code for user token (OBO flow)
         obo_token = await auth_manager.get_obo_token(auth_code, agent_token=agent_token, code_verifier=code_verifier)
 
-
     # Connect to MCP Server with Auth Header
-    client = MultiServerMCPClient(
-        {
-            "mcp_server": {
-                "transport": "streamable_http",
-                "url":os.getenv("MCP_SERVER_URL"),
-                "headers": {
-                    "Authorization": f"Bearer {obo_token.access_token}",
-                }
-            }
-        }
+    return McpToolset(
+        connection_params=StreamableHTTPConnectionParams(
+            url=os.getenv("MCP_SERVER_URL"),
+            headers={"Authorization": f"Bearer {obo_token.access_token}"}
+        )
     )
 
-    # LLM (Gemini) + LangChain Agent
-    llm = ChatGoogleGenerativeAI(
+async def main():
+
+    mcp_toolset = await build_toolset()
+
+    # Define LLM Agent (Gemini)
+    agent = LlmAgent(
         model="gemini-2.0-flash",
-        temperature=0.9
+        name="add_agent",
+        description="Adds two numbers using an MCP server.",
+        instruction="When the user asks to add numbers, call the MCP tool `add(a, b)`.",
+        tools=[mcp_toolset],
     )
 
-    tools = await client.get_tools()
-    agent = create_agent(llm, tools)
+    # Setup runner + session
+    runner = InMemoryRunner(agent, app_name="add_numbers_app")
 
-    user_input = input("Enter your question: ")
-
-    # Invoke the agent
-    response = await agent.ainvoke(
-        {"messages": [{"role": "user", "content": user_input}]}
+    session = await runner.session_service.create_session(
+        app_name="add_numbers_app",
+        user_id="user"
     )
 
-    print("Agent Response:", response["messages"][-1].content)
+    question = input("Enter your question: ")
 
+    try:
+        async for event in runner.run_async(
+                user_id="user",
+                session_id=session.id,
+                new_message=types.Content(
+                    role="user",
+                    parts=[types.Part(text=question)]
+                ),
+        ):
+            if event.content and event.content.parts:
+                text = event.content.parts[0].text
+                if text:
+                    print(text)
 
-# Run app
+    finally:
+        await mcp_toolset.close()
+        await runner.close()
+
 if __name__ == "__main__":
     asyncio.run(main())
