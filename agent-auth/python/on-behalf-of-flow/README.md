@@ -135,7 +135,9 @@ to call your MCP server.
 
 ## Running the OBO Flow
 
-Once everything is set up, navigate into either the `google-adk` or `langchain` folder depending on the framework of your choice and simply run:
+Ensure the secured MCP Server is up and running.
+
+Navigate into either the `google-adk` or `langchain` folder depending on the framework of your choice and simply run:
 
 ```bash
 python main.py

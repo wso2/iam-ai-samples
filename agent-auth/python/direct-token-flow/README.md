@@ -102,6 +102,8 @@ If you don’t already have an MCP server running, you can quickly set one up by
 
 ## Running the Direct Token Flow
 
+Ensure the secured MCP Server is up and running.
+
 Navigate into either the `google-adk` or `langchain` folder depending on the framework of your choice and simply run:
 
 ```bash
