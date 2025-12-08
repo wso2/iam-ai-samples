@@ -115,14 +115,15 @@ For more information on how to run MCP Inspector, refer to the [MCP Inspector do
 5. Click on the **Connect** button to establish a connection with the MCP server.
    (Once you click on the connect button, it will redirect you to the Asgardeo login page, where you can login with your Asgardeo credentials.)
 ![mcp-server-connect.png](images/mcp-server-connect.png)
-6. Once connected, you can start testing the available get_weather tool by navigating the **Tools** tab in the MCP Inspector.
+6. Once connected, you can start testing the available `add` tool by navigating the **Tools** tab in the MCP Inspector.
 
 ## Available Tools
 
-### get_weather Tool
+### add Tool
 
-- **Description**: Get weather data for a city
+- **Description**: Adds two numbers and returns the computed result.
 - **Parameters**: 
-  - `city` (optional): City name (defaults to "London")
-- **Authentication**: Required (valid JWT token)
-- **Returns**: Weather information including temperature, condition, and humidity
+  - `a` (float): First number
+  - `b` (float): Second number
+- **Authentication**: Required (valid JWT token).
+- **Returns**: Returns the computed result.
