@@ -1,4 +1,4 @@
-# AI Agent Authentication Quickstart - On-Behalf-Of (OBO) Flow
+# Agent Identity Quickstart - On-Behalf-Of (OBO) Flow
 
 This guide explains how to run the `On-Behalf-Of (OBO) authentication flow` using Asgardeo with modern agent frameworks such as **LangChain** and **Google ADK**.
 
@@ -24,7 +24,7 @@ This example corresponds to the _“AI agent acting on behalf of a user”_ scen
 This sample is located under:
 
 ```
-agent-auth/python/on-behalf-of-flow/
+agent-identity/python/on-behalf-of-flow/
 ├── README.md               # You are here
 ├── google-adk/             # OBO flow using the Google Agent Development Kit
 │   ├── main.py
@@ -75,7 +75,7 @@ Navigate into either the `google-adk` or `langchain` folder depending on which f
 
 Example:
 ```bash
-   cd python/direct-token-flow/langchain
+   cd agent-identity/python/on-behalf-of-flow/langchain
 ```
 
 ### Create and activate a virtual environment

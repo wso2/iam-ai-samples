@@ -1,6 +1,6 @@
-# AI Agent Authentication Quickstart — Direct Token Flow
+# Agent Identity Quickstart — Agent Authentication Flow
 
-This guide walks you through running the **Direct Token Flow** sample for authenticating AI agents using **Asgardeo** and securely connecting to an MCP server through modern agent frameworks such as **LangChain** and **Google ADK**.
+This guide walks you through running the **Agent Authentication Flow** sample for authenticating AI agents using **Asgardeo** and securely connecting to an MCP server through modern agent frameworks such as **LangChain** and **Google ADK**.
 
 In this flow, the AI agent authenticates by itself (not on behalf of a user) using its Agent Credentials and obtains a valid access token to call MCP tools securely.
 
@@ -16,12 +16,12 @@ This example corresponds to the _“AI agent acting on its own”_ scenario desc
 ## Directory Overview
 
 ```
-agent-auth/python/direct-token-flow/
+agent-identity/python/agent-auth-flow/
 ├── README.md           # You are here
-├── google-adk/         # Direct token flow using the Google Agent Development Kit
+├── google-adk/         # Agent Authentication flow using the Google Agent Development Kit
 │   ├── main.py
 │   └── requirements.txt
-└── langchain/          # Direct token flow using LangChain framework
+└── langchain/          # Agent Authentication flow using LangChain framework
     ├── main.py
     └── requirements.txt
 ```
@@ -70,7 +70,7 @@ Navigate into either the `google-adk` or `langchain` folder depending on which f
 
 Example:
 ```bash
-   cd python/direct-token-flow/langchain
+   cd agent-identity/python/agent-auth-flow/langchain
 ```
 
 ### Create and activate a virtual environment
@@ -100,7 +100,7 @@ Update the `.env` file located at `iam-ai-samples/agent-auth/python` by replacin
 
 If you don’t already have an MCP server running, you can quickly set one up by following the [MCP Authentication Quickstart](https://github.com/wso2/iam-ai-samples/tree/main/mcp-auth/python) guide. When using the default configuration from that guide, your MCP server URL will be: http://127.0.0.1:8000/mcp.
 
-## Running the Direct Token Flow
+## Running the Agent Authentication Flow
 
 Ensure the secured MCP Server is up and running.
 
@@ -128,7 +128,7 @@ Enter your question: Can you add six and 9?
 Agent Response: The sum of 6 and 9 is 15.
 ```
 
-## Understanding the Direct Token Flow
+## Understanding the Agent Authentication Flow
 
 This flow is used when:
 
@@ -137,4 +137,4 @@ This flow is used when:
     ✔ Tokens represent the agent itself
 
 If you want to authenticate on behalf of a user using PKCE and authorization code flow, refer to:
-➡ `python/on-behalf-of-flow/README.md`
+➡ `agent-auth/python/on-behalf-of-flow/README.md`

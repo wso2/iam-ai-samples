@@ -6,7 +6,7 @@
   herein is strictly forbidden, unless permitted by WSO2 in accordance with
   the WSO2 Commercial License available at http://wso2.com/licenses.
   For specific language governing the permissions and limitations under
-  this license, please see the license as well as any agreement you’ve
+  this license, please see the license as well as any agreement you've
   entered into with WSO2 governing the purchase of this software and any
 """
 
@@ -67,7 +67,7 @@ async def main():
             print(f"Authorization failed or cancelled. Error: {error}")
             return
 
-        print(f"Received auth_code={auth_code}")
+        print("Received authorization code")
 
         # Exchange auth code for user token (OBO flow)
         obo_token = await auth_manager.get_obo_token(auth_code, agent_token=agent_token, code_verifier=code_verifier)

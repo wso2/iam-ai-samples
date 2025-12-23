@@ -1,10 +1,10 @@
-# AI Agent Authentication Quickstart — Python Samples
+# Agent Identity Quickstart — Python Samples
 
 This directory contains two Python-based sample implementations demonstrating how to authenticate AI agents with Asgardeo and securely interact with MCP servers. Each scenario showcases a different authentication model.
 
 ## Available Scenarios
 
-### direct-token-flow/
+### agent-auth-flow/
 
 - AI agent authenticates **on its own** using Agent Credentials.
 - No user interaction or redirection is involved.

@@ -6,7 +6,7 @@
   herein is strictly forbidden, unless permitted by WSO2 in accordance with
   the WSO2 Commercial License available at http://wso2.com/licenses.
   For specific language governing the permissions and limitations under
-  this license, please see the license as well as any agreement you’ve
+  this license, please see the license as well as any agreement you've
   entered into with WSO2 governing the purchase of this software and any
 
 
@@ -42,6 +42,14 @@ class OAuthCallbackServer:
             url = urlparse(self.path)
             params = parse_qs(url.query)
 
+            # Invalid callback
+            if url.path != "/oauth/callback":
+                self.parent._error = "Invalid Callback URL"
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"Invalid redirect. You can close this window.")
+                return
+
             # OAuth error case
             if "error" in params:
                 self.parent._error = params["error"][0]
@@ -57,14 +65,6 @@ class OAuthCallbackServer:
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(b"Authentication successful. You can close this window.")
-                return
-
-            # Invalid callback
-            if url.path != "/oauth/callback":
-                self.parent._error = "Invalid Callback URL"
-                self.send_response(200)
-                self.end_headers()
-                self.wfile.write(b"Invalid redirect. You can close this window.")
                 return
 
     def start(self):

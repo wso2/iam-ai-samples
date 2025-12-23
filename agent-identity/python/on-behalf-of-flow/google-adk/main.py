@@ -6,7 +6,7 @@
   herein is strictly forbidden, unless permitted by WSO2 in accordance with
   the WSO2 Commercial License available at http://wso2.com/licenses.
   For specific language governing the permissions and limitations under
-  this license, please see the license as well as any agreement you’ve
+  this license, please see the license as well as any agreement you've
   entered into with WSO2 governing the purchase of this software and any
 """
 
@@ -23,6 +23,9 @@ from google.adk.runners import InMemoryRunner
 from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams
 from google.genai import types
+
+from oauth_callback import OAuthCallbackServer
+
 
 # Load environment variables from .env file
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -42,13 +45,37 @@ AGENT_CONFIG = AgentConfig(
 async def build_toolset():
     async with AgentAuthManager(ASGARDEO_CONFIG, AGENT_CONFIG) as auth_manager:
         # Get agent token
-        agent_token = await auth_manager.get_agent_token(["openid"])
+        agent_token = await auth_manager.get_agent_token(["openid", "email"])
+
+        # Generate user authorization URL
+        auth_url, state, code_verifier = auth_manager.get_authorization_url_with_pkce(["openid", "email"])
+
+        print("Open this URL in your browser to authenticate:")
+        print(auth_url)
+
+        callback = OAuthCallbackServer(port=6274)
+        callback.start()
+
+        print("Waiting for authorization code from redirect...")
+
+        # Wait for redirect
+        auth_code, returned_state, error = await callback.wait_for_code()
+        callback.stop()
+
+        if auth_code is None:
+            print(f"Authorization failed or cancelled. Error: {error}")
+            return
+
+        print("Received authorization code")
+
+        # Exchange auth code for user token (OBO flow)
+        obo_token = await auth_manager.get_obo_token(auth_code, agent_token=agent_token, code_verifier=code_verifier)
 
     # Connect to MCP Server with Auth Header
     return McpToolset(
         connection_params=StreamableHTTPConnectionParams(
             url=os.getenv("MCP_SERVER_URL"),
-            headers={"Authorization": f"Bearer {agent_token.access_token}"}
+            headers={"Authorization": f"Bearer {obo_token.access_token}"}
         )
     )
 
@@ -56,9 +83,13 @@ async def main():
 
     mcp_toolset = await build_toolset()
 
+    if mcp_toolset is None:
+        print("Failed to build toolset. Exiting.")
+        return
+
     # Define LLM Agent (Gemini)
     agent = LlmAgent(
-        model="gemini-2.5-flash",
+        model="gemini-2.0-flash",
         name="add_agent",
         description="Adds two numbers using an MCP server.",
         instruction="When the user asks to add numbers, call the MCP tool `add(a, b)`.",
