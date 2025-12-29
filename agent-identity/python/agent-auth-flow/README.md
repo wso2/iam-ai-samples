@@ -90,7 +90,7 @@ pip install -r requirements.txt
 
 ## Configure Environment Variables
 
-Update the `.env` file located at `iam-ai-samples/agent-auth/python` by replacing the following placeholders with your actual values:
+Update the `.env` file located at `agent-identity/python` by replacing the following placeholders with your actual values:
 
 - `<your-tenant>` → Your tenant ID (visible in the Asgardeo console URL)
 - `<your-client-id>` → from the MCP application

@@ -87,7 +87,7 @@ class OAuthCallbackServer:
             self._httpd.shutdown()
 
     async def wait_for_code(self):
-        """Returns (auth_code, state). auth_code==None means canceled, error, or timed out."""
+        """Returns (auth_code, state, _error). auth_code==None means canceled, error, or timed out."""
         elapsed = 0
         while self.auth_code is None and self._error is None and elapsed < self.timeout:
             await asyncio.sleep(0.1)
