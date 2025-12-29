@@ -137,4 +137,4 @@ This flow is used when:
     ✔ Tokens represent the agent itself
 
 If you want to authenticate on behalf of a user using PKCE and authorization code flow, refer to:
-➡ `agent-auth/python/on-behalf-of-flow/README.md`
+➡ `agent-identity/python/on-behalf-of-flow/README.md`

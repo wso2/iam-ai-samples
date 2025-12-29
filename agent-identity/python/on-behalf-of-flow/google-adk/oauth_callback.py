@@ -67,6 +67,12 @@ class OAuthCallbackServer:
                 self.wfile.write(b"Authentication successful. You can close this window.")
                 return
 
+            # Fallthrough - missing required parameters
+            self.parent._error = "Missing authorization code"
+            self.send_response(400)
+            self.end_headers()
+            self.wfile.write(b"Missing authorization code. You can close this window.")
+
     def start(self):
         handler = self._Handler
         handler.parent = self

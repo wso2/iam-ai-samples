@@ -42,6 +42,14 @@ class OAuthCallbackServer:
             url = urlparse(self.path)
             params = parse_qs(url.query)
 
+            # Invalid callback
+            if url.path != "/oauth/callback":
+                self.parent._error = "Invalid Callback URL"
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"Invalid redirect. You can close this window.")
+                return
+
             # OAuth error case
             if "error" in params:
                 self.parent._error = params["error"][0]
@@ -59,13 +67,11 @@ class OAuthCallbackServer:
                 self.wfile.write(b"Authentication successful. You can close this window.")
                 return
 
-            # Invalid callback
-            if url.path != "/oauth/callback":
-                self.parent._error = "Invalid Callback URL"
-                self.send_response(200)
-                self.end_headers()
-                self.wfile.write(b"Invalid redirect. You can close this window.")
-                return
+            # Fallthrough - missing required parameters
+            self.parent._error = "Missing authorization code"
+            self.send_response(400)
+            self.end_headers()
+            self.wfile.write(b"Missing authorization code. You can close this window.")
 
     def start(self):
         handler = self._Handler
