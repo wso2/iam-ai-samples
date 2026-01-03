@@ -6,20 +6,26 @@
   herein is strictly forbidden, unless permitted by WSO2 in accordance with
   the WSO2 Commercial License available at http://wso2.com/licenses.
   For specific language governing the permissions and limitations under
-  this license, please see the license as well as any agreement you’ve
+  this license, please see the license as well as any agreement you've
   entered into with WSO2 governing the purchase of this software and any
 """
 
 import os
+import logging
+import traceback
 
 import httpx
 from dotenv import load_dotenv
 
 from asgardeo.models import OAuthToken
 
+# Configure logging for this module
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
 hotel_api_base_url = os.environ.get('HOTEL_API_BASE_URL')
+logger.info(f"[tools.py] Hotel API Base URL configured as: {hotel_api_base_url}")
 
 
 async def _get(base_url: str, path: str, bearer_token: str, params: dict = None) -> dict:
@@ -30,13 +36,43 @@ async def _get(base_url: str, path: str, bearer_token: str, params: dict = None)
     # Only add Authorization header if token is provided and not empty
     if bearer_token and bearer_token.strip():
         headers["Authorization"] = f"Bearer {bearer_token}"
+        logger.debug(f"[_get] Authorization header added (token length: {len(bearer_token)})")
+    else:
+        logger.debug("[_get] No bearer token provided, making unauthenticated request")
 
     url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
+    logger.info(f"[_get] Making GET request to: {url}")
+    logger.debug(f"[_get] Request params: {params}")
 
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, headers=headers, params=params)
-        response.raise_for_status()
-        return response.json()
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(url, headers=headers, params=params)
+            logger.info(f"[_get] Response status: {response.status_code} for URL: {url}")
+            
+            if response.status_code >= 400:
+                logger.error(f"[_get] HTTP error {response.status_code}: {response.text[:500]}")
+            
+            response.raise_for_status()
+            return response.json()
+    except httpx.ConnectError as e:
+        logger.error(f"[_get] Connection error to {url}: {str(e)}")
+        logger.error(f"[_get] This usually means the backend service is not running or unreachable")
+        logger.error(f"[_get] Base URL: {base_url}, Path: {path}")
+        logger.error(f"[_get] Full traceback:\n{traceback.format_exc()}")
+        raise
+    except httpx.TimeoutException as e:
+        logger.error(f"[_get] Timeout error for {url}: {str(e)}")
+        logger.error(f"[_get] Full traceback:\n{traceback.format_exc()}")
+        raise
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[_get] HTTP status error for {url}: {e.response.status_code}")
+        logger.error(f"[_get] Response body: {e.response.text[:1000]}")
+        logger.error(f"[_get] Full traceback:\n{traceback.format_exc()}")
+        raise
+    except Exception as e:
+        logger.error(f"[_get] Unexpected error for {url}: {type(e).__name__}: {str(e)}")
+        logger.error(f"[_get] Full traceback:\n{traceback.format_exc()}")
+        raise
 
 
 async def _post(base_url: str, path: str, bearer_token: str, data: dict = None, params: dict = None) -> dict:
@@ -48,13 +84,44 @@ async def _post(base_url: str, path: str, bearer_token: str, data: dict = None, 
     # Only add Authorization header if token is provided and not empty
     if bearer_token and bearer_token.strip():
         headers["Authorization"] = f"Bearer {bearer_token}"
+        logger.debug(f"[_post] Authorization header added (token length: {len(bearer_token)})")
+    else:
+        logger.debug("[_post] No bearer token provided, making unauthenticated request")
 
     url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
+    logger.info(f"[_post] Making POST request to: {url}")
+    logger.debug(f"[_post] Request data: {data}")
+    logger.debug(f"[_post] Request params: {params}")
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, headers=headers, json=data, params=params)
-        response.raise_for_status()
-        return response.json()
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, headers=headers, json=data, params=params)
+            logger.info(f"[_post] Response status: {response.status_code} for URL: {url}")
+            
+            if response.status_code >= 400:
+                logger.error(f"[_post] HTTP error {response.status_code}: {response.text[:500]}")
+            
+            response.raise_for_status()
+            return response.json()
+    except httpx.ConnectError as e:
+        logger.error(f"[_post] Connection error to {url}: {str(e)}")
+        logger.error(f"[_post] This usually means the backend service is not running or unreachable")
+        logger.error(f"[_post] Base URL: {base_url}, Path: {path}")
+        logger.error(f"[_post] Full traceback:\n{traceback.format_exc()}")
+        raise
+    except httpx.TimeoutException as e:
+        logger.error(f"[_post] Timeout error for {url}: {str(e)}")
+        logger.error(f"[_post] Full traceback:\n{traceback.format_exc()}")
+        raise
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[_post] HTTP status error for {url}: {e.response.status_code}")
+        logger.error(f"[_post] Response body: {e.response.text[:1000]}")
+        logger.error(f"[_post] Full traceback:\n{traceback.format_exc()}")
+        raise
+    except Exception as e:
+        logger.error(f"[_post] Unexpected error for {url}: {type(e).__name__}: {str(e)}")
+        logger.error(f"[_post] Full traceback:\n{traceback.format_exc()}")
+        raise
 
 
 async def _patch(base_url: str, path: str, bearer_token: str, data: dict = None, params: dict = None) -> dict:
@@ -66,13 +133,44 @@ async def _patch(base_url: str, path: str, bearer_token: str, data: dict = None,
     # Only add Authorization header if token is provided and not empty
     if bearer_token and bearer_token.strip():
         headers["Authorization"] = f"Bearer {bearer_token}"
+        logger.debug(f"[_patch] Authorization header added (token length: {len(bearer_token)})")
+    else:
+        logger.debug("[_patch] No bearer token provided, making unauthenticated request")
 
     url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
+    logger.info(f"[_patch] Making PATCH request to: {url}")
+    logger.debug(f"[_patch] Request data: {data}")
+    logger.debug(f"[_patch] Request params: {params}")
 
-    async with httpx.AsyncClient() as client:
-        response = await client.patch(url, headers=headers, json=data, params=params)
-        response.raise_for_status()
-        return response.json()
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.patch(url, headers=headers, json=data, params=params)
+            logger.info(f"[_patch] Response status: {response.status_code} for URL: {url}")
+            
+            if response.status_code >= 400:
+                logger.error(f"[_patch] HTTP error {response.status_code}: {response.text[:500]}")
+            
+            response.raise_for_status()
+            return response.json()
+    except httpx.ConnectError as e:
+        logger.error(f"[_patch] Connection error to {url}: {str(e)}")
+        logger.error(f"[_patch] This usually means the backend service is not running or unreachable")
+        logger.error(f"[_patch] Base URL: {base_url}, Path: {path}")
+        logger.error(f"[_patch] Full traceback:\n{traceback.format_exc()}")
+        raise
+    except httpx.TimeoutException as e:
+        logger.error(f"[_patch] Timeout error for {url}: {str(e)}")
+        logger.error(f"[_patch] Full traceback:\n{traceback.format_exc()}")
+        raise
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[_patch] HTTP status error for {url}: {e.response.status_code}")
+        logger.error(f"[_patch] Response body: {e.response.text[:1000]}")
+        logger.error(f"[_patch] Full traceback:\n{traceback.format_exc()}")
+        raise
+    except Exception as e:
+        logger.error(f"[_patch] Unexpected error for {url}: {type(e).__name__}: {str(e)}")
+        logger.error(f"[_patch] Full traceback:\n{traceback.format_exc()}")
+        raise
 
 
 async def fetch_hotels(token: OAuthToken = None, city: str = None, brand: str = None, amenities: list = None, limit: int = 20, offset: int = 0) -> dict:

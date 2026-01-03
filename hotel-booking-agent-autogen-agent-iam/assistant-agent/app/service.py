@@ -97,18 +97,35 @@ async def run_agent(assistant: AssistantAgent, websocket: WebSocket):
     # Start the chat loop
     while True:
         user_input = await websocket.receive_text()
+        logger.info(f"[run_agent] Received user input: {user_input[:100]}...")
 
         if user_input.strip().lower() == "exit":
+            logger.info("[run_agent] User requested exit, closing websocket")
             await websocket.close()
             break
 
         # Send the user message to the agent
-        response = await assistant.on_messages(
-            [TextMessage(content=user_input, source="user")], cancellation_token=CancellationToken())
+        logger.info("[run_agent] Sending message to agent for processing")
+        try:
+            response = await assistant.on_messages(
+                [TextMessage(content=user_input, source="user")], cancellation_token=CancellationToken())
+        except Exception as e:
+            logger.error(f"[run_agent] Agent processing failed: {type(e).__name__}: {str(e)}")
+            import traceback
+            logger.error(f"[run_agent] Full traceback:\n{traceback.format_exc()}")
+            await websocket.send_json(TextResponse(content=f"I encountered an error processing your request. Please try again.").model_dump())
+            continue
 
-        # Log the response
+        # Log the response with detailed information
+        logger.info(f"[run_agent] Agent response received with {len(response.inner_messages)} inner messages")
         for i, msg in enumerate(response.inner_messages):
-            print(f"Step {i + 1}: {msg.content}")
+            msg_type = type(msg).__name__
+            content_preview = str(msg.content)[:200] if hasattr(msg, 'content') else str(msg)[:200]
+            logger.info(f"[run_agent] Step {i + 1} ({msg_type}): {content_preview}")
+            # Also print to stdout for docker logs visibility
+            print(f"Step {i + 1} ({msg_type}): {msg.content}")
+        
+        logger.info(f"[run_agent] Final Response: {response.chat_message.content[:200]}...")
         print(f"Final Response: {response.chat_message.content}")
 
         # Send the response back to the client
