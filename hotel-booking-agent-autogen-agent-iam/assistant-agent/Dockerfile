@@ -1,5 +1,5 @@
 # Use an official Python runtime as a base image
-FROM python:3.11-alpine3.22.1
+FROM python:3.11-alpine3.20
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -42,4 +42,4 @@ EXPOSE 8000
 # Run the application (adjust as needed)
 CMD ["uvicorn", "app.service:app", "--host", "0.0.0.0", "--port", "8000"]
 
- 
+
