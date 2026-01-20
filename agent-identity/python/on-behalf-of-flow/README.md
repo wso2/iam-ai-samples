@@ -100,8 +100,8 @@ Update the `.env` file located at `agent-identity/python` by replacing the follo
 - `<your-tenant>` → Your tenant ID (visible in the Asgardeo console URL)
 - `<your-client-id>` → from the MCP application
 - `<your-agent-id>` / `<your-agent-secret>` → Values from your AI agent registration
-- `GOOGLE_API_KEY` → You can generate one from [Google AI Studio](https://aistudio.google.com/app/api-keys)
-- `MCP_SERVER_URL` → your secured MCP server endpoint
+- `<google-api-key>` → You can generate one from [Google AI Studio](https://aistudio.google.com/app/api-keys)
+- `<mcp-server-url>` → your secured MCP server endpoint
 
 If you don’t already have an MCP server running, you can quickly set one up by following the [MCP Authentication Quickstart](https://github.com/wso2/iam-ai-samples/tree/main/mcp-auth/python) guide. When using the default configuration from that guide, your MCP server URL will be: http://127.0.0.1:8000/mcp.
 

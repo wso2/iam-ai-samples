@@ -58,7 +58,7 @@ async def main():
 
     # Define LLM Agent (Gemini)
     agent = LlmAgent(
-        model="gemini-2.5-flash",
+        model=os.getenv("LLM_MODEL"),
         name="add_agent",
         description="Adds two numbers using an MCP server.",
         instruction="When the user asks to add numbers, call the MCP tool `add(a, b)`.",

@@ -86,9 +86,9 @@ async def main():
         }
     )
 
-    # LLM (Gemini) + LangChain Agent
+    # LLM Model (Gemini) + LangChain Agent
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
+        model=os.getenv("LLM_MODEL"),
         temperature=0.9
     )
 
