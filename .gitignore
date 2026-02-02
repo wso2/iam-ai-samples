@@ -74,3 +74,6 @@ bundle-analyzer-report.html
 **/.env
 
 .DS_Store
+
+/mcp-auth/client/node_modules
+*.idea/
