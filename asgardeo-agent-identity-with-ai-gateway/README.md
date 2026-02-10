@@ -6,10 +6,10 @@ An application demonstrating secure authentication and authorization for AI agen
 
 ## 📑 Table of Contents
 
-- [Architecture](#-architecture)
+- [Architecture](#️-architecture)
 - [Prerequisites](#-prerequisites)
 - [Getting Started](#-getting-started)
-- [Configuration](#-configuration)
+- [Configuration](#️-configuration)
 - [Simulation Scenarios](#-simulation-scenarios)
 - [Contributing](#-contributing)
 
