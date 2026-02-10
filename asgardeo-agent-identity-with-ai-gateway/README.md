@@ -1,6 +1,6 @@
 # 🔐 Asgardeo + AI Gateway Integration
 
-A application demonstrating secure authentication and authorization for AI agents using [Asgardeo](https://wso2.com/asgardeo/) identity and access management with AI Gateways. 
+An application demonstrating secure authentication and authorization for AI agents using [Asgardeo](https://wso2.com/asgardeo/) identity and access management with AI Gateways. 
 
 ---
 
