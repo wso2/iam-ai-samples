@@ -159,7 +159,7 @@ export default function ConfigurationModal({ isOpen, onClose, config, onSave }: 
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {localConfig.gatewayType === 'kong'
                     ? 'Uses a single endpoint with header-based agent routing'
-                    : 'Uses separate proxy URLs per agent (Make sure you get final urls from test console by excuting one time)'}
+                    : 'Uses separate proxy URLs per agent (Make sure you get final urls from test console by executing one time)'}
                 </p>
               </div>
 
