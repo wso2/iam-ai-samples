@@ -66,11 +66,6 @@ export default function SelectionPanel({
           <span className={`w-2 h-2 rounded-full ${isKong ? 'bg-indigo-500' : 'bg-teal-500'}`} />
           {isKong ? 'Kong AI Gateway' : 'WSO2 AI Gateway'}
         </span>
-        {/* <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-          {isKong
-            ? 'Agent routing via x-agent-type header'
-            : 'Separate proxy URLs per agent'}
-        </p> */}
       </div>
 
       <div className="space-y-6 mb-6">
