@@ -7,11 +7,11 @@ An application demonstrating secure authentication and authorization for AI agen
 ## 📑 Table of Contents
 
 - [Architecture](#️-architecture)
-- [Prerequisites](#-prerequisites)
-- [Getting Started](#-getting-started)
+- [Prerequisites](`#-prerequisites`)
+- [Getting Started](`#-getting-started`)
 - [Configuration](#️-configuration)
-- [Simulation Scenarios](#-simulation-scenarios)
-- [Contributing](#-contributing)
+- [Simulation Scenarios](`#-simulation-scenarios`)
+- [Contributing](`#-contributing`)
 
 ---
 
@@ -45,8 +45,8 @@ Before you begin, ensure you have the following:
 
 Choose your preferred AI Gateway and follow the corresponding setup guide:
 
-- **[WSO2 AI Gateway]([./docs/wso2-setup.md](https://docs.google.com/document/d/1MyN9pvb7kB6T1-hUoKU2UxMKlliyCsdduhLua7W4ApY/edit?tab=t.b0cjn1i5xs8e))** — Configure WSO2 with Asgardeo for agent authentication
-- **[Kong AI Gateway]([./docs/kong-setup.md](https://docs.google.com/document/d/1MyN9pvb7kB6T1-hUoKU2UxMKlliyCsdduhLua7W4ApY/edit?tab=t.q7w0iwyxsa2p))** — Configure Kong with Asgardeo for agent authentication
+- **WSO2 AI Gateway[Link neeeds to be added]** — Configure WSO2 with Asgardeo for agent authentication
+- **Kong AI Gateway[Link neeeds to be added]** — Configure Kong with Asgardeo for agent authentication
 
 ---
 
@@ -54,7 +54,7 @@ Choose your preferred AI Gateway and follow the corresponding setup guide:
 
 1. **Clone the repository:**
    ```bash
-   git clone [<repository-url>](https://github.com/wso2/iam-ai-samples/tree/main/asgardeo-agent-identity-with-ai-gateway
+   git clone https://github.com/wso2/iam-ai-samples/tree/main/asgardeo-agent-identity-with-ai-gateway
    cd asgardeo-agent-identity-with-ai-gateway
    ```
 
