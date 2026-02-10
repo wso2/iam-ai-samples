@@ -26,7 +26,7 @@ export default function Home() {
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // Ensure we're mounted before accessing localStorage
+  // Ensure we're mounted before accessing sessionStorage
   useEffect(() => {
     setMounted(true);
   }, []);
