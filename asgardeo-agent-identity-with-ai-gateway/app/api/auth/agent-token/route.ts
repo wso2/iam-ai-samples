@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
         password: agentSecret,
         scope: 'openid Support-Coordinator Technical-Specialist'
       }),
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!tokenResponse.ok) {
