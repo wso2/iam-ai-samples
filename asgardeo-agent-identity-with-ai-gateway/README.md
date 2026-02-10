@@ -85,7 +85,7 @@ When you first launch the application, you'll be prompted to configure the follo
 | Parameter | Description | Example |
 |-----------|-------------|---------|
 | **Organization Name** | Your Asgardeo organization identifier | `aigateway` |
-| **Client ID** | The Client ID from your Asgardeo Public Client | `abc123xyz` |
+| **Client ID** | The Client ID from your Asgardeo Public Client | `tcHmGhEG3t353z2Df6iRc3jlzPwa` |
 | **Support-Coordinator Credentials** | Agent ID and Agent Secret for the Support-Coordinator agent | - |
 | **Technical-Specialist Credentials** | Agent ID and Agent Secret for the Technical-Specialist agent | - |
 | **AI Gateway Type** | Choose between **Kong AI Gateway** or **WSO2 AI Gateway** | `Kong AI Gateway`/ `WSO2 AI Gateway` |
