@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers,
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30_000),
     });
 
     console.log("Response status:", response.status);
