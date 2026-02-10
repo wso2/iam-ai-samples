@@ -13,7 +13,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AppConfig } from './ConfigurationModal';
+import { AppConfig, GateWayType } from './ConfigurationModal';
 import {
   Header,
   ConfigWarning,
@@ -44,7 +44,7 @@ export default function AgentSimulator({ config, onOpenConfig }: AgentSimulatorP
            config.coordinatorAgent.agentId && config.coordinatorAgent.agentSecret &&
            config.expertAgent.agentId && config.expertAgent.agentSecret);
     
-    if (config.gatewayType === 'wso2') {
+    if (config.gatewayType === GateWayType.WSO2) {
       return baseValid && !!(config.wso2CoordinatorUrl && config.wso2ExpertUrl);
     }
     return baseValid && !!config.targetUrl;
@@ -91,7 +91,7 @@ export default function AgentSimulator({ config, onOpenConfig }: AgentSimulatorP
   };
 
   const getTargetUrl = (targetAgent: string): string => {
-    if (config.gatewayType === 'wso2') {
+    if (config.gatewayType === GateWayType.WSO2) {
       return targetAgent === 'Support-Coordinator'
         ? config.wso2CoordinatorUrl
         : config.wso2ExpertUrl;
@@ -109,7 +109,7 @@ export default function AgentSimulator({ config, onOpenConfig }: AgentSimulatorP
     };
 
     // Kong uses header-based routing
-    if (config.gatewayType === 'kong') {
+    if (config.gatewayType === GateWayType.KONG) {
       headers['x-agent-type'] = agentType;
     }
 
