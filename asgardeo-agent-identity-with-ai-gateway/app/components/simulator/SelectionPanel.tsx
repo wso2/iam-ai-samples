@@ -12,12 +12,12 @@
 
 'use client';
 
-import { GatewayType } from '../ConfigurationModal';
+import { GateWayType } from '../ConfigurationModal';
 import { AgentType, SimulationSelection, getExpectedOutcome } from './types';
 
 interface SelectionPanelProps {
   selection: SimulationSelection;
-  gatewayType: GatewayType;
+  gatewayType: GateWayType;
   isLoading: boolean;
   isConfigValid: boolean;
   onSelectionChange: (selection: SimulationSelection) => void;
@@ -45,8 +45,8 @@ export default function SelectionPanel({
     { value: 'Technical-Specialist', label: 'Technical-Specialist', icon: '🔧' }
   ];
 
-  const isKong = gatewayType === 'kong';
-
+  const isKong = gatewayType === GateWayType.KONG;
+ 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
       <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
