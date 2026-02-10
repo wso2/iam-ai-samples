@@ -19,7 +19,7 @@ An application demonstrating secure authentication and authorization for AI agen
 
 This application demonstrates a secure architecture where:
 
-1. **Agents** authenticate with Asgardeo using their unique credentials
+1. **AI Agents** authenticate with Asgardeo using their unique credentials
 2. **JWT tokens** are obtained through Asgardeo
 3. **Requests** are routed through an AI Gateway (**Kong** or **WSO2**)
 4. **Identity validation** ensures agents can only act as themselves
