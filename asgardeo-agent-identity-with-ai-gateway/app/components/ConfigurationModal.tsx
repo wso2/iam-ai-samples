@@ -14,10 +14,13 @@
 
 import { useState, useEffect } from 'react';
 
-export type GatewayType = 'wso2' | 'kong';
+export enum GateWayType {
+  WSO2 = 'wso2',
+  KONG = 'kong'
+}
 
 export interface AppConfig {
-  gatewayType: GatewayType;
+  gatewayType: GateWayType;
   orgName: string;
   clientId: string;
   targetUrl: string;
@@ -162,16 +165,16 @@ export default function ConfigurationModal({ isOpen, onClose, config, onSave }: 
                 </label>
                 <select
                   value={localConfig.gatewayType}
-                  onChange={(e) => setLocalConfig({ ...localConfig, gatewayType: e.target.value as GatewayType })}
+                  onChange={(e) => setLocalConfig({ ...localConfig, gatewayType: e.target.value as GateWayType })}
                   className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 >
-                  <option value="wso2">WSO2 AI Gateway</option>
-                  <option value="kong">Kong AI Gateway</option>
+                  <option value={GateWayType.WSO2}>WSO2 AI Gateway</option>
+                  <option value={GateWayType.KONG}>Kong AI Gateway</option>
                 </select>
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                   {localConfig.gatewayType === 'kong'
                     ? 'Uses a single endpoint with header-based agent routing'
-                    : 'Uses separate proxy URLs per agent (Make sure you get final urls from test console by executing one time)'}
+                    : 'Uses separate proxy URLs per agent (Make sure you get final urls from test console by excuting one time)'}
                 </p>
               </div>
 
