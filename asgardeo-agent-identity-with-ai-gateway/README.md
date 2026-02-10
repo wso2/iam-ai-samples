@@ -37,7 +37,7 @@ Before you begin, ensure you have the following:
 
 - **Node.js** (v18 or higher)
 - **npm** or **yarn** package manager
-- **Asgardeo account** (create one at [asgardeo.io](https://asgardeo.io))
+- An **Asgardeo** account (create one at [asgardeo.io](https://wso2.com/asgardeo))
 - **An AI Gateway** configured and accessible
 - **Application** created in Asgardeo Console
 
