@@ -35,20 +35,18 @@ Agent → Asgardeo (Auth) → AI Gateway → AI Services
 
 Before you begin, ensure you have the following:
 
-- **Node.js** (v18 or higher)
+- **Node.js** (v24 or higher)
 - **npm** or **yarn** package manager
 - An **Asgardeo** account (create one at [asgardeo.io](https://wso2.com/asgardeo))
 - **An AI Gateway** configured and accessible
 - **Application** created in Asgardeo Console
 
-### Asgardeo Setup
+### Asgardeo and AI Gateway Setup
 
-1. Log in to [Asgardeo Console](https://console.asgardeo.io/)
-2. Create a new **Public Client** application
-3. Note your **Organization Name** and **Client ID**
-4. Create accounts for your agents:
-   - Support-Coordinator Agent
-   - Technical-Specialist Agent
+Choose your preferred AI Gateway and follow the corresponding setup guide:
+
+- **[WSO2 AI Gateway]([./docs/wso2-setup.md](https://docs.google.com/document/d/1MyN9pvb7kB6T1-hUoKU2UxMKlliyCsdduhLua7W4ApY/edit?tab=t.b0cjn1i5xs8e))** — Configure WSO2 with Asgardeo for agent authentication
+- **[Kong AI Gateway]([./docs/kong-setup.md](https://docs.google.com/document/d/1MyN9pvb7kB6T1-hUoKU2UxMKlliyCsdduhLua7W4ApY/edit?tab=t.q7w0iwyxsa2p))** — Configure Kong with Asgardeo for agent authentication
 
 ---
 
@@ -56,7 +54,7 @@ Before you begin, ensure you have the following:
 
 1. **Clone the repository:**
    ```bash
-   git clone <repository-url>
+   git clone [<repository-url>](https://github.com/wso2/iam-ai-samples/tree/main/asgardeo-agent-identity-with-ai-gateway
    cd asgardeo-agent-identity-with-ai-gateway
    ```
 
@@ -86,7 +84,7 @@ When you first launch the application, you'll be prompted to configure the follo
 
 | Parameter | Description | Example |
 |-----------|-------------|---------|
-| **Organization Name** | Your Asgardeo organization identifier | `org123` |
+| **Organization Name** | Your Asgardeo organization identifier | `aigateway` |
 | **Client ID** | The Client ID from your Asgardeo Public Client | `abc123xyz` |
 | **Support-Coordinator Credentials** | Agent ID and Agent Secret for the Support-Coordinator agent | - |
 | **Technical-Specialist Credentials** | Agent ID and Agent Secret for the Technical-Specialist agent | - |
@@ -98,7 +96,7 @@ When you first launch the application, you'll be prompted to configure the follo
 | **API Gateway URL** | Single Kong AI Gateway endpoint URL (header-based routing) | `https://kong-gateway.example.com/api` |
 
 #### WSO2 AI Gateway URLs
-Make sure you get final urls from test console by excuting one time.
+Make sure you get final urls from test console by executing one time.
 | Parameter | Description | Example |
 |-----------|-------------|---------|
 | **Support-Coordinator Proxy URL** | Dedicated WSO2 proxy URL for the Support-Coordinator agent | `https://wso2-gateway.example.com/coordinator/chat` |
