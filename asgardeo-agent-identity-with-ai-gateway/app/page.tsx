@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import ConfigurationModal, { AppConfig } from './components/ConfigurationModal';
+import ConfigurationModal, { AppConfig, GateWayType } from './components/ConfigurationModal';
 import AgentSimulator from './components/AgentSimulator';
 
 const defaultConfig: AppConfig = {
-  gatewayType: 'kong',
+  gatewayType: GateWayType.KONG,
   orgName: '',
   clientId: '',
   targetUrl: '',
