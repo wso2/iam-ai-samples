@@ -27,11 +27,6 @@ export async function POST(request: NextRequest) {
     const targetUrl = request.headers.get("x-target-url") || "https://ai-gateway-url.com/chat";
     const accessToken = request.headers.get("authorization");
 
-    console.log("Gateway type:", gatewayType);
-    console.log("Proxy request to:", targetUrl);
-    console.log("Model:", model);
-    console.log("Has Access Token:", !!accessToken);
-    console.log("Body:", body);
 
     // Build headers for AI Gateway
     const headers: Record<string, string> = {
