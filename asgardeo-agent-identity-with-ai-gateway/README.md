@@ -78,7 +78,7 @@ Choose your preferred AI Gateway and follow the corresponding setup guide:
 
 When you first launch the application, you'll be prompted to configure the following settings:
 
-![Configuration Modal](images/configuration.png)
+![Configuration Modal](assets/images/configuration.png)
 
 ### Configuration Parameters
 
@@ -117,7 +117,7 @@ Make sure you get final urls from test console by executing one time.
 
 The application provides a flexible simulation panel where you configure each request by selecting three options:
 
-![Simulation Interface](images/simulation.png)
+![Simulation Interface](assets/images/simulation.png)
 
 | Option | Description |
 |--------|-------------|

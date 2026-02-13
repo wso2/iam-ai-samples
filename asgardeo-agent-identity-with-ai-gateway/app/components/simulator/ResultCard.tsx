@@ -20,6 +20,7 @@
 
 import { SimulationResult } from './types';
 import StatusBadge from './StatusBadge';
+import { ChevronDownIcon, ExternalLinkIcon } from '../../../assets/icons';
 
 interface ResultCardProps {
   result: SimulationResult;
@@ -48,17 +49,9 @@ export default function ResultCard({ result, isExpanded, onToggle }: ResultCardP
           </span>
           <StatusBadge statusCode={result.statusCode} />
         </div>
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
+        <ChevronDownIcon
           className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-        >
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
+        />
       </button>
 
       {/* Result Details */}
@@ -95,11 +88,7 @@ export default function ResultCard({ result, isExpanded, onToggle }: ResultCardP
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/40 rounded transition-colors"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                    <polyline points="15 3 21 3 21 9"/>
-                    <line x1="10" y1="14" x2="21" y2="3"/>
-                  </svg>
+                  <ExternalLinkIcon />
                   Decode Token
                 </a>
               </div>

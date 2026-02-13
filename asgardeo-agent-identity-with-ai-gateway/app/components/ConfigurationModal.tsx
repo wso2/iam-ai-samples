@@ -19,6 +19,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { SettingsIcon, CloseIcon, InfoCircleIcon } from '../../assets/icons';
 
 export enum GateWayType {
   WSO2 = 'wso2',
@@ -79,19 +80,14 @@ export default function ConfigurationModal({ isOpen, onClose, config, onSave }: 
         {/* Header */}
         <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-4 flex items-center justify-between">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-            </svg>
+            <SettingsIcon />
             Configuration
           </h2>
           <button
             onClick={onClose}
             className="text-white/80 hover:text-white transition-colors"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6L6 18M6 6l12 12"/>
-            </svg>
+            <CloseIcon />
           </button>
         </div>
 
@@ -240,10 +236,7 @@ export default function ConfigurationModal({ isOpen, onClose, config, onSave }: 
           {activeTab === 'coordinator' && (
             <div className="space-y-4">
               <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-500">
-                  <circle cx="12" cy="12" r="10"/>
-                  <path d="M12 16v-4M12 8h.01"/>
-                </svg>
+                <InfoCircleIcon className="text-blue-500" />
                 <span className="text-sm text-blue-700 dark:text-blue-300">
                   Support-Coordinator Agent Credentials
                 </span>
@@ -284,10 +277,7 @@ export default function ConfigurationModal({ isOpen, onClose, config, onSave }: 
           {activeTab === 'expert' && (
             <div className="space-y-4">
               <div className="flex items-center gap-2 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-500">
-                  <circle cx="12" cy="12" r="10"/>
-                  <path d="M12 16v-4M12 8h.01"/>
-                </svg>
+                <InfoCircleIcon className="text-purple-500" />
                 <span className="text-sm text-purple-700 dark:text-purple-300">
                   Technical-Specialist Agent Credentials
                 </span>
