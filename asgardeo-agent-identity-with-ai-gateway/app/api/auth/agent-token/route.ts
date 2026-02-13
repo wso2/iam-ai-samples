@@ -17,12 +17,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { GateWayType } from "@/app/components/ConfigurationModal";
 
 export async function POST(request: NextRequest) {
   try {
     // Get the request body and headers from the client
     const body = await request.json();
-    const gatewayType = request.headers.get("x-gateway-type") || "kong"; // value matches GateWayType enum
+    const gatewayType = request.headers.get("x-gateway-type") || GateWayType.KONG;
     const model = request.headers.get("x-agent-type") || "Support-Coordinator";
     const targetUrl = request.headers.get("x-target-url") || "https://ai-gateway-url.com/chat";
     const accessToken = request.headers.get("authorization");
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Kong uses header-based routing; WSO2 uses separate URLs so no agent-type header needed
-    if (gatewayType === "kong") { // matches GateWayType.KONG value
+    if (gatewayType === GateWayType.KONG) {
       headers["x-agent-type"] = model;
     }
 
@@ -50,8 +51,6 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(body),
     });
 
-    console.log("Response status:", response.status);
-
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Error response:", errorText);
@@ -62,7 +61,6 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json();
-    console.log("Response data:", data);
 
     return NextResponse.json(data);
   } catch (error) {
