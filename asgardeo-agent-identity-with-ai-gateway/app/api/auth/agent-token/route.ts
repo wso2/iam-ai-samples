@@ -28,7 +28,6 @@ export async function POST(request: NextRequest) {
     const targetUrl = request.headers.get("x-target-url") || "https://ai-gateway-url.com/chat";
     const accessToken = request.headers.get("authorization");
 
-
     // Build headers for AI Gateway
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
