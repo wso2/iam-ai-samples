@@ -175,18 +175,23 @@ const extractUser = (req: Request, res: Response, next: NextFunction) => {
 // Stores the MCP server + transport per session so that:
 //   - Tool Discovery check runs ONCE (when session is created)
 //   - Subsequent requests (tools/call) reuse the same server
-const sessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport }>();
+const sessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport; userId: string }>();
 
 // Execution order: 1. router() → 2. protect() → 3. extractUser → 4. handler
 app.post('/mcp', mcpAuthServer.protect(), extractUser, async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
-    if (!authReq.user) return res.status(403).json({ error: "Unauthorized" });
+    if (!authReq.user) return res.status(401).json({ error: "Unauthorized" });
 
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
     // ── Existing session: reuse server (no tool discovery check) ──
     if (sessionId && sessions.has(sessionId)) {
-        const { transport } = sessions.get(sessionId)!;
+        const session = sessions.get(sessionId)!;
+        if (session.userId !== authReq.user!.id) {
+            return res.status(403).json({ error: "Session belongs to a different user" });
+        }
+        const { transport } = session;
+        
         try {
             await transport.handleRequest(req, res, req.body);
         } catch (error) {
@@ -213,7 +218,7 @@ app.post('/mcp', mcpAuthServer.protect(), extractUser, async (req: Request, res:
     });
 
     // Cache the session
-    sessions.set(newSessionId, { server, transport });
+    sessions.set(newSessionId, { server, transport, userId: authReq.user.id });
 
     // Clean up when the transport closes
     transport.onclose = () => {

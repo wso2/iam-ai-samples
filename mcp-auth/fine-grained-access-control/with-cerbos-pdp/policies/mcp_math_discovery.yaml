@@ -11,3 +11,4 @@ resourcePolicy:
     - actions: ["add", "subtract", "multiply"]
       effect: EFFECT_ALLOW
       roles: ["user", "guest"]
+      

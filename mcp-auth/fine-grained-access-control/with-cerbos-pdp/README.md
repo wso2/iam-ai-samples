@@ -32,7 +32,7 @@ docker run --rm --name cerbos -d -p 3593:3593 -v $(pwd)/policies:/policies \
   ghcr.io/cerbos/cerbos:latest server
 ```
 
-Refer to the [Cerbos](https://github.com/cerbos/cerbos) for more details on running the PDP and writing policies.
+Refer to the [Cerbos documentation](https://docs.cerbos.dev/) for more details on running the PDP and writing policies.
 
 ### 3. Configure WSO2 Identity Server / Asgardeo
 
