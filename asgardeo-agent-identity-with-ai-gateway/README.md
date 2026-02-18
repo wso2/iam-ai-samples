@@ -7,11 +7,11 @@ An application demonstrating secure authentication and authorization for AI agen
 ## 📑 Table of Contents
 
 - [Architecture](#️-architecture)
-- [Prerequisites](`#-prerequisites`)
-- [Getting Started](`#-getting-started`)
+- [Prerequisites](#-prerequisites)
+- [Getting Started](#-getting-started)
 - [Configuration](#️-configuration)
-- [Simulation Scenarios](`#-simulation-scenarios`)
-- [Contributing](`#-contributing`)
+- [Simulation Scenarios](#-simulation-scenarios)
+- [Contributing](#-contributing)
 
 ---
 
@@ -38,7 +38,7 @@ Before you begin, ensure you have the following:
 - **Node.js** (v24 or higher)
 - **npm** or **yarn** package manager
 - An **Asgardeo** account (create one at [asgardeo.io](https://wso2.com/asgardeo))
-- **An AI Gateway** configured and accessible
+- An **AI Gateway** configured and accessible (WSO2/KONG)
 - **Application** created in Asgardeo Console
 
 ### Asgardeo and AI Gateway Setup
@@ -54,7 +54,7 @@ Choose your preferred AI Gateway and follow the corresponding setup guide:
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/wso2/iam-ai-samples/tree/main/asgardeo-agent-identity-with-ai-gateway
+   git clone https://github.com/wso2/iam-ai-samples
    cd asgardeo-agent-identity-with-ai-gateway
    ```
 
