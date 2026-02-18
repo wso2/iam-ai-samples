@@ -6,6 +6,34 @@ It implements a two-tier access control mechanism:
 1. **Tool Discovery**: Controls which tools are visible to the user based on their roles.
 2. **Tool Execution**: Controls whether a user can execute a tool based on the scopes in their access token.
 
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant OAuth as  WSO2/Asgardeo <br/> (Auth Server)
+    participant Server as MCP Server<br/> (Gateway)
+    participant Cerbos as PDP <br/> (Cerbos)
+
+    Client->>OAuth: Authenticate/obtain Bearer token
+    OAuth-->>Client: JWT (roles, scopes, attrs)
+
+    Client->>Server: POST /mcp (discovery)
+    Server->>Server: extractUser (JWT -> principal attrs)
+    Server->>Cerbos: discoveryCheck (resource: mcp::math_discovery)
+    Cerbos-->>Server: allowed tools based on roles
+    Server-->>Client: discovery response (available tools)
+
+    Client->>Server: POST /mcp (execute tool)
+    Server->>Server: extractUser (JWT -> principal attrs)
+    Server->>Cerbos: check (resource: mcp::math / mcp::math_tools, action)
+    Cerbos-->>Server: Allow / Deny
+    alt Allow
+        Server->>Server: run tool handler (validate input, compute)
+        Server-->>Client: 200 result
+    else Deny
+        Server-->>Client: 403 Forbidden
+    end
+```
+
 ## Prerequisites
 
 - **Node.js** (v18 or higher)
