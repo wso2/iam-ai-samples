@@ -17,7 +17,6 @@
  */
 
 export { default as Header } from './Header';
-export { default as ConfigWarning } from './ConfigWarning';
 export { default as SelectionPanel } from './SelectionPanel';
 export { default as ResultsPanel } from './ResultsPanel';
 export { default as ResultCard } from './ResultCard';

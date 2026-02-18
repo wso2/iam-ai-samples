@@ -18,7 +18,7 @@
 
 'use client';
 
-import { GateWayType } from '../ConfigurationModal';
+import { GateWayType } from '../../config';
 import { AgentType, SimulationSelection, getExpectedOutcome } from './types';
 import PlayIcon from '../../../assets/icons/play.svg';
 import LockIcon from '../../../assets/icons/lock.svg';
@@ -30,7 +30,6 @@ interface SelectionPanelProps {
   selection: SimulationSelection;
   gatewayType: GateWayType;
   isLoading: boolean;
-  isConfigValid: boolean;
   onSelectionChange: (selection: SimulationSelection) => void;
   onRunSimulation: () => void;
 }
@@ -39,7 +38,6 @@ export default function SelectionPanel({
   selection,
   gatewayType,
   isLoading,
-  isConfigValid,
   onSelectionChange,
   onRunSimulation
 }: SelectionPanelProps) {
@@ -209,7 +207,7 @@ export default function SelectionPanel({
       {/* Run Button */}
       <button
         onClick={onRunSimulation}
-        disabled={isLoading || !isConfigValid}
+        disabled={isLoading}
         className="w-full py-3 px-4 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-medium rounded-lg shadow-lg hover:shadow-xl disabled:shadow-none transition-all flex items-center justify-center gap-2"
       >
         {isLoading ? (

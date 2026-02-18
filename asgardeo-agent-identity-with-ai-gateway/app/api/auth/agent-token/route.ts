@@ -17,55 +17,56 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { GateWayType } from "@/app/components/ConfigurationModal";
+import { getAppConfig, GateWayType } from "@/app/config";
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the request body and headers from the client
+    const config = getAppConfig();
     const body = await request.json();
-    const gatewayType = request.headers.get("x-gateway-type") || GateWayType.KONG;
-    const model = request.headers.get("x-agent-type") || "Support-Coordinator";
-    const targetUrl = request.headers.get("x-target-url") || "https://ai-gateway-url.com/chat";
-    const accessToken = request.headers.get("authorization");
+    const { orgName, clientId, callingAgent } = body;
 
-    // Build headers for AI Gateway
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
+    // Pick credentials from env based on which agent is calling
+    const credentials = callingAgent === 'Support-Coordinator'
+      ? config.coordinatorAgent
+      : config.expertAgent;
 
-    // Kong uses header-based routing; WSO2 uses separate URLs so no agent-type header needed
-    if (gatewayType === GateWayType.KONG) {
-      headers["x-agent-type"] = model;
-    }
-
-    // Add authorization header if provided
-    if (accessToken) {
-      headers["Authorization"] = accessToken;
-    }
-
-    // Make the request to AI Gateway from the server side (no CORS issues)
-    const response = await fetch(targetUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Error response:", errorText);
+    if (!credentials.agentId || !credentials.agentSecret) {
       return NextResponse.json(
-        { error: `HTTP ${response.status}: ${errorText || response.statusText}` },
-        { status: response.status }
+        { error: `Missing agent credentials for ${callingAgent}. Check your .env.local file.` },
+        { status: 400 }
       );
     }
 
-    const data = await response.json();
+    // Exchange agent credentials for an access token via Asgardeo
+    const tokenUrl = `https://api.asgardeo.io/t/${orgName}/oauth2/token`;
 
+    const tokenResponse = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'password',
+        client_id: clientId,
+        username: credentials.agentId,
+        password: credentials.agentSecret,
+        scope: "openid Technical-Specialist Support-Coordinator",
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('Agent token error:', errorText);
+      return NextResponse.json(
+        { error: `Agent token failed (${tokenResponse.status}): ${errorText}` },
+        { status: tokenResponse.status }
+      );
+    }
+
+    const data = await tokenResponse.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error("Proxy error:", error);
+    console.error('Agent token error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error occurred" },
+      { error: error instanceof Error ? error.message : 'Unknown error occurred' },
       { status: 500 }
     );
   }

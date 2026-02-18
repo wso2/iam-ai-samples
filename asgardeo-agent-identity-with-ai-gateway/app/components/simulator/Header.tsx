@@ -19,13 +19,8 @@
 'use client';
 
 import LayersIcon from '../../../assets/icons/layers.svg';
-import SettingsIcon from '../../../assets/icons/settings.svg';
 
-interface HeaderProps {
-  onOpenConfig: () => void;
-}
-
-export default function Header({ onOpenConfig }: HeaderProps) {
+export default function Header() {
   return (
     <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
       <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
@@ -40,13 +35,6 @@ export default function Header({ onOpenConfig }: HeaderProps) {
             </p>
           </div>
         </div>
-        <button
-          onClick={onOpenConfig}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
-        >
-          <SettingsIcon width={20} height={20} />
-          Configuration
-        </button>
       </div>
     </header>
   );

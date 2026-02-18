@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { GateWayType } from "@/app/components/ConfigurationModal";
+import { GateWayType } from "@/app/config";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {

@@ -19,10 +19,9 @@
 'use client';
 
 import { useState } from 'react';
-import { AppConfig, GateWayType } from './ConfigurationModal';
+import { GateWayType } from '../config';
 import {
   Header,
-  ConfigWarning,
   SelectionPanel,
   ResultsPanel,
   SimulationSelection,
@@ -30,12 +29,14 @@ import {
   getScenarioLabel
 } from './simulator';
 
-interface AgentSimulatorProps {
-  config: AppConfig;
-  onOpenConfig: () => void;
-}
+export default function AgentSimulator() {
+  const gatewayType = (process.env.NEXT_PUBLIC_GATEWAY_TYPE as GateWayType) || GateWayType.KONG;
+  const orgName = process.env.NEXT_PUBLIC_ORG_NAME || '';
+  const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || '';
+  const targetUrl = process.env.NEXT_PUBLIC_TARGET_URL || '';
+  const wso2CoordinatorUrl = process.env.NEXT_PUBLIC_WSO2_COORDINATOR_URL || '';
+  const wso2ExpertUrl = process.env.NEXT_PUBLIC_WSO2_EXPERT_URL || '';
 
-export default function AgentSimulator({ config, onOpenConfig }: AgentSimulatorProps) {
   const [selection, setSelection] = useState<SimulationSelection>({
     callingAgent: 'Support-Coordinator',
     targetRoute: 'Support-Coordinator',
@@ -45,41 +46,15 @@ export default function AgentSimulator({ config, onOpenConfig }: AgentSimulatorP
   const [results, setResults] = useState<SimulationResult[]>([]);
   const [expandedResult, setExpandedResult] = useState<number | null>(null);
 
-  const isConfigValid = (): boolean => {
-    const baseValid = !!(config.orgName && config.clientId &&
-           config.coordinatorAgent.agentId && config.coordinatorAgent.agentSecret &&
-           config.expertAgent.agentId && config.expertAgent.agentSecret);
-    
-    if (config.gatewayType === GateWayType.WSO2) {
-      return baseValid && !!(config.wso2CoordinatorUrl && config.wso2ExpertUrl);
-    }
-    return baseValid && !!config.targetUrl;
-  };
-
-  const getAgentCredentials = (agentType: string) => {
-    if (agentType === 'Support-Coordinator') {
-      return {
-        agentId: config.coordinatorAgent.agentId,
-        agentSecret: config.coordinatorAgent.agentSecret
-      };
-    } else {
-      return {
-        agentId: config.expertAgent.agentId,
-        agentSecret: config.expertAgent.agentSecret
-      };
-    }
-  };
-
-  const authenticateAgent = async (agentId: string, agentSecret: string): Promise<string | null> => {
+  const authenticateAgent = async (callingAgent: string): Promise<string | null> => {
     try {
       const response = await fetch('/api/auth/agent-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          orgName: config.orgName,
-          clientId: config.clientId,
-          agentId: agentId,
-          agentSecret: agentSecret
+          orgName,
+          clientId,
+          callingAgent,
         })
       });
 
@@ -97,25 +72,25 @@ export default function AgentSimulator({ config, onOpenConfig }: AgentSimulatorP
   };
 
   const getTargetUrl = (targetAgent: string): string => {
-    if (config.gatewayType === GateWayType.WSO2) {
+    if (gatewayType === GateWayType.WSO2) {
       return targetAgent === 'Support-Coordinator'
-        ? config.wso2CoordinatorUrl
-        : config.wso2ExpertUrl;
+        ? wso2CoordinatorUrl
+        : wso2ExpertUrl;
     }
-    return config.targetUrl;
+    return targetUrl;
   };
 
   const sendChatRequest = async (token: string | null, agentType: string) => {
-    const targetUrl = getTargetUrl(agentType);
+    const url = getTargetUrl(agentType);
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'x-target-url': targetUrl,
-      'x-gateway-type': config.gatewayType
+      'x-target-url': url,
+      'x-gateway-type': gatewayType
     };
 
     // Kong uses header-based routing
-    if (config.gatewayType === GateWayType.KONG) {
+    if (gatewayType === GateWayType.KONG) {
       headers['x-agent-type'] = agentType;
     }
 
@@ -136,12 +111,6 @@ export default function AgentSimulator({ config, onOpenConfig }: AgentSimulatorP
   };
 
   const runSimulation = async () => {
-    if (!isConfigValid()) {
-      alert('Please configure all settings first');
-      onOpenConfig();
-      return;
-    }
-
     setIsLoading(true);
 
     try {
@@ -149,8 +118,7 @@ export default function AgentSimulator({ config, onOpenConfig }: AgentSimulatorP
 
       // Authenticate using the calling agent's credentials (if authorization is enabled)
       if (selection.withAuthorization) {
-        const credentials = getAgentCredentials(selection.callingAgent);
-        token = await authenticateAgent(credentials.agentId, credentials.agentSecret);
+        token = await authenticateAgent(selection.callingAgent);
       }
 
       // Send the request to the target route
@@ -158,8 +126,8 @@ export default function AgentSimulator({ config, onOpenConfig }: AgentSimulatorP
 
       const result: SimulationResult = {
         selection: { ...selection },
-        gatewayType: config.gatewayType,
-        scenarioLabel: getScenarioLabel(selection, config.gatewayType),
+        gatewayType,
+        scenarioLabel: getScenarioLabel(selection, gatewayType),
         tokenReceived: token,
         response: data,
         statusCode,
@@ -171,8 +139,8 @@ export default function AgentSimulator({ config, onOpenConfig }: AgentSimulatorP
     } catch (error) {
       const errorResult: SimulationResult = {
         selection: { ...selection },
-        gatewayType: config.gatewayType,
-        scenarioLabel: getScenarioLabel(selection, config.gatewayType),
+        gatewayType,
+        scenarioLabel: getScenarioLabel(selection, gatewayType),
         tokenReceived: null,
         response: { error: error instanceof Error ? error.message : 'Unknown error' },
         statusCode: 500,
@@ -196,17 +164,14 @@ export default function AgentSimulator({ config, onOpenConfig }: AgentSimulatorP
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-      <Header onOpenConfig={onOpenConfig} />
+      <Header />
 
       <main className="max-w-7xl mx-auto px-6 py-8">
-        {!isConfigValid() && <ConfigWarning onOpenConfig={onOpenConfig} />}
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <SelectionPanel
             selection={selection}
-            gatewayType={config.gatewayType}
+            gatewayType={gatewayType}
             isLoading={isLoading}
-            isConfigValid={isConfigValid()}
             onSelectionChange={setSelection}
             onRunSimulation={runSimulation}
           />

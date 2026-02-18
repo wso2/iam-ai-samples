@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { AppConfig, GateWayType } from '../ConfigurationModal';
+import { GateWayType } from '../../config';
 
 export type AgentType = 'Support-Coordinator' | 'Technical-Specialist';
 
@@ -34,11 +34,6 @@ export interface SimulationResult {
   response: any;
   statusCode: number;
   timestamp: Date;
-}
-
-export interface AgentSimulatorProps {
-  config: AppConfig;
-  onOpenConfig: () => void;
 }
 
 /**
