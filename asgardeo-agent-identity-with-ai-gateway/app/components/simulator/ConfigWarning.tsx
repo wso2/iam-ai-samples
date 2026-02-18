@@ -17,7 +17,7 @@
  */
 'use client';
 
-import { WarningIcon } from '../../../assets/icons';
+import WarningIcon from '../../../assets/icons/warning.svg';
 
 interface ConfigWarningProps {
   onOpenConfig: () => void;

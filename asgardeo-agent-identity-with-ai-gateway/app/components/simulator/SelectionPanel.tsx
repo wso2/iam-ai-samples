@@ -20,7 +20,11 @@
 
 import { GateWayType } from '../ConfigurationModal';
 import { AgentType, SimulationSelection, getExpectedOutcome } from './types';
-import { PlayIcon, LockIcon, UnlockIcon, InfoCircleIcon, SpinnerIcon } from '../../../assets/icons';
+import PlayIcon from '../../../assets/icons/play.svg';
+import LockIcon from '../../../assets/icons/lock.svg';
+import UnlockIcon from '../../../assets/icons/unlock.svg';
+import InfoCircleIcon from '../../../assets/icons/info-circle.svg';
+import SpinnerIcon from '../../../assets/icons/spinner.svg';
 
 interface SelectionPanelProps {
   selection: SimulationSelection;

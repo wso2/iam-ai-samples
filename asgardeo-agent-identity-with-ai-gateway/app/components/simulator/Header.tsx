@@ -18,7 +18,8 @@
 
 'use client';
 
-import { LayersIcon, SettingsIcon } from '../../../assets/icons';
+import LayersIcon from '../../../assets/icons/layers.svg';
+import SettingsIcon from '../../../assets/icons/settings.svg';
 
 interface HeaderProps {
   onOpenConfig: () => void;

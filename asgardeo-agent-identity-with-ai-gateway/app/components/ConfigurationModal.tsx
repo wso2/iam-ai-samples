@@ -19,7 +19,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { SettingsIcon, CloseIcon, InfoCircleIcon } from '../../assets/icons';
+import SettingsIcon from '../../assets/icons/settings.svg';
+import CloseIcon from '../../assets/icons/close.svg';
+import InfoCircleIcon from '../../assets/icons/info-circle.svg';
 
 export enum GateWayType {
   WSO2 = 'wso2',

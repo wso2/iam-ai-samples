@@ -20,7 +20,8 @@
 
 import { SimulationResult } from './types';
 import ResultCard from './ResultCard';
-import { DocumentIcon, GridIcon } from '../../../assets/icons';
+import DocumentIcon from '../../../assets/icons/document.svg';
+import GridIcon from '../../../assets/icons/grid.svg';
 
 interface ResultsPanelProps {
   results: SimulationResult[];

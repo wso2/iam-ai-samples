@@ -20,7 +20,8 @@
 
 import { SimulationResult } from './types';
 import StatusBadge from './StatusBadge';
-import { ChevronDownIcon, ExternalLinkIcon } from '../../../assets/icons';
+import ChevronDownIcon from '../../../assets/icons/chevron-down.svg';
+import ExternalLinkIcon from '../../../assets/icons/external-link.svg';
 
 interface ResultCardProps {
   result: SimulationResult;
