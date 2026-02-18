@@ -63,12 +63,18 @@ Choose your preferred AI Gateway and follow the corresponding setup guide:
    npm install
    ```
 
-3. **Start the development server:**
+3. **Configure environment variables:**
+   ```bash
+   cp .env.example .env
+   ```
+   Open `.env` and fill in your values. See the [Configuration](#️-configuration) section for details.
+
+4. **Start the development server:**
    ```bash
    npm run dev
    ```
 
-4. **Open your browser:**
+5. **Open your browser:**
    
    Navigate to [http://localhost:3000](http://localhost:3000)
 
@@ -76,40 +82,40 @@ Choose your preferred AI Gateway and follow the corresponding setup guide:
 
 ## ⚙️ Configuration
 
-When you first launch the application, you'll be prompted to configure the following settings:
+Configuration is provided via a `.env` file. A `.env.example` file is included in the project — copy it and fill in your values:
 
-![Configuration Modal](assets/images/configuration.png)
+```bash
+cp .env.example .env
+```
 
-### Configuration Parameters
+### Environment Variables
 
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| **Organization Name** | Your Asgardeo organization identifier | `aigateway` |
-| **Client ID** | The Client ID from your Asgardeo Public Client | `tcHmGhEG3t353z2Df6iRc3jlzPwa` |
-| **Support-Coordinator Credentials** | Agent ID and Agent Secret for the Support-Coordinator agent | - |
-| **Technical-Specialist Credentials** | Agent ID and Agent Secret for the Technical-Specialist agent | - |
-| **AI Gateway Type** | Choose between **Kong AI Gateway** or **WSO2 AI Gateway** | `Kong AI Gateway`/ `WSO2 AI Gateway` |
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `NEXT_PUBLIC_GATEWAY_TYPE` | Gateway type — `"kong"` or `"wso2"` | `kong` |
+| `NEXT_PUBLIC_ORG_NAME` | Your Asgardeo organization identifier | `aigateway` |
+| `NEXT_PUBLIC_CLIENT_ID` | Application Client ID from Asgardeo Console | `tcHmGhEG3t353z2Df6iRc3jlzPwa` |
 
-#### Kong AI Gateway URLs
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| **API Gateway URL** | Single Kong AI Gateway endpoint URL (header-based routing) | `https://kong-gateway.example.com/api` |
+#### Kong AI Gateway
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `NEXT_PUBLIC_TARGET_URL` | Single Kong AI Gateway proxy URL endpoint (header-based routing) | `https://kong-gateway.example.com/api` |
 
-#### WSO2 AI Gateway URLs
-Make sure you get final urls from test console by executing one time.
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| **Support-Coordinator Proxy URL** | Dedicated WSO2 proxy URL for the Support-Coordinator agent | `https://wso2-gateway.example.com/coordinator/chat` |
-| **Technical-Specialist Proxy URL** | Dedicated WSO2 proxy URL for the Technical-Specialist agent | `https://wso2-gateway.example.com/expert/chat` |
+#### WSO2 AI Gateway
+Make sure you get the final URLs from the test console by executing once.
 
-> **Note:** The URL fields shown depend on the selected gateway type. Kong uses a single endpoint with `x-agent-type` header routing, while WSO2 uses separate proxy URLs per agent.
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `NEXT_PUBLIC_WSO2_COORDINATOR_URL` | AI proxy URL for the Support-Coordinator agent | `https://wso2-gateway.example.com/coordinator/chat` |
+| `NEXT_PUBLIC_WSO2_EXPERT_URL` | AI proxy URL for the Technical-Specialist agent | `https://wso2-gateway.example.com/expert/chat` |
 
-### Configuration Steps
-
-1. Click the **Configuration** button in the application
-2. Fill in all required fields
-3. Click **Save Configuration**
-4. The settings are stored in your browser's session storage
+#### Agent Credentials
+| Variable | Description |
+|----------|-------------|
+| `COORDINATOR_AGENT_ID` | Agent ID for the Support-Coordinator agent |
+| `COORDINATOR_AGENT_SECRET` | Agent Secret for the Support-Coordinator agent |
+| `EXPERT_AGENT_ID` | Agent ID for the Technical-Specialist agent |
+| `EXPERT_AGENT_SECRET` | Agent Secret for the Technical-Specialist agent |
 
 ---
 
