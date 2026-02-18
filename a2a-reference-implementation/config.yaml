@@ -1,0 +1,104 @@
+# A2A Reference Implementation Configuration
+
+# ─────────────────────────────────────────────────────────────────
+# Asgardeo Configuration
+# ─────────────────────────────────────────────────────────────────
+asgardeo:
+  organization: "${ASGARDEO_ORG_NAME}"
+  
+  # Orchestrator Application (ONLY App in the system)
+  # All agents are linked to this single Application
+  orchestrator:
+    application:
+      client_id: "${ORCHESTRATOR_CLIENT_ID}"
+      client_secret: "${ORCHESTRATOR_CLIENT_SECRET}"
+    agent:
+      agent_id: "${ORCHESTRATOR_AGENT_ID}"
+      agent_secret: "${ORCHESTRATOR_AGENT_SECRET}"
+
+# ─────────────────────────────────────────────────────────────────
+# A2A Agents (Worker Agents)
+# ─────────────────────────────────────────────────────────────────
+# NOTE: These agents do NOT have separate Applications.
+# They use the Orchestrator's App credentials but have their own Agent IDs.
+# All agents use onboarding-api as the audience (scopes are global in WSO2 IS)
+agents:
+  hr_agent:
+    name: "HR Agent"
+    description: "Manages employee profiles"
+    url: "http://localhost:8001"
+    required_scopes: ["hr:read", "hr:write"]
+    target_audience: "onboarding-api"
+    agent_id: "${HR_AGENT_ID}"
+    agent_secret: "${HR_AGENT_SECRET}"
+    skills:
+      - id: "create_employee"
+        name: "Create Employee"
+
+  it_agent:
+    name: "IT Agent"
+    description: "Provisions IT accounts"
+    url: "http://localhost:8002"
+    required_scopes: ["it:read", "it:write"]
+    target_audience: "onboarding-api"
+    agent_id: "${IT_AGENT_ID}"
+    agent_secret: "${IT_AGENT_SECRET}"
+    # IT Agent routes through MCP Server instead of calling API directly
+    # MCP Server is also registered as AI Agent in WSO2 IS
+    mcp_server:
+      url: "http://localhost:8012"
+      client_id: "${MCP_IT_CLIENT_ID}"
+      client_secret: "${MCP_IT_CLIENT_SECRET}"
+      agent_id: "${MCP_IT_AGENT_ID}"
+      agent_secret: "${MCP_IT_AGENT_SECRET}"
+    skills:
+      - id: "provision_vpn"
+        name: "Provision VPN"
+
+  approval_agent:
+    name: "Approval Agent"
+    description: "Handles approval workflows"
+    url: "http://localhost:8003"
+    required_scopes: ["approval:read", "approval:write"]
+    target_audience: "onboarding-api"
+    agent_id: "${APPROVAL_AGENT_ID}"
+    agent_secret: "${APPROVAL_AGENT_SECRET}"
+    skills:
+      - id: "request_approval"
+        name: "Request Approval"
+
+  booking_agent:
+    name: "Booking Agent"
+    description: "Schedules tasks and deliveries"
+    url: "http://localhost:8004"
+    required_scopes: ["booking:read", "booking:write"]
+    target_audience: "onboarding-api"
+    agent_id: "${BOOKING_AGENT_ID}"
+    agent_secret: "${BOOKING_AGENT_SECRET}"
+    skills:
+      - id: "create_task"
+        name: "Create Task"
+
+
+
+
+# ─────────────────────────────────────────────────────────────────
+# Orchestrator Settings
+# ─────────────────────────────────────────────────────────────────
+orchestrator:
+  name: "Onboarding Orchestrator"
+  description: "AI-powered employee onboarding coordinator"
+  url: "http://localhost:8000"
+  port: 8000
+  
+  discovery:
+    agent_urls:
+      - "http://localhost:8001"
+      - "http://localhost:8002"
+      - "http://localhost:8003"
+      - "http://localhost:8004"
+  
+  llm:
+    provider: "openai"
+    model: "gpt-4o"
+    temperature: 0

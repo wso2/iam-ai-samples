@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A2A Token Flow Visualizer</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-area">
+                <img src="https://wso2.cachefly.net/wso2/sites/images/brand/downloads/wso2-logo.png" alt="WSO2 Logo"
+                    class="wso2-logo">
+                <div class="divider"></div>
+                <h1>A2A Token Flow</h1>
+            </div>
+            <div class="header-actions">
+                <button class="reset-btn" onclick="resetAll()">
+                    <span>Reset</span>
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+                    </svg>
+                </button>
+                <div class="connection-status">
+                    <span class="status-dot" id="status-dot"></span>
+                    <span id="status-text">Connecting...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dynamic Flow Diagram -->
+        <div class="flow-diagram-wrapper">
+            <div class="flow-diagram">
+                <!-- User Section -->
+                <div class="flow-section">
+                    <div class="flow-node user" id="node-user">
+                        <div class="node-icon">
+                            <svg viewBox="0 0 24 24">
+                                <path
+                                    d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                            </svg>
+                        </div>
+                        <span class="node-label">User</span>
+                        <div class="tooltip">Initiates the request</div>
+                    </div>
+
+                    <div class="connector" id="conn-user-wso2">
+                        <div class="connector-line"></div>
+                        <div class="packet forward"></div>
+                    </div>
+                </div>
+
+                <!-- Direct Response Bypass (Visual only) -->
+                <div class="connector direct-bypass" id="conn-orch-user-direct">
+                    <div class="packet reverse"></div>
+                    <div class="connector-label">Response</div>
+                </div>
+
+                <!-- WSO2 & Orchestrator Section -->
+                <div class="flow-section column">
+                    <div class="flow-node wso2" id="node-wso2">
+                        <div class="node-icon">
+                            <span>IS</span>
+                        </div>
+                        <span class="node-label">Identity Server</span>
+                        <div class="tooltip">Asgardeo/WSO2 IS<br>Issues Tokens & Validates</div>
+                    </div>
+
+                    <div class="connector vertical" id="conn-wso2-orch">
+                        <div class="connector-line"></div>
+                        <div class="packet forward"></div>
+                    </div>
+
+                    <div class="flow-node orchestrator" id="node-orchestrator">
+                        <div class="node-icon">
+                            <svg viewBox="0 0 24 24">
+                                <path
+                                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                            </svg>
+                        </div>
+                        <span class="node-label">Orchestrator Agent</span>
+                        <div class="tooltip">Manages workflow logic, aggregates results, sends final response</div>
+                    </div>
+                </div>
+
+                <!-- Exchanger Section -->
+                <div class="flow-section center">
+                    <div class="connector" id="conn-orch-exchanger">
+                        <div class="connector-line"></div>
+                        <div class="packet forward"></div>
+                        <div class="packet reverse"></div>
+                    </div>
+
+                    <div class="flow-node exchanger" id="node-exchanger">
+                        <div class="node-icon">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z" />
+                            </svg>
+                        </div>
+                        <span class="node-label">Token Exchanger</span>
+                        <div class="tooltip">Exchanges user/orch tokens for Agent-specific tokens (RFC 8693)</div>
+                    </div>
+
+                    <div class="connector" id="conn-exchanger-agents">
+                        <div class="connector-line"></div>
+                        <div class="packet forward"></div>
+                    </div>
+                </div>
+
+                <!-- Agents & APIs Section -->
+                <div class="flow-section results">
+                    <div class="agents-grid">
+                        <!-- HR -->
+                        <div class="agent-path">
+                            <div class="flow-node agent" id="node-hr">
+                                <div class="node-icon hr">HR Agent</div>
+                                <div class="tooltip">HR Agent<br>Creates Employee Profiles</div>
+                            </div>
+                            <div class="connector small" id="conn-hr-api">
+                                <div class="connector-line"></div>
+                                <div class="packet forward"></div>
+                                <div class="packet reverse"></div>
+                            </div>
+                            <div class="flow-node api" id="node-hr-api">API</div>
+                        </div>
+
+                        <!-- Booking -->
+                        <div class="agent-path">
+                            <div class="flow-node agent" id="node-booking">
+                                <div class="node-icon booking">Booking Agent</div>
+                                <div class="tooltip">Booking Agent<br>Schedules Orientation</div>
+                            </div>
+                            <div class="connector small" id="conn-booking-api">
+                                <div class="connector-line"></div>
+                                <div class="packet forward"></div>
+                                <div class="packet reverse"></div>
+                            </div>
+                            <div class="flow-node api" id="node-booking-api">API</div>
+                        </div>
+
+                        <!-- IT -->
+                        <div class="agent-path">
+                            <div class="flow-node agent" id="node-it">
+                                <div class="node-icon it">IT Agent</div>
+                                <div class="tooltip">IT Agent<br>Provisions VPN, Email, etc.</div>
+                            </div>
+                            <div class="connector small" id="conn-it-mcp">
+                                <div class="connector-line"></div>
+                                <div class="packet forward"></div>
+                                <div class="packet reverse"></div>
+                            </div>
+                            <div class="flow-node mcp" id="node-it-mcp">MCP</div>
+                            <div class="connector small" id="conn-mcp-api">
+                                <div class="connector-line"></div>
+                                <div class="packet forward"></div>
+                                <div class="packet reverse"></div>
+                            </div>
+                            <div class="flow-node api" id="node-it-api">API</div>
+                        </div>
+
+                        <!-- Approval -->
+                        <div class="agent-path">
+                            <div class="flow-node agent" id="node-approval">
+                                <div class="node-icon approval">Approval Agent</div>
+                                <div class="tooltip">
+                                    <strong>Approval Agent</strong><br>
+                                    Manages high-risk permission requests.<br>
+                                    Requires human sign-off for sensitive access.
+                                </div>
+                            </div>
+                            <div class="connector small" id="conn-approval-api">
+                                <div class="connector-line"></div>
+                                <div class="packet forward"></div>
+                                <div class="packet reverse"></div>
+                            </div>
+                            <div class="flow-node api" id="node-approval-api">API</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Interface Section -->
+        <div class="chat-interface">
+            <div class="section-header">
+                <h2>💬 Send Instruction</h2>
+                <span class="badge">Dynamic</span>
+            </div>
+            <div class="chat-input-container">
+                <input type="text" id="chat-input" placeholder="e.g., Onboard Alice Smith as Product Manager"
+                    onkeydown="if(event.key==='Enter')sendInstruction()">
+                <button class="send-btn" onclick="sendInstruction()">
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="currentColor" />
+                    </svg>
+                    Send
+                </button>
+            </div>
+            <div class="chat-actions">
+                <a href="http://localhost:8000/auth/login" target="_blank" class="action-btn login">
+                    🔑 Login First
+                </a>
+            </div>
+            <div class="response-panel" id="response-panel">
+                <div class="response-header">
+                    <span class="response-icon">📋</span>
+                    <span>Agent Responses</span>
+                    <button class="clear-response-btn" onclick="clearResponses()">Clear</button>
+                </div>
+                <div class="response-content" id="response-content">
+                    <div class="response-placeholder">Send an instruction to see agent responses here...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="tokens-panel">
+                <div class="section-header">
+                    <h2>Live Tokens</h2>
+                    <span class="badge">Autoupdating</span>
+                </div>
+
+                <div class="tokens-grid">
+                    <!-- Orchestrator -->
+                    <div class="token-box" id="token-orchestrator_actor">
+                        <div class="token-header">
+                            <span class="dot"></span>
+                            <h3>Orchestrator Actor</h3>
+                        </div>
+                        <div class="token-content">
+                            <code class="token-value">Waiting...</code>
+                            <button class="copy-btn" onclick="copyToken('orchestrator_actor')">Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- User Delegated -->
+                    <div class="token-box" id="token-user_delegated">
+                        <div class="token-header">
+                            <span class="dot"></span>
+                            <h3>User Delegated</h3>
+                        </div>
+                        <div class="token-content">
+                            <code class="token-value">Waiting...</code>
+                            <button class="copy-btn" onclick="copyToken('user_delegated')">Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- Agents -->
+                    <div class="agents-tokens">
+                        <div class="agent-group hr">
+                            <h4>HR Agent</h4>
+                            <div class="token-pair">
+                                <div class="token-badge" id="token-hr_actor" onclick="copyToken('hr_actor')">
+                                    Actor <span class="icon">📋</span>
+                                </div>
+                                <div class="token-badge" id="token-hr_exchanged" onclick="copyToken('hr_exchanged')">
+                                    Exchanged <span class="icon">🔄</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="agent-group booking">
+                            <h4>Booking</h4>
+                            <div class="token-pair">
+                                <div class="token-badge" id="token-booking_actor" onclick="copyToken('booking_actor')">
+                                    Actor <span class="icon">📋</span>
+                                </div>
+                                <div class="token-badge" id="token-booking_exchanged"
+                                    onclick="copyToken('booking_exchanged')">
+                                    Exchanged <span class="icon">🔄</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="agent-group it">
+                            <h4>IT Agent</h4>
+                            <div class="token-pair">
+                                <div class="token-badge" id="token-it_actor" onclick="copyToken('it_actor')">
+                                    Actor <span class="icon">📋</span>
+                                </div>
+                                <div class="token-badge" id="token-it_exchanged" onclick="copyToken('it_exchanged')">
+                                    Exchanged <span class="icon">🔄</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="agent-group approval">
+                            <h4>Approval</h4>
+                            <div class="token-pair">
+                                <div class="token-badge" id="token-approval_actor"
+                                    onclick="copyToken('approval_actor')">
+                                    Actor <span class="icon">📋</span>
+                                </div>
+                                <div class="token-badge" id="token-approval_exchanged"
+                                    onclick="copyToken('approval_exchanged')">
+                                    Exchanged <span class="icon">🔄</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Console -->
+        <div class="console">
+            <div class="console-header">
+                <h3>System Logs</h3>
+                <button onclick="clearLogs()">Clear</button>
+            </div>
+            <div id="logs" class="console-body"></div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">Token Copied</div>
+    <script src="app.js"></script>
+</body>
+
+</html>
