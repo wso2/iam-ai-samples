@@ -75,18 +75,45 @@ class SecureFunctionTool(FunctionTool):
         self._func = func
 
     async def run(self, args: BaseModel, cancellation_token: CancellationToken) -> Any:
+        logger.info(f"[SecureFunctionTool] Starting execution of tool: {self.name}")
+        logger.debug(f"[SecureFunctionTool] Tool args: {args}")
+        
         # Skip auth if no auth context
         if not self.auth:
+            logger.debug(f"[SecureFunctionTool] No auth context for tool {self.name}, using empty token")
             args = args.model_copy(update={TOKEN_FIELD: ""})  # Set a empty token if no auth context
-            return await super().run(args, cancellation_token)
+            try:
+                result = await super().run(args, cancellation_token)
+                logger.info(f"[SecureFunctionTool] Tool {self.name} completed successfully (no auth)")
+                return result
+            except Exception as e:
+                logger.error(f"[SecureFunctionTool] Tool {self.name} failed with error: {type(e).__name__}: {str(e)}")
+                raise
 
-        token = await self.auth.manager.get_oauth_token(self.auth.config)
+        logger.debug(f"[SecureFunctionTool] Requesting OAuth token for tool {self.name}")
+        logger.debug(f"[SecureFunctionTool] Auth config: scopes={self.auth.config.scopes}, token_type={self.auth.config.token_type}")
+        
+        try:
+            token = await self.auth.manager.get_oauth_token(self.auth.config)
+        except Exception as e:
+            logger.error(f"[SecureFunctionTool] Failed to get OAuth token for tool {self.name}: {type(e).__name__}: {str(e)}")
+            raise
+            
         if not token:
             # No token was received
+            logger.error(f"[SecureFunctionTool] No OAuth token received for tool {self.name}")
             raise Exception(f"No OAuth token found for {self.auth.config}")
+
+        logger.debug(f"[SecureFunctionTool] OAuth token acquired for tool {self.name} (token length: {len(token.access_token) if token.access_token else 0})")
 
         # Modify args with the token
         args = args.model_copy(update={TOKEN_FIELD: token})
 
         # Execute the tool
-        return await super().run(args, cancellation_token)
+        try:
+            result = await super().run(args, cancellation_token)
+            logger.info(f"[SecureFunctionTool] Tool {self.name} completed successfully")
+            return result
+        except Exception as e:
+            logger.error(f"[SecureFunctionTool] Tool {self.name} failed with error: {type(e).__name__}: {str(e)}")
+            raise

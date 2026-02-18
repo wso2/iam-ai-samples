@@ -4,9 +4,10 @@ This guide provides instructions for setting up and running the Hotel Booking Ap
 
 ## Architecture
 
-The application consists of three main services:
+The application consists of four main services:
 - **Backend** (Port 8001): FastAPI service for hotel booking API
-- **AI Agents** (Port 8000): AI agents service for booking management
+- **Assistant Agent** (Port 8000): Guest-facing AI agent for room search and booking
+- **Staff Management Agent** (Port 8002): Background agent for staff optimization
 - **Frontend** (Port 3000): React application for user interface
 
 ## Prerequisites
@@ -46,7 +47,8 @@ docker-compose up --build
 
 # View service logs
 docker-compose logs backend
-docker-compose logs ai-agents
+docker-compose logs assistant-agent
+docker-compose logs staff-management-agent
 docker-compose logs frontend
 ```
 
@@ -99,27 +101,26 @@ export PYTHONPATH=$(pwd)
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 ```
 
-#### AI Agents Service
+#### Assistant Agent Service
 ```bash
-cd ai-agents
+cd assistant-agent
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
-pip install 'uvicorn[standard]' poetry
-
-# Install Asgardeo packages
-git clone -b sdk https://github.com/shashimalcse/python.git /tmp/python-sdk
-cd /tmp/python-sdk/packages/asgardeo
-poetry build
-cd ../asgardeo-ai
-poetry build
-pip install --force-reinstall --no-deps /tmp/python-sdk/packages/asgardeo/dist/*.whl /tmp/python-sdk/packages/asgardeo-ai/dist/*.whl
-
-# Return to agent directory and install requirements
-cd /path/to/your/project/ai-agents
 pip install -r requirements.txt
 export PYTHONPATH=$(pwd)
 uvicorn app.service:app --reload --host 0.0.0.0 --port 8000
+```
+
+#### Staff Management Agent Service
+```bash
+cd staff-management-agent
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+export PYTHONPATH=$(pwd)
+uvicorn app.service:app --reload --host 0.0.0.0 --port 8002
 ```
 
 #### Frontend
@@ -145,7 +146,8 @@ docker-compose logs
 
 # Follow logs for specific service
 docker-compose logs -f backend
-docker-compose logs -f ai-agents
+docker-compose logs -f assistant-agent
+docker-compose logs -f staff-management-agent
 docker-compose logs -f frontend
 
 # View container status
@@ -156,7 +158,8 @@ docker-compose ps
 ```bash
 # View logs (created by start-services.sh)
 tail -f logs/backend.log
-tail -f logs/ai-agents.log
+tail -f logs/assistant_agent.log
+tail -f logs/staff_management_agent.log
 tail -f logs/frontend.log
 
 # View all logs
