@@ -16,16 +16,16 @@
  * under the License.
  */
 
-export { default as SettingsIcon } from './SettingsIcon';
-export { default as CloseIcon } from './CloseIcon';
-export { default as InfoCircleIcon } from './InfoCircleIcon';
-export { default as PlayIcon } from './PlayIcon';
-export { default as LockIcon } from './LockIcon';
-export { default as UnlockIcon } from './UnlockIcon';
-export { default as SpinnerIcon } from './SpinnerIcon';
-export { default as DocumentIcon } from './DocumentIcon';
-export { default as GridIcon } from './GridIcon';
-export { default as ChevronDownIcon } from './ChevronDownIcon';
-export { default as ExternalLinkIcon } from './ExternalLinkIcon';
-export { default as LayersIcon } from './LayersIcon';
-export { default as WarningIcon } from './WarningIcon';
+export { default as SettingsIcon } from './settings.svg';
+export { default as CloseIcon } from './close.svg';
+export { default as InfoCircleIcon } from './info-circle.svg';
+export { default as PlayIcon } from './play.svg';
+export { default as LockIcon } from './lock.svg';
+export { default as UnlockIcon } from './unlock.svg';
+export { default as SpinnerIcon } from './spinner.svg';
+export { default as DocumentIcon } from './document.svg';
+export { default as GridIcon } from './grid.svg';
+export { default as ChevronDownIcon } from './chevron-down.svg';
+export { default as ExternalLinkIcon } from './external-link.svg';
+export { default as LayersIcon } from './layers.svg';
+export { default as WarningIcon } from './warning.svg';
