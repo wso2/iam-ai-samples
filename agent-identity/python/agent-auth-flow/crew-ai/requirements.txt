@@ -1,0 +1,8 @@
+asgardeo==0.2.1
+asgardeo_ai==0.2.2
+
+python-dotenv~=1.1.1
+
+crewai==1.9.3
+crewai-mcp-toolbox==0.1.0
+crewai[google-genai]==1.9.3
