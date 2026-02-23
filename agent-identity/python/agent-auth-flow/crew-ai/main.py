@@ -48,7 +48,7 @@ def main():
     agent_token = asyncio.run(get_agent_token())
 
     # 2. Get the user question
-    question = input("Enter your question: ")
+    question = input("\nEnter your question (e.g., 'Add 45 and 99'): ")
 
     # 3. Configure the MCP server for CrewAI
     # We map StreamableHTTPConnectionParams directly to MCPServerHTTP
