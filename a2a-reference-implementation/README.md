@@ -60,9 +60,9 @@ Each agent uses a **modern AI framework** for autonomous request handling instea
 
 | Component | Port | Framework | Description |
 |-----------|------|-----------|-------------|
-| **Orchestrator** | 8000 | OpenAI GPT-4o | Receives user requests, uses LLM to decompose into sub-tasks, exchanges tokens per agent, dispatches via A2A protocol |
+| **Orchestrator** | 8000 | **LangGraph** + GPT-4o | Receives user requests, uses a LangGraph `StateGraph` to decompose into sub-tasks, exchanges tokens per agent, dispatches via A2A protocol |
 | **HR Agent** | 8001 | **Vercel AI SDK** | Manages employee profiles using autonomous `@ai.tool` functions and `ai.run()` loop |
-| **IT Agent** | 8002 | OpenAI GPT-4o-mini | IT provisioning (VPN, GitHub, AWS). Routes through MCP Server |
+| **IT Agent** | 8002 | **LangGraph** + MCP | IT provisioning (VPN, GitHub, AWS). LangGraph drives MCP Server calls and result formatting |
 | **Approval Agent** | 8003 | **CrewAI** | Approval workflows using a CrewAI `Crew` with autonomous tool execution |
 | **Booking Agent** | 8005 | **Google ADK** | Task scheduling & equipment delivery using Google Agent Development Kit |
 | **IT MCP Server** | 8020 | FastMCP (SSE) | Intermediary between IT Agent and IT API. LLM-powered routing + scope-narrowing token exchange |
@@ -73,6 +73,26 @@ Each agent uses a **modern AI framework** for autonomous request handling instea
 ## What's New — Agent Framework Upgrades
 
 This implementation modernised each agent's LLM integration from raw OpenAI HTTP calls to production-grade AI frameworks:
+
+### ✅ IT Agent → LangGraph
+
+The IT Agent was migrated from a monolithic `process_request` method to a **LangGraph** `StateGraph`:
+
+- A new `graph.py` defines `ITAgentState` (TypedDict) and two graph nodes:
+  - `call_mcp_node` — connects to the IT MCP Server via SSE (port 8020) and invokes `handle_it_request`
+  - `format_results_node` — transforms the raw MCP dict into a formatted human-readable string
+- `run_it_agent_workflow(query, token)` compiles and runs the graph, returning the final string
+- `process_request` in `agent.py` is now a thin one-liner that calls `run_it_agent_workflow`
+- The MCP transport was also upgraded from `stdio` (spawning a subprocess per call) to **SSE** (`sse_client` on the already-running port 8020 MCP server)
+
+### ✅ Orchestrator → LangGraph
+
+The Orchestrator task-decomposition loop was refactored to use **LangGraph**:
+
+- A `StateGraph` (`graph.py`) models the orchestration flow as explicit nodes: `plan_tasks` → `execute_task` → conditional edge back to `execute_task` or `END`
+- `ToolNode` from `langgraph.prebuilt` handles A2A dispatch calls
+- `run_with_langgraph()` in `agent.py` drives the compiled graph with the user query as initial state
+- This gives the orchestrator checkpointing, deterministic node ordering, and clean separation of planning vs. execution logic compared to a raw agentic loop
 
 ### ✅ Approval Agent → CrewAI
 
@@ -366,19 +386,22 @@ Open http://localhost:8200/ to see real-time token flows, agent interactions, an
 
 ```
 ├── agents/
-│   ├── orchestrator/           # Port 8000 — LLM task decomposition + dynamic routing
+│   ├── orchestrator/           # Port 8000 — LangGraph-powered task decomposition + routing
 │   │   ├── __main__.py         #   Entry point, OAuth endpoints, A2A server
-│   │   ├── agent.py            #   LLM decomposition, A2A client, token exchange
+│   │   ├── agent.py            #   run_with_langgraph(), A2A client, token exchange
 │   │   │                       #   Reads agent URLs dynamically from config.yaml
+│   │   ├── graph.py            #   LangGraph StateGraph: plan_tasks → execute_task nodes
 │   │   └── executor.py         #   A2A executor adapter
 │   ├── hr_agent/               # Port 8001 — Employee management (Vercel AI SDK)
 │   │   ├── __main__.py         #   Entry point, mounts HR API + A2A server
 │   │   ├── agent.py            #   @ai.tool module-level functions + ai.run() loop
 │   │   │                       #   Token shared via ContextVar (_current_token)
 │   │   └── executor.py         #   A2A executor adapter
-│   ├── it_agent/               # Port 8002 — IT provisioning via MCP (SSE)
+│   ├── it_agent/               # Port 8002 — IT provisioning (LangGraph + MCP SSE)
 │   │   ├── __main__.py         #   Entry point, mounts IT API + A2A server
-│   │   ├── agent.py            #   Sends requests to MCP handle_it_request tool
+│   │   ├── agent.py            #   Thin wrapper; delegates to run_it_agent_workflow
+│   │   │                       #   _call_mcp_tool connects via SSE to port 8020
+│   │   ├── graph.py            #   LangGraph StateGraph: call_mcp → format_results
 │   │   └── executor.py         #   A2A executor adapter
 │   ├── approval_agent/         # Port 8003 — Approval workflows (CrewAI)
 │   │   ├── __main__.py         #   Entry point, mounts Approval API + A2A server
@@ -417,13 +440,14 @@ Open http://localhost:8200/ to see real-time token flows, agent interactions, an
 
 ## How Each Agent Works
 
-### Orchestrator (GPT-4o)
+### Orchestrator (LangGraph + GPT-4o)
 1. Receives natural language request from user
-2. **LLM decomposes** the request into ordered sub-tasks for available agents
-3. Agent URLs are loaded **dynamically from `config.yaml`** — no hardcoded port mappings
-4. For each task: performs **token exchange** (RFC 8693) to get a scoped token
-5. Dispatches task to the target agent via **A2A protocol** (JSON-RPC)
-6. Collects and aggregates results
+2. **LangGraph `StateGraph`** drives the flow through `plan_tasks_node` → `execute_task_node`
+3. `plan_tasks_node`: GPT-4o decomposes the request into an ordered list of agent sub-tasks
+4. Agent URLs are loaded **dynamically from `config.yaml`** — no hardcoded port mappings
+5. `execute_task_node`: for each task, performs **RFC 8693 token exchange** then dispatches via **A2A protocol**
+6. A conditional edge loops back until all tasks are done, then exits to `END`
+7. Results are aggregated and returned
 
 ### HR Agent (Vercel AI SDK)
 1. Receives A2A request with `hr:read + hr:write` scoped token
@@ -447,13 +471,14 @@ Open http://localhost:8200/ to see real-time token flows, agent interactions, an
 4. ADK tools call the Booking REST API with the scoped token
 5. ADK response is translated back to A2A format
 
-### IT Agent + MCP Server
-1. IT Agent receives request with `it:read + it:write` token
-2. Connects to MCP Server via **SSE transport** on port 8020
-3. MCP Server's **LLM classifies** the request (vpn/github/aws/list)
-4. MCP Server **narrows token scope** (e.g., `it:write` only for provisioning)
+### IT Agent (LangGraph + MCP)
+1. Receives A2A request with `it:read + it:write` scoped token
+2. **LangGraph `StateGraph`** drives execution through `call_mcp_node` → `format_results_node`
+3. `call_mcp_node`: connects to the IT MCP Server via **SSE** on port 8020 and calls `handle_it_request`
+4. MCP Server's internal LLM classifies the request (vpn/github/aws/list) and narrows the token scope
 5. Calls IT API with the narrowed token
-6. Returns result back through MCP → IT Agent → Orchestrator
+6. `format_results_node`: transforms the MCP result dict into a readable provisioning summary
+7. Returns formatted result via A2A protocol
 
 ---
 
@@ -477,6 +502,7 @@ Open http://localhost:8200/ to see real-time token flows, agent interactions, an
 | FastAPI | REST API endpoints |
 | Starlette | A2A agent HTTP servers |
 | a2a-sdk | Official A2A protocol SDK |
+| **langgraph** | Orchestrator + IT Agent — `StateGraph` workflows |
 | **vercel-ai-sdk** | HR Agent — autonomous tool-calling loop |
 | **crewai** | Approval Agent — multi-agent crew framework |
 | **google-adk** | Booking Agent — Google Agent Development Kit |
