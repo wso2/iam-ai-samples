@@ -140,8 +140,13 @@ async def api_demo(request: Request):
     
     from src.log_broadcaster import log_and_broadcast
     
-    # Get the demo token (from most recent session)
-    token = broker.get_demo_token()
+    # Try to get token from Authorization header first
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+    else:
+        # Fallback to demo token (from most recent session)
+        token = broker.get_demo_token()
     
     if not token:
         return JSONResponse({
@@ -188,7 +193,13 @@ async def api_demo(request: Request):
         return JSONResponse(result)
         
     except Exception as e:
-        logger.error(f"Request failed: {e}")
+        import traceback
+        err_msg = traceback.format_exc()
+        logger.error(f"Request failed: {e}\n{err_msg}")
+        with open("orchestrator_crash.log", "w", encoding="utf-8") as f:
+            f.write(err_msg)
+        
+        from src.log_broadcaster import log_and_broadcast
         log_and_broadcast(f"\n[ERROR] {str(e)}")
         return JSONResponse({
             "status": "error",

@@ -101,11 +101,9 @@ class OrchestratorAgent:
         
         # Agent URLs from config
         discovery_urls = orch_config.get("discovery", {}).get("agent_urls", [])
+        # Dynamically build agent URLs from config.yaml if discovery_urls is empty
         self.agent_urls = discovery_urls or [
-            "http://localhost:8001",  # HR
-            "http://localhost:8002",  # IT
-            "http://localhost:8003",  # Approval
-            "http://localhost:8004",  # Booking
+            str(info.get("url")) for info in self.agents_config.values() if info.get("url")
         ]
         
         # Token broker (uses existing implementation)
@@ -328,7 +326,7 @@ class OrchestratorAgent:
                         "Authorization": f"Bearer {exchanged_token}",
                         "Content-Type": "application/json"
                     },
-                    timeout=30.0
+                    timeout=120.0
                 )
 
                 if response.status_code == 200:
@@ -340,9 +338,9 @@ class OrchestratorAgent:
                     return {"error": f"Agent error: {response.status_code}"}
 
         except Exception as e:
-            logger.error(f"Error calling agent: {e}")
-            vlog(f"\n[{agent_type}] Error: {str(e)}")
-            return {"error": str(e)}
+            logger.error(f"Error calling agent: {repr(e)}")
+            vlog(f"\n[{agent_type}] Error: {str(e) or repr(e)}")
+            return {"error": str(e) or repr(e)}
 
     def _parse_agent_response(self, result: Dict[str, Any]) -> str:
         """Parse A2A response to extract text."""
@@ -491,12 +489,26 @@ Respond with JSON in this exact format:
         tasks = []
         step = 1
 
-        keyword_map = {
-            "hr": (["employee", "profile", "hr", "hire", "onboard", "new hire", "create"], "http://localhost:8001"),
-            "it": (["vpn", "github", "aws", "provision", "access", "account", "laptop", "email"], "http://localhost:8002"),
-            "approval": (["approve", "approval", "permission", "request", "manager"], "http://localhost:8003"),
-            "booking": (["schedule", "task", "booking", "book", "orientation", "equipment", "pickup"], "http://localhost:8004"),
+        # Pre-defined base keywords for robustness, but URLs mapped dynamically
+        base_keywords = {
+            "hr_agent": ["employee", "profile", "hr", "hire", "onboard", "new hire", "create"],
+            "it_agent": ["vpn", "github", "aws", "provision", "access", "account", "laptop", "email"],
+            "approval_agent": ["approve", "approval", "permission", "request", "manager"],
+            "booking_agent": ["schedule", "task", "booking", "book", "orientation", "equipment", "pickup"]
         }
+
+        keyword_map = {}
+        for agent_key, info in self.agents_config.items():
+            url = info.get("url")
+            if not url:
+                continue
+            
+            keywords = list(base_keywords.get(agent_key, []))
+            # Also add words from description to expand coverage
+            desc_words = [w for w in info.get("description", "").lower().replace(",", "").split() if len(w) > 3]
+            keywords.extend(desc_words)
+            
+            keyword_map[agent_key] = (keywords, url)
 
         for agent_key, (keywords, url) in keyword_map.items():
             if any(kw in query_lower for kw in keywords):

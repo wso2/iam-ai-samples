@@ -108,7 +108,7 @@ class ITAgent:
         handle_it_request tool, which uses an LLM to classify and route.
         """
         if not token:
-            return "❌ No token provided. Authentication required."
+            return "[X] No token provided. Authentication required."
 
         logger.info(f"[IT_AGENT] Sending request to MCP handle_it_request: {query[:80]}...")
 
@@ -120,67 +120,81 @@ class ITAgent:
 
         # Format the response based on what happened
         if not result.get("success"):
-            return f"❌ IT provisioning failed: {result.get('error', 'Unknown error')}"
+            errors = []
+            for r in result.get("results", []):
+                if not r.get("success") and "error" in r:
+                    errors.append(r["error"])
+            err_msg = "; ".join(errors) if errors else result.get('error', 'Unknown error')
+            return f"[X] IT provisioning failed: {err_msg}"
 
-        routing = result.get("_routing", {})
-        action = routing.get("action", "unknown")
-        scope_info = routing.get("scope_narrowed", "N/A")
-        classified_by = routing.get("classified_by", "N/A")
+        results_array = result.get("results", [])
+        if not results_array:
+            return f"[X] IT provisioning failed: No results returned from MCP server"
 
-        if action == "provision_vpn":
-            return (
-                f"✅ VPN access provisioned via MCP → IT API!\n"
-                f"- Provision ID: {result.get('provision_id', 'N/A')}\n"
-                f"- Employee: {result.get('employee_id', 'N/A')}\n"
-                f"- VPN Server: {result.get('details', {}).get('vpn_server', 'vpn.nebulasoft.internal')}\n"
-                f"- Status: {result.get('status', 'active')}\n"
-                f"- Routed by: {classified_by}\n"
-                f"- Token scope narrowed: {scope_info}"
-            )
+        formatted_responses = []
+        for action_result in results_array:
+            routing = action_result.get("_routing", {})
+            action = routing.get("action", "unknown")
+            scope_info = routing.get("scope_narrowing", "N/A")
+            classified_by = routing.get("routed_by", "N/A")
+            employee_id = action_result.get("employee_id", "N/A")
 
-        if action == "provision_github":
-            return (
-                f"✅ GitHub Enterprise access provisioned via MCP → IT API!\n"
-                f"- Provision ID: {result.get('provision_id', 'N/A')}\n"
-                f"- Employee: {result.get('employee_id', 'N/A')}\n"
-                f"- GitHub User: {result.get('details', {}).get('github_username', 'N/A')}\n"
-                f"- Repos: {result.get('details', {}).get('repositories', [])}\n"
-                f"- Status: {result.get('status', 'active')}\n"
-                f"- Routed by: {classified_by}\n"
-                f"- Token scope narrowed: {scope_info}"
-            )
+            res_text = ""
+            if action == "provision_vpn":
+                res_text = (
+                    f"[OK] VPN access provisioned via MCP → IT API!\n"
+                    f"- Provision ID: {action_result.get('provision_id', 'N/A')}\n"
+                    f"- Employee: {action_result.get('employee_id', employee_id)}\n"
+                    f"- VPN Server: {action_result.get('details', {}).get('vpn_server', 'vpn.nebulasoft.internal')}\n"
+                    f"- Status: {action_result.get('status', 'active')}\n"
+                    f"- Routed by: {classified_by}\n"
+                    f"- Token scope narrowed: {scope_info}"
+                )
+            elif action == "provision_github":
+                res_text = (
+                    f"[OK] GitHub Enterprise access provisioned via MCP → IT API!\n"
+                    f"- Provision ID: {action_result.get('provision_id', 'N/A')}\n"
+                    f"- Employee: {action_result.get('employee_id', employee_id)}\n"
+                    f"- GitHub User: {action_result.get('details', {}).get('github_username', 'N/A')}\n"
+                    f"- Repos: {action_result.get('details', {}).get('repositories', [])}\n"
+                    f"- Status: {action_result.get('status', 'active')}\n"
+                    f"- Routed by: {classified_by}\n"
+                    f"- Token scope narrowed: {scope_info}"
+                )
+            elif action == "provision_aws":
+                res_text = (
+                    f"[OK] AWS environment provisioned via MCP → IT API!\n"
+                    f"- Provision ID: {action_result.get('provision_id', 'N/A')}\n"
+                    f"- Employee: {action_result.get('employee_id', employee_id)}\n"
+                    f"- IAM User: {action_result.get('details', {}).get('iam_user', 'N/A')}\n"
+                    f"- Account: {action_result.get('details', {}).get('account', 'N/A')}\n"
+                    f"- Status: {action_result.get('status', 'active')}\n"
+                    f"- Routed by: {classified_by}\n"
+                    f"- Token scope narrowed: {scope_info}"
+                )
+            elif action == "list_provisions":
+                provisions = action_result.get("data", [])
+                if not provisions:
+                    res_text = f"📋 No provisions found for {employee_id}."
+                else:
+                    lines = [f"📋 Provisions for {employee_id} ({len(provisions)} total):"]
+                    for p in provisions:
+                        lines.append(f"  - {p.get('provision_id')}: {p.get('service')} ({p.get('status')})")
+                    lines.append(f"  Routed by: {classified_by}")
+                    lines.append(f"  Token scope narrowed: {scope_info}")
+                    res_text = "\n".join(lines)
+            else:
+                # Generic success / unknown action
+                res_text = (
+                    f"[OK] IT request processed via MCP → IT API!\n"
+                    f"- Action: {action}\n"
+                    f"- Routed by: {classified_by}\n"
+                    f"- Token scope narrowed: {scope_info}\n"
+                    f"- Result: {json.dumps(action_result, indent=2)}"
+                )
+            formatted_responses.append(res_text)
 
-        if action == "provision_aws":
-            return (
-                f"✅ AWS environment provisioned via MCP → IT API!\n"
-                f"- Provision ID: {result.get('provision_id', 'N/A')}\n"
-                f"- Employee: {result.get('employee_id', 'N/A')}\n"
-                f"- IAM User: {result.get('details', {}).get('iam_user', 'N/A')}\n"
-                f"- Account: {result.get('details', {}).get('account', 'N/A')}\n"
-                f"- Status: {result.get('status', 'active')}\n"
-                f"- Routed by: {classified_by}\n"
-                f"- Token scope narrowed: {scope_info}"
-            )
-
-        if action == "list_provisions":
-            provisions = result.get("data", [])
-            if not provisions:
-                return f"📋 No provisions found for {routing.get('employee_id', 'N/A')}."
-            lines = [f"📋 Provisions for {routing.get('employee_id', 'N/A')} ({len(provisions)} total):"]
-            for p in provisions:
-                lines.append(f"  - {p.get('provision_id')}: {p.get('service')} ({p.get('status')})")
-            lines.append(f"  Routed by: {classified_by}")
-            lines.append(f"  Token scope narrowed: {scope_info}")
-            return "\n".join(lines)
-
-        # Generic success
-        return (
-            f"✅ IT request processed via MCP → IT API!\n"
-            f"- Action: {action}\n"
-            f"- Routed by: {classified_by}\n"
-            f"- Token scope narrowed: {scope_info}\n"
-            f"- Result: {json.dumps(result, indent=2)}"
-        )
+        return "\n\n".join(formatted_responses)
 
     async def stream(self, query: str, token: str = None) -> AsyncIterable[Dict[str, Any]]:
         """Stream response - A2A pattern."""

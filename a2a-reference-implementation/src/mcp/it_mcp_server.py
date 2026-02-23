@@ -428,10 +428,17 @@ async def classify_request(request_text: str) -> dict:
             content = content.strip()
 
         classification = json.loads(content)
-        logger.info(f"[MCP_IT] LLM classified -> action={classification['action']}, "
-                     f"employee={classification.get('employee_id', 'N/A')}")
+        
+        # Log the classification without throwing KeyError
+        actions = classification.get("actions", [])
+        if actions:
+            action_list = [a.get("action", "unknown") for a in actions]
+            logger.info(f"[MCP_IT] LLM classified -> {len(actions)} actions: {action_list}")
+        else:
+            logger.info(f"[MCP_IT] LLM classified -> action={classification.get('action', 'unknown')}, "
+                         f"employee={classification.get('employee_id', 'N/A')}")
+            
         return classification
-
 
 # ─────────────────────────────────────────────────────────────────
 # MCP Server Definition

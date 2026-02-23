@@ -37,7 +37,7 @@ env/
 .settings/
 
 # Environment variables - IMPORTANT: Contains secrets
-.env
+# .env
 
 # Logs
 *.log

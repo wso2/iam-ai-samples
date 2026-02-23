@@ -125,9 +125,13 @@ CRITICAL RULES:
    - Example: Instead of 3 separate IT tasks (VPN, GitHub, AWS), create 1 task: "Provision VPN, GitHub, and AWS access for Alice"
    - This reduces token exchanges and improves efficiency
 
-4. Only use agents that are actually available
-5. Tasks should be specific and actionable
-6. Return ONLY the JSON array, no other text
+4. **MAINTAIN CONTEXT ACROSS STEPS**: It is crucial that you pass relevant context into later tasks.
+   - For example, if task 1 creates a profile and subsequent steps need to assign permissions to that same person, EXPLICITLY state the person's name or known ID in the later tasks.
+   - Agents DO NOT share memory. Task N only knows what you write in its description.
+
+5. Only use agents that are actually available
+6. Tasks should be specific and actionable
+7. Return ONLY the JSON array, no other text
 
 Example for MIXED-RISK request:
 Request: "Give Bob high-level HR privileges and normal IT access"
@@ -273,11 +277,19 @@ async def execute_task_node(state: OrchestratorState) -> OrchestratorState:
             target_scopes=agent_scopes  # agent_scopes is already a list
         )
         
+        # Combine query with previous task results for context
+        enhanced_query = current_task["task"]
+        if state.get("task_results"):
+            context_pieces = [f"Step {r['step']} ({r['agent']}): {r['result']}" for r in state["task_results"] if r.get("success")]
+            if context_pieces:
+                context_str = "\n".join(context_pieces)
+                enhanced_query = f"{current_task['task']}\n\nContext from previous steps:\n{context_str}"
+
         # Call the agent with pre-exchanged token (avoid duplicate exchange)
         orchestrator = OrchestratorAgent()
         agent_response = await orchestrator.call_agent(
             agent_url=current_task["agent_url"],
-            query=current_task["task"],
+            query=enhanced_query,
             access_token=state["access_token"],
             pre_exchanged_token=agent_token  # Pass pre-exchanged token to skip duplicate exchange
         )
@@ -285,7 +297,7 @@ async def execute_task_node(state: OrchestratorState) -> OrchestratorState:
         # Extract result from A2A response
         if isinstance(agent_response, dict):
             if "error" in agent_response:
-                result = agent_response["error"]
+                result = agent_response["error"] or "Unknown specific agent error"
                 success = False
             elif "result" in agent_response:
                 # A2A JSON-RPC response
@@ -296,16 +308,32 @@ async def execute_task_node(state: OrchestratorState) -> OrchestratorState:
                     result = str(result_data)
                     success = True
                 elif isinstance(result_data, dict):
-                    # Extract text from message parts
-                    message = result_data.get("message", {})
-                    parts = message.get("parts", [])
-                    if parts and isinstance(parts, list):
-                        result = parts[0].get("text", str(result_data))
+                    # Extract text from message parts depending on A2A agent framework
+                    if result_data.get("kind") == "message":
+                        parts = result_data.get("parts", [])
+                        if parts and isinstance(parts, list):
+                            result = parts[0].get("text", str(result_data))
+                        else:
+                            result = str(result_data)
+                    elif "artifacts" in result_data:
+                        artifacts = result_data.get("artifacts", [])
+                        if artifacts and isinstance(artifacts, list):
+                            parts = artifacts[0].get("parts", [])
+                            if parts and isinstance(parts, list):
+                                result = parts[0].get("text", str(result_data))
+                            else:
+                                result = str(result_data)
+                        else:
+                            result = str(result_data)
+                    elif "message" in result_data:
+                        message = result_data.get("message", {})
+                        parts = message.get("parts", [])
+                        if parts and isinstance(parts, list):
+                            result = parts[0].get("text", str(result_data))
+                        else:
+                            result = str(result_data)
                     else:
                         result = str(result_data)
-                    success = True
-                else:
-                    result = str(result_data)
                     success = True
             else:
                 result = str(agent_response)
@@ -353,12 +381,12 @@ async def execute_task_node(state: OrchestratorState) -> OrchestratorState:
                 }]
         
     except Exception as e:
-        logger.error(f"❌ [LangGraph] Task {task_idx + 1} failed: {e}")
+        logger.error(f"❌ [LangGraph] Task {task_idx + 1} failed: {repr(e)}")
         task_result = {
             "step": current_task["step"],
             "agent": current_task["agent_name"],
             "task": current_task["task"],
-            "result": str(e),
+            "result": str(e) or repr(e),
             "success": False
         }
         approval_decisions = state.get("approval_decisions", [])

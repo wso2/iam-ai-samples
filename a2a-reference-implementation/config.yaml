@@ -70,7 +70,7 @@ agents:
   booking_agent:
     name: "Booking Agent"
     description: "Schedules tasks and deliveries"
-    url: "http://localhost:8004"
+    url: "http://localhost:8005"
     required_scopes: ["booking:read", "booking:write"]
     target_audience: "onboarding-api"
     agent_id: "${BOOKING_AGENT_ID}"
@@ -96,7 +96,7 @@ orchestrator:
       - "http://localhost:8001"
       - "http://localhost:8002"
       - "http://localhost:8003"
-      - "http://localhost:8004"
+      - "http://localhost:8005"
   
   llm:
     provider: "openai"
