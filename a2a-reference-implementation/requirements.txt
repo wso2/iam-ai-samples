@@ -1,28 +1,74 @@
-# Core
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-pydantic==2.5.3
-pydantic-settings==2.1.0
-python-dotenv==1.0.0
+# ==============================================================================
+# A2A Reference Implementation — Direct Dependencies
+# No strict version pins to avoid cross-package constraint conflicts.
+# ==============================================================================
 
-# LangGraph & AI
-langgraph==0.2.0
-langchain==0.3.0
-langchain-openai==0.2.0
-openai==1.50.0
+# --- A2A Protocol ---
+a2a-sdk>=0.3.24
 
-# OAuth2/JWT
-python-jose[cryptography]==3.3.0
-httpx==0.27.0
-authlib==1.3.0
+# --- Agent Frameworks ---
+# Orchestrator & IT Agent (LangGraph)
+langgraph>=1.0.9
+langgraph-checkpoint>=4.0.0
+langgraph-prebuilt>=1.0.8
+langgraph-sdk>=0.3.8
+langchain>=1.2.10
+langchain-core>=1.2.14
+langchain-openai>=1.1.10
 
-# Utilities
-structlog==24.1.0
-python-multipart==0.0.9
-pyyaml==6.0.1
+# Approval Agent (no extra framework needed - uses standard A2A)
+# crewai removed: incompatible with Python 3.14 (crewai requires Python <3.14)
 
-# A2A Protocol
-a2a-sdk[http-server]>=0.1.0
+# Booking Agent (Google ADK + litellm for OpenAI via LiteLLM)
+# NOTE: do NOT pin litellm separately — google-adk manages its own compatible version
+google-adk>=1.25.1
 
-# MCP Protocol
-mcp>=1.0.0
+# HR Agent (SQLite-backed employee database via aiosqlite)
+aiosqlite>=0.21.0
+
+# --- MCP (Model Context Protocol) ---
+mcp>=1.26.0
+sse-starlette>=3.2.0
+
+# --- Web Frameworks & Servers ---
+fastapi>=0.129.2
+starlette>=0.52.1
+uvicorn>=0.41.0
+python-multipart>=0.0.22
+
+# --- HTTP Client (Provides 'import httpx') ---
+httpx>=0.28.1
+httpx-sse>=0.4.3
+websockets>=15.0.1
+aiohttp>=3.11.12
+
+# --- Environment & Configuration ---
+# Provides 'import dotenv' (load_dotenv)
+python-dotenv>=1.2.1
+
+# Provides 'import yaml'
+PyYAML>=6.0.3
+
+# Provides 'import pydantic'
+pydantic>=2.12.5
+pydantic-settings>=2.13.1
+# Required for Pydantic's EmailStr type (used in EmployeeCreate model)
+email-validator>=2.0.0
+
+# --- AI & LLM Models ---
+openai>=2.21.0
+tiktoken>=0.12.0
+
+# --- Auth & Cryptography (Provides 'import jose', 'import jwt') ---
+python-jose>=3.5.0
+PyJWT>=2.11.0
+cryptography>=45.0.3
+pyOpenSSL>=25.3.0
+
+# --- Utilities & Logging ---
+structlog>=25.5.0
+tenacity>=9.1.4
+packaging>=26.0
+python-dateutil>=2.9.0.post0
+tqdm>=4.67.3
+rich>=14.3.3

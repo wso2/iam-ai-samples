@@ -4,10 +4,10 @@ A reference implementation demonstrating the **Agent-to-Agent (A2A) protocol** w
 
 Each agent uses a **modern AI framework** for autonomous request handling instead of hardcoded keyword matching:
 - **Orchestrator** — OpenAI GPT-4o for LLM task decomposition
-- **HR Agent** — [Vercel AI SDK](https://github.com/vercel/ai) (Python) for autonomous tool-calling
+- **HR Agent** — Standard A2A + **SQLite** (`aiosqlite`) for persistent employee records
 - **IT Agent** — OpenAI GPT-4o-mini for LLM-routing via MCP
-- **Approval Agent** — [CrewAI](https://www.crewai.com/) multi-agent framework
-- **Booking Agent** — [Google ADK](https://google.github.io/adk-docs/) (Agent Development Kit)
+- **Approval Agent** — Standard A2A autonomous approval workflow
+- **Booking Agent** — [Google ADK](https://google.github.io/adk-docs/) (Agent Development Kit) + **Google Calendar** integration
 
 ---
 
@@ -61,10 +61,10 @@ Each agent uses a **modern AI framework** for autonomous request handling instea
 | Component | Port | Framework | Description |
 |-----------|------|-----------|-------------|
 | **Orchestrator** | 8000 | OpenAI GPT-4o | Receives user requests, uses LLM to decompose into sub-tasks, exchanges tokens per agent, dispatches via A2A protocol |
-| **HR Agent** | 8001 | **Vercel AI SDK** | Manages employee profiles using autonomous `@ai.tool` functions and `ai.run()` loop |
+| **HR Agent** | 8001 | Standard A2A + **SQLite** | Manages employee profiles. Records persisted to `data/hr.db` via `aiosqlite` |
 | **IT Agent** | 8002 | OpenAI GPT-4o-mini | IT provisioning (VPN, GitHub, AWS). Routes through MCP Server |
-| **Approval Agent** | 8003 | **CrewAI** | Approval workflows using a CrewAI `Crew` with autonomous tool execution |
-| **Booking Agent** | 8005 | **Google ADK** | Task scheduling & equipment delivery using Google Agent Development Kit |
+| **Approval Agent** | 8003 | Standard A2A | Approval workflows with autonomous approval logic |
+| **Booking Agent** | 8005 | **Google ADK** | Task scheduling & equipment delivery. Creates real **Google Calendar events** |
 | **IT MCP Server** | 8020 | FastMCP (SSE) | Intermediary between IT Agent and IT API. LLM-powered routing + scope-narrowing token exchange |
 | **Visualizer** | 8200 | WebSocket | Real-time UI showing token flows and agent interactions |
 
@@ -164,13 +164,124 @@ python3.12 -m venv .venv
 pip install -r requirements.txt
 ```
 
-> **Important:** All services must be started using the `.venv` Python interpreter to ensure `crewai`, `google-adk`, `vercel-ai-sdk`, and `litellm` are available.
+> **Important:** All services must be started using the `.venv` Python interpreter to ensure `google-adk` and `litellm` are available.
+
+---
+
+### HR Employee Database (SQLite)
+
+The HR API uses **SQLite** for persistent employee storage via [`aiosqlite`](https://aiosqlite.omnilib.dev/).
+
+**No manual setup required** — the database and table are created automatically on first run at:
+```
+data/hr.db
+```
+
+#### Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS employees (
+    employee_id   TEXT PRIMARY KEY,        -- e.g. EMP-A1B2C3D4
+    name          TEXT NOT NULL,
+    email         TEXT NOT NULL UNIQUE,    -- duplicate emails rejected (409)
+    role          TEXT NOT NULL,
+    team          TEXT NOT NULL,
+    manager_email TEXT NOT NULL,
+    start_date    TEXT NOT NULL,           -- ISO date string
+    status        TEXT NOT NULL DEFAULT 'pending_onboarding',
+    created_at    TEXT NOT NULL,           -- ISO datetime (UTC)
+    created_by    TEXT NOT NULL            -- token subject (audit trail)
+);
+```
+
+#### Valid status values
+
+| Status | Meaning |
+|--------|----------|
+| `pending_onboarding` | Default — newly created employee |
+| `active` | Fully onboarded |
+| `on_leave` | Temporarily away |
+| `suspended` | Access revoked pending review |
+| `offboarded` | Soft-deleted via `DELETE /employees/{id}` |
+
+#### Reset / inspect the database
+
+```powershell
+# View all employees
+.venv\Scripts\python.exe -c "
+import sqlite3, json
+con = sqlite3.connect('data/hr.db')
+con.row_factory = sqlite3.Row
+rows = con.execute('SELECT * FROM employees').fetchall()
+print(json.dumps([dict(r) for r in rows], indent=2))
+"
+
+# Clear all records (reset)
+.venv\Scripts\python.exe -c "import sqlite3; sqlite3.connect('data/hr.db').execute('DELETE FROM employees').connection.commit()"
+
+# Delete the database entirely (will be recreated on next start)
+Remove-Item data\hr.db
+```
+
+---
+
+### Google Calendar Integration (Booking Agent)
+
+The Booking Agent creates **real Google Calendar events** for orientation sessions and equipment deliveries. This uses a Google Cloud **Service Account** — no user login required.
+
+#### Step 1 — Create a Google Cloud Project & Enable the Calendar API
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Create a new project (or select an existing one)
+3. Navigate to **APIs & Services → Library**
+4. Search for **Google Calendar API** and click **Enable**
+
+#### Step 2 — Create a Service Account
+
+1. Go to **APIs & Services → Credentials → Create Credentials → Service Account**
+2. Give it a name (e.g. `a2a-booking-agent`)
+3. Click **Create and Continue** → skip optional role/user steps → **Done**
+4. Click the service account → **Keys** tab → **Add Key → Create new key → JSON**
+5. Download the `.json` file — this is your credentials file
+
+> **Template:** A mock credentials file with the expected structure is provided at:
+> [`google-service-account.example.json`](google-service-account.example.json)
+> Copy it, fill in your real values, and rename it (e.g. `my-service-account.json`).
+
+#### Step 3 — Create & Share a Google Calendar
+
+1. Open [Google Calendar](https://calendar.google.com) → **+ Other calendars → Create new calendar**
+2. Name it (e.g. `A2A Onboarding Calendar`)
+3. After creation, click the calendar → **Settings and sharing**
+4. Under **Share with specific people**, add the service account email:
+   ```
+   your-service-account-name@your-gcp-project-id.iam.gserviceaccount.com
+   ```
+   Set permission to **Make changes to events**
+5. Copy the **Calendar ID** from **Integrate calendar** section (looks like `abc123...@group.calendar.google.com`)
+
+#### Step 4 — Configure Environment Variables
+
+Add to your `.env` file:
+
+```env
+# Path to your downloaded service account JSON file
+GOOGLE_APPLICATION_CREDENTIALS=./my-service-account.json
+
+# Your shared calendar's Calendar ID (from Step 3)
+GOOGLE_CALENDAR_ID=your-calendar-id@group.calendar.google.com
+```
+
+#### Fallback — Mock Mode
+
+If credentials are missing or invalid, the Booking Agent **automatically falls back to mock mode** — bookings are still recorded in-memory and the system continues working. The calendar links returned will be placeholder URLs. This means Google Calendar is **optional** for local development.
 
 ---
 
 ## Setup Guide
 
 ### 1. Clone and Install Dependencies
+
 
 ```bash
 git clone <repository-url>
@@ -390,10 +501,11 @@ Open http://localhost:8200/ to see real-time token flows, agent interactions, an
 │       └── agent.py            #   google.adk.agents.LlmAgent with booking tools
 ├── src/
 │   ├── apis/                   # FastAPI REST API routers
-│   │   ├── hr_api.py           #   POST/GET /employees (requires hr:read, hr:write)
+│   │   ├── hr_api.py           #   CRUD /employees — persisted to data/hr.db (aiosqlite)
 │   │   ├── it_api.py           #   POST/GET /provision/* (requires it:read, it:write)
 │   │   ├── approval_api.py     #   POST/GET /requests (requires approval:*)
-│   │   └── booking_api.py      #   POST/GET /tasks, /deliveries (requires booking:*)
+│   │   ├── booking_api.py      #   POST/GET /tasks, /deliveries + Google Calendar events
+│   │   └── google_calendar.py  #   Google Calendar service account helper
 │   ├── auth/                   # Authentication & token management
 │   │   ├── asgardeo.py         #   WSO2 IS client (OAuth, actor tokens, token exchange)
 │   │   ├── token_broker.py     #   Centralized token broker (session, exchange, audit)
@@ -477,10 +589,10 @@ Open http://localhost:8200/ to see real-time token flows, agent interactions, an
 | FastAPI | REST API endpoints |
 | Starlette | A2A agent HTTP servers |
 | a2a-sdk | Official A2A protocol SDK |
-| **vercel-ai-sdk** | HR Agent — autonomous tool-calling loop |
-| **crewai** | Approval Agent — multi-agent crew framework |
+| **aiosqlite** | HR Agent — async SQLite driver for employee persistence |
 | **google-adk** | Booking Agent — Google Agent Development Kit |
 | **litellm** | OpenAI bridge for Google ADK |
+| **google-api-python-client** | Booking Agent — Google Calendar event creation |
 | mcp (FastMCP) | IT MCP Server — Model Context Protocol SDK |
 | OpenAI GPT-4o | LLM task decomposition (orchestrator) |
 | OpenAI GPT-4o-mini | LLM request routing (IT Agent + MCP) |

@@ -208,59 +208,52 @@ async def api_demo(request: Request):
 
 
 async def api_chat(request: Request):
-    """Dynamic chat endpoint - routes user instructions using LLM."""
+    """Dynamic chat endpoint - routes user instructions using LLM and returns structured step results."""
     global _executor
     broker = get_token_broker()
-    
+
     from src.log_broadcaster import log_and_broadcast
-    
+
     # Get the demo token (from most recent session)
     token = broker.get_demo_token()
-    
+
     if not token:
         return JSONResponse({
-            "status": "error", 
+            "status": "error",
             "error": "No authenticated session found. Please login first at /auth/login"
         }, status_code=401)
-    
-    # Set token in executor
+
     if _executor:
         _executor.set_auth_token(token)
-    
-    # Get message from query params
-    message = request.query_params.get('message', '')
-    
+
+    # Message from query param or POST body
+    if request.method == "POST":
+        body = await request.json()
+        message = body.get("message", "")
+    else:
+        message = request.query_params.get('message', '')
+
     if not message:
-        return JSONResponse({
-            "status": "error",
-            "error": "No message provided"
-        }, status_code=400)
-    
+        return JSONResponse({"status": "error", "error": "No message provided"}, status_code=400)
+
     log_and_broadcast(f"\n[CHAT REQUEST] {message[:80]}...")
-    
+
     try:
-        # Stream response from orchestrator (uses LLM routing)
-        full_response = ""
-        async for chunk in _executor.agent.stream(message, "chat-session", token):
-            content = chunk.get('content', '')
-            if content:
-                full_response += content
-        
-        log_and_broadcast(f"\n[CHAT RESPONSE] {full_response[:80]}...")
-        
-        return JSONResponse({
-            "status": "success",
-            "message": message,
-            "response": full_response,
-            "token_preview": f"{token[:50]}..." if token else None
-        })
+        if not _executor.agent._discovered_agents:
+            await _executor.agent.discover_agents()
+
+        result = await _executor.agent.process_workflow(
+            user_input=message,
+            access_token=token
+        )
+
+        return JSONResponse(result)
+
     except Exception as e:
         logger.error(f"Chat request failed: {e}")
         log_and_broadcast(f"\n[ERROR] Chat failed: {str(e)}")
-        return JSONResponse({
-            "status": "error",
-            "error": str(e)
-        }, status_code=500)
+        return JSONResponse({"status": "error", "error": str(e)}, status_code=500)
+
 
 
 def create_app():

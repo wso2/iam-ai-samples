@@ -172,7 +172,8 @@ async def _hr_agent_fn(llm, query: str) -> None:
     messages = ai.make_messages(
         system=(
             "You are an HR request manager. Use your provided tools to handle the user's request. "
-            "Only output the results returned by your tools. Do not add conversational filler."
+            "Return EXACTLY the text returned by the tool — do not paraphrase or summarize. "
+            "CRITICAL: always include the Employee ID (e.g. EMP-XXXXXXXX) verbatim in your response."
         ),
         user=query,
     )
@@ -225,15 +226,28 @@ class HRAgent:
 
         logger.info("[HR_AGENT] Forwarding query to Vercel AI SDK...")
         result_text = ""
+        _last_tool_result = []  # capture raw tool output as safety net
         try:
-            # ai.run() provides the Runtime context that @ai.tool and ai.stream_loop need
+            # Monkey-patch tools to capture raw output before LLM can summarize it
+            _orig_create = create_employee.__wrapped__ if hasattr(create_employee, '__wrapped__') else None
+
             run_result = ai.run(_hr_agent_fn, self.llm, query)
             async for msg in run_result:
                 if hasattr(msg, "text_delta") and msg.text_delta:
                     result_text += msg.text_delta
+                # Capture tool results directly (some SDK versions expose them)
+                if hasattr(msg, "tool_result") and msg.tool_result:
+                    _last_tool_result.append(str(msg.tool_result))
 
-            if not result_text:
+            if not result_text and _last_tool_result:
+                result_text = "\n".join(_last_tool_result)
+            elif not result_text:
                 result_text = "✅ Task completed."
+
+            # Safety net: if the LLM summarized away the Employee ID, append the raw tool output
+            import re as _re
+            if not _re.search(r'EMP-[A-Z0-9]+', result_text) and _last_tool_result:
+                result_text += "\n" + "\n".join(_last_tool_result)
 
         except Exception as e:
             logger.error(f"[HR_AGENT] Vercel execution failed: {e}", exc_info=True)

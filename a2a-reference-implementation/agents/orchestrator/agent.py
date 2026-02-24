@@ -415,29 +415,40 @@ Available Agents:
 
 Rules:
 - CAREFULLY identify ALL distinct actions in the user request. A single sentence can require MULTIPLE agents.
-- For example: "Create employee profile and provision VPN for John" needs BOTH the HR agent (create profile) AND the IT agent (provision VPN).
 - Each task must have a clear, specific instruction for that agent.
-- Order tasks logically (e.g., create profile before provisioning access).
-- If only one agent is genuinely needed, return a single task.
-- Never skip an action that the user explicitly asked for.
+- Assign a `depends_on` list: the step numbers this task must wait for before starting.
+  * If a task needs result data from a prior task (e.g. employee ID), it MUST list that step in depends_on.
+  * Independent tasks should have `depends_on: []` — they will run in PARALLEL.
+- Common dependency rules:
+  * IT Agent needs employee ID → depends on HR Agent step
+  * Booking Agent needs employee ID → depends on HR Agent step
+  * An execution step after an Approval step → depends on that Approval step
+  * If IT and Booking are both independent of each other but both need HR, they can both list only HR
+- Never skip an action the user explicitly asked for.
 
 Privilege / Access Workflow:
-- When the request involves granting privileges, elevated access, or role-based permissions (e.g. "HR privileges", "admin access", "manager role"), the Approval Agent MUST be invoked FIRST to approve the privilege request.
-- AFTER approval, route to the appropriate agent to actually grant/apply the privileges:
-  * HR privileges / roles / access  →  HR Agent (after Approval Agent approves)
-  * IT privileges / system access   →  IT Agent (after Approval Agent approves)
-- Example: "give HR privileges to Bob" should produce:
-  Step 1: Approval Agent → "Request approval for granting HR privileges to Bob"
-  Step 2: HR Agent → "Grant HR privileges to Bob (approved by Approval Agent)"
+- When the request involves elevated privileges, the Approval Agent MUST run first.
+- After approval, route to the appropriate agent (HR/IT) with a depends_on pointing to the Approval step.
 
 Respond with JSON in this exact format:
 {{
   "tasks": [
-    {{"step": 1, "agent_url": "<url>", "agent_name": "<name>", "task": "<specific instruction for this agent>"}},
-    ...
+    {{"step": 1, "agent_url": "<url>", "agent_name": "<name>", "task": "<instruction>", "depends_on": []}},
+    {{"step": 2, "agent_url": "<url>", "agent_name": "<name>", "task": "<instruction>", "depends_on": [1]}},
+    {{"step": 3, "agent_url": "<url>", "agent_name": "<name>", "task": "<instruction>", "depends_on": [1]}}
   ],
-  "summary": "<one-line summary of the plan>"
-}}"""
+  "summary": "<one-line summary>"
+}}
+
+Example (onboarding with parallel Booking + IT after Approval):
+[
+  {{"step": 1, "agent_name": "HR Agent",       "depends_on": []}},
+  {{"step": 2, "agent_name": "Approval Agent", "depends_on": [1]}},
+  {{"step": 3, "agent_name": "IT Agent",       "depends_on": [1, 2]}},
+  {{"step": 4, "agent_name": "Booking Agent",  "depends_on": [1]}}
+]
+→ Execution: Wave1=[HR], Wave2=[Approval+Booking in parallel], Wave3=[IT]
+"""
 
         if not self.openai_api_key:
             return self._fallback_decompose(user_input)
@@ -473,9 +484,10 @@ Respond with JSON in this exact format:
                 tasks = plan.get("tasks", [])
                 summary = plan.get("summary", "")
 
-                vlog(f"\n[LLM PLAN] {summary}")
+                vlog(f"\n[LLM PLAN] {summary} (parallel execution enabled)")
                 for t in tasks:
-                    vlog(f"  Step {t['step']}: [{t['agent_name']}] {t['task']}")
+                    deps = t.get('depends_on', [])
+                    vlog(f"  Step {t['step']}: [{t['agent_name']}] depends_on={deps} → {t['task'][:60]}")
 
                 return tasks
 
@@ -560,59 +572,112 @@ Respond with JSON in this exact format:
         total = len(tasks)
         results = []
 
-        # Step 2: Execute each task sequentially
-        for task in tasks:
-            step_num = task["step"]
-            agent_url = task["agent_url"]
-            agent_name = task["agent_name"]
-            task_query = task["task"]
-
-            vlog(f"\n{'='*60}")
-            vlog(f"[STEP {step_num}/{total}] {agent_name}")
-            vlog(f"  Task: {task_query}")
-            vlog(f"{'='*60}")
-
-            try:
-                result = await self.call_agent(
-                    agent_url=agent_url,
-                    query=task_query,
-                    access_token=access_token
-                )
-                response_text = self._parse_agent_response(result)
-
-                results.append({
-                    "step": step_num,
-                    "agent": agent_name,
-                    "task": task_query,
-                    "status": "success",
-                    "response": response_text
-                })
-
-                vlog(f"\n[STEP {step_num} COMPLETE] {agent_name}")
-
-            except Exception as e:
-                logger.error(f"Step {step_num} failed: {e}")
-                results.append({
-                    "step": step_num,
-                    "agent": agent_name,
-                    "task": task_query,
-                    "status": "error",
-                    "response": str(e)
-                })
-                vlog(f"\n[STEP {step_num} FAILED] {agent_name}: {e}")
+        # Step 2: Execute as DAG with parallel waves
+        results = await self._execute_dag(tasks, access_token)
 
         vlog(f"\n{'='*60}")
         vlog(f"[WORKFLOW COMPLETE] {sum(1 for r in results if r['status'] == 'success')}/{total} steps succeeded")
         vlog(f"{'='*60}")
 
+        # Build responses dict for the visualizer's step-card rendering:
+        # app.js expects data.responses = { "Agent Name": "result text" }
+        # with each entry rendered as a new card with an auto-incrementing STEP badge.
+        responses = {}
+        for r in results:
+            key = r["agent"]
+            responses[key] = r["response"]
+
         return {
             "status": "success",
             "input": user_input,
+            "responses": responses,  # Used by visualizer for step cards
             "plan": [{"step": t["step"], "agent": t["agent_name"], "task": t["task"]} for t in tasks],
             "results": results
         }
 
-    # ==================== LLM ROUTING ====================
+    # ==================== DAG PARALLEL EXECUTION ====================
+
+    async def _execute_dag(
+        self,
+        tasks: list,
+        access_token: str
+    ) -> list:
+        """
+        Execute tasks as a DAG (Directed Acyclic Graph).
+        Groups independent tasks into waves and runs each wave concurrently
+        with asyncio.gather. Passes completed results as context to next waves.
+        """
+        # Build a step_num → task map
+        task_map = {t["step"]: t for t in tasks}
+        completed: dict[int, dict] = {}   # step_num → result dict
+        all_results: list = []
+
+        remaining = list(task_map.keys())
+
+        while remaining:
+            # Find tasks whose dependencies are ALL satisfied
+            wave = [
+                step for step in remaining
+                if all(dep in completed for dep in task_map[step].get("depends_on", []))
+            ]
+
+            if not wave:
+                # Circular dependency or unsolvable — fall back to running remaining sequentially
+                logger.warning("[DAG] Circular/unresolved dependencies, running remaining sequentially")
+                wave = [remaining[0]]
+
+            vlog(f"\n[DAG] Executing wave: steps {wave} in parallel")
+
+            # Build context string from all completed steps
+            context_str = ""
+            if completed:
+                context_pieces = [
+                    f"Step {s} ({completed[s]['agent']}): {completed[s]['response']}"
+                    for s in sorted(completed)
+                ]
+                context_str = "\nContext from previous steps:\n" + "\n".join(context_pieces)
+
+            async def _run_step(step_num: int) -> dict:
+                task = task_map[step_num]
+                query = task["task"] + (context_str if context_str else "")
+                try:
+                    raw = await self.call_agent(
+                        agent_url=task["agent_url"],
+                        query=query,
+                        access_token=access_token
+                    )
+                    response_text = self._parse_agent_response(raw)
+                    vlog(f"\n[DAG] Step {step_num} ({task['agent_name']}) DONE")
+                    return {
+                        "step": step_num,
+                        "agent": task["agent_name"],
+                        "task": task["task"],
+                        "status": "success",
+                        "response": response_text
+                    }
+                except Exception as e:
+                    logger.error(f"[DAG] Step {step_num} ({task['agent_name']}) FAILED: {e}")
+                    return {
+                        "step": step_num,
+                        "agent": task["agent_name"],
+                        "task": task["task"],
+                        "status": "error",
+                        "response": str(e)
+                    }
+
+            import asyncio
+            wave_results = await asyncio.gather(*[_run_step(s) for s in wave])
+
+            for r in wave_results:
+                completed[r["step"]] = r
+                all_results.append(r)
+
+            remaining = [s for s in remaining if s not in wave]
+
+        # Return results sorted by step number
+        return sorted(all_results, key=lambda r: r["step"])
+
+    # ==================== MAIN WORKFLOW ====================
 
     async def _call_openai(self, query: str) -> Dict[str, Any]:
         """Use OpenAI with registered tools to route requests."""

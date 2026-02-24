@@ -225,15 +225,16 @@ async def list_deliveries(employee_id: str = None) -> dict:
 # ADK Agent Definition
 # ─────────────────────────────────────────────────────────────────
 
-root_agent = LlmAgent(
-    # Uses OpenAI via LiteLLM — ADK supports any LiteLLM-compatible model
-    model="openai/gpt-4o-mini",
-    name="booking_agent",
-    description=(
-        "Schedules onboarding tasks (orientation, training sessions) and "
-        "equipment deliveries (laptops, phones, monitors) for new employees."
-    ),
-    instruction="""You are a Booking Agent for an employee onboarding system.
+from datetime import datetime as _dt
+
+def _build_instruction() -> str:
+    today = _dt.utcnow().strftime("%B %d, %Y")
+    return f"""You are a Booking Agent for an employee onboarding system.
+
+TODAY'S DATE: {today}
+CURRENT YEAR: {_dt.utcnow().year}
+
+IMPORTANT: When the user says a date like "March 1st" or "next Friday", always use the CURRENT YEAR ({_dt.utcnow().year}) unless they explicitly specify a different year.
 
 You help schedule onboarding tasks and equipment deliveries for new employees.
 
@@ -244,14 +245,31 @@ Available operations:
 - **list_deliveries**: List scheduled deliveries (optionally for a specific employee)
 
 Rules:
-- Always extract the employee ID (format: EMP-XXXX) from the request
-- For tasks: determine task_type from context (orientation, security_training, hr_orientation, general). If unspecified, default to 'orientation'.
-- For deliveries: determine item_type from context (laptop, equipment, phone, monitor). If unspecified, default to 'laptop'.
-- If listing is requested, call the appropriate list tool
-- If both tasks and deliveries are asked for, call both list_tasks and list_deliveries
-- Always provide clear, concise confirmation of what was scheduled
-- CRITICAL: Do NOT ask the user for confirmation or clarification before scheduling. Automatically proceed with 'orientation' and 'laptop' as defaults and execute the underlying tool calls immediately.
-- If no token is available, inform the user authentication is required
-""",
+- Always extract the employee ID (format: EMP-XXXX) from the request or context.
+- `create_task` is ONLY for scheduling sessions/orientations/trainings. Use the ORIENTATION date.
+- `schedule_delivery` is ONLY for physical equipment delivery. Use the DELIVERY date.
+- NEVER call `create_task` with the delivery date.
+- NEVER call `schedule_delivery` with the orientation date.
+- Each tool must be called exactly ONCE per item requested.
+
+Date mapping — follow this exactly:
+  "orientation on March 3rd"  → call `create_task` with scheduled_date="2026-03-03"  (ONE call)
+  "laptop delivery on March 4th" → call `schedule_delivery` with delivery_date="2026-03-04" (ONE call)
+
+- Each requested action = exactly ONE tool call on exactly ONE date. Do not repeat calls.
+- Always confirm ALL scheduled items in your response, each on its own line.
+- CRITICAL: Do NOT ask for confirmation. Execute all tool calls immediately.
+- If no token is available, inform the user authentication is required.
+"""
+
+root_agent = LlmAgent(
+    # Uses OpenAI via LiteLLM — ADK supports any LiteLLM-compatible model
+    model="openai/gpt-4o-mini",
+    name="booking_agent",
+    description=(
+        "Schedules onboarding tasks (orientation, training sessions) and "
+        "equipment deliveries (laptops, phones, monitors) for new employees."
+    ),
+    instruction=_build_instruction(),
     tools=[create_task, schedule_delivery, list_tasks, list_deliveries],
 )
