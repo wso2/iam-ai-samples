@@ -72,17 +72,19 @@ async def create_task(
     task_type: str = "orientation",
     title: str = None,
     scheduled_date: str = None,
+    start_time: str = None,
     duration_hours: float = 2.0,
     description: str = "Scheduled onboarding task"
 ) -> dict:
     """
-    Schedule an onboarding task for an employee.
+    Schedule an onboarding task (e.g. orientation session) for an employee.
 
     Args:
         employee_id: Employee ID in format EMP-XXXX
         task_type: Type of task - orientation, security_training, hr_orientation, or general
         title: Title of the task (auto-generated from task_type if not provided)
         scheduled_date: ISO date string (YYYY-MM-DD). Defaults to 3 days from today.
+        start_time: Time in HH:MM 24h format, e.g. "15:00" for 3 PM. Defaults to "09:00".
         duration_hours: Duration in hours (default 2.0)
         description: Task description
 
@@ -102,12 +104,15 @@ async def create_task(
         "duration_hours": duration_hours,
         "description": description
     }
-    logger.info(f"[ADK_BOOKING] Creating task: {title} for {employee_id}")
+    if start_time:
+        payload["start_time"] = start_time
+
+    logger.info(f"[ADK_BOOKING] Creating task: {title} for {employee_id} on {scheduled_date} at {start_time or '09:00'}")
     result = await _call_api("POST", "/tasks", payload)
     if result.get("success"):
         return {
             "success": True,
-            "message": f"[OK] Task '{title}' scheduled for {employee_id} on {scheduled_date}",
+            "message": f"[OK] Task '{title}' scheduled for {employee_id} on {scheduled_date} at {start_time or '09:00'}",
             "task_id": result.get("task_id"),
             "scheduled_date": result.get("scheduled_date"),
             "status": result.get("status", "scheduled")
@@ -120,10 +125,11 @@ async def schedule_delivery(
     item_type: str = "laptop",
     item_description: str = None,
     delivery_address: str = "Office HQ, Floor 5",
-    delivery_date: str = None
+    delivery_date: str = None,
+    start_time: str = None
 ) -> dict:
     """
-    Schedule an equipment delivery for an employee.
+    Schedule an equipment delivery (e.g. laptop) for an employee.
 
     Args:
         employee_id: Employee ID in format EMP-XXXX
@@ -131,6 +137,7 @@ async def schedule_delivery(
         item_description: Description of the item (auto-generated if not provided)
         delivery_address: Delivery address
         delivery_date: ISO date string (YYYY-MM-DD). Defaults to 5 days from today.
+        start_time: Delivery time in HH:MM 24h format, e.g. "08:00". Defaults to "10:00".
 
     Returns:
         dict with delivery_id, employee_id, item_type, delivery_date, tracking_number, status
@@ -147,12 +154,15 @@ async def schedule_delivery(
         "delivery_address": delivery_address,
         "delivery_date": delivery_date
     }
-    logger.info(f"[ADK_BOOKING] Scheduling delivery: {item_type} for {employee_id}")
+    if start_time:
+        payload["start_time"] = start_time
+
+    logger.info(f"[ADK_BOOKING] Scheduling delivery: {item_type} for {employee_id} on {delivery_date} at {start_time or '10:00'}")
     result = await _call_api("POST", "/deliveries", payload)
     if result.get("success"):
         return {
             "success": True,
-            "message": f"[OK] {item_type.title()} delivery scheduled for {employee_id} on {delivery_date}",
+            "message": f"[OK] {item_type.title()} delivery scheduled for {employee_id} on {delivery_date} at {start_time or '10:00'}",
             "delivery_id": result.get("delivery_id"),
             "tracking_number": result.get("tracking_number"),
             "delivery_date": result.get("delivery_date"),
@@ -246,18 +256,23 @@ Available operations:
 
 Rules:
 - Always extract the employee ID (format: EMP-XXXX) from the request or context.
-- `create_task` is ONLY for scheduling sessions/orientations/trainings. Use the ORIENTATION date.
-- `schedule_delivery` is ONLY for physical equipment delivery. Use the DELIVERY date.
+- `create_task` is ONLY for scheduling sessions/orientations/trainings. Use the ORIENTATION date + time.
+- `schedule_delivery` is ONLY for physical equipment delivery. Use the DELIVERY date + time.
 - NEVER call `create_task` with the delivery date.
 - NEVER call `schedule_delivery` with the orientation date.
 - Each tool must be called exactly ONCE per item requested.
+- Always extract the time from the request and pass it as `start_time` in "HH:MM" 24h format.
+  * "3 PM" or "3:00 pm" → "15:00"
+  * "8 AM" or "8:00 am" → "08:00"
+  * "2:30 PM" → "14:30"
+  * If no time given → omit start_time (API will use default)
 
-Date mapping — follow this exactly:
-  "orientation on March 3rd"  → call `create_task` with scheduled_date="2026-03-03"  (ONE call)
-  "laptop delivery on March 4th" → call `schedule_delivery` with delivery_date="2026-03-04" (ONE call)
+Date+time mapping — follow this exactly:
+  "orientation on March 5th at 3 PM"    → call `create_task` with scheduled_date="2026-03-05", start_time="15:00"  (ONE call)
+  "laptop delivery on March 6th at 8 AM" → call `schedule_delivery` with delivery_date="2026-03-06", start_time="08:00" (ONE call)
 
 - Each requested action = exactly ONE tool call on exactly ONE date. Do not repeat calls.
-- Always confirm ALL scheduled items in your response, each on its own line.
+- Always confirm ALL scheduled items in your response, each on its own line with date and time.
 - CRITICAL: Do NOT ask for confirmation. Execute all tool calls immediately.
 - If no token is available, inform the user authentication is required.
 """

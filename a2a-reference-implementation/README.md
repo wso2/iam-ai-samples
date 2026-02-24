@@ -5,9 +5,9 @@ A reference implementation demonstrating the **Agent-to-Agent (A2A) protocol** w
 Each agent uses a **modern AI framework** for autonomous request handling instead of hardcoded keyword matching:
 - **Orchestrator** — OpenAI GPT-4o for LLM task decomposition
 - **HR Agent** — Standard A2A + **SQLite** (`aiosqlite`) for persistent employee records
-- **IT Agent** — OpenAI GPT-4o-mini for LLM-routing via MCP
-- **Approval Agent** — Standard A2A autonomous approval workflow
-- **Booking Agent** — [Google ADK](https://google.github.io/adk-docs/) (Agent Development Kit) + **Google Calendar** integration
+- **IT Agent** — OpenAI GPT-4o-mini for LLM-routing via MCP + **Human-in-the-Loop Approval Gate**
+- **Finance & Payroll Agent** — **CrewAI** autonomous payroll and expense registration
+- **Booking Agent** — [Google ADK](https://google.github.io/adk-docs/) + **Google Calendar** integration
 
 ---
 
@@ -36,14 +36,14 @@ Each agent uses a **modern AI framework** for autonomous request handling instea
      ┌─────────────┘      │      │      └─────────────┐
      ▼                    ▼      ▼                    ▼
 ┌──────────────┐  ┌──────────┐ ┌──────────┐ ┌────────────────┐
-│  HR Agent    │  │ IT Agent │ │ Approval │ │ Booking Agent  │
-│  port 8001   │  │ port 8002│ │ port 8003│ │   port 8005    │
+│  HR Agent    │  │ IT Agent │ │ Payroll  │ │ Booking Agent  │
+│  port 8001   │  │ port 8002│ │ port 8004│ │   port 8005    │
 │ Vercel AI SDK│  │ LLM+MCP  │ │  CrewAI  │ │  Google ADK    │
 └──────┬───────┘  └────┬─────┘ └────┬─────┘ └───────┬────────┘
        │               │            │               │
        ▼               ▼            ▼               ▼
  ┌──────────┐  ┌─────────────┐ ┌──────────┐ ┌──────────┐
- │ HR API   │  │ MCP Server  │ │Approval  │ │Booking   │
+ │ HR API   │  │ MCP Server  │ │Payroll   │ │Booking   │
  │ /api/hr  │  │  port 8020  │ │  API     │ │  API     │
  └──────────┘  │ LLM routing │ └──────────┘ └──────────┘
                │ + scope      │
@@ -64,6 +64,7 @@ Each agent uses a **modern AI framework** for autonomous request handling instea
 | **HR Agent** | 8001 | Standard A2A + **SQLite** | Manages employee profiles. Records persisted to `data/hr.db` via `aiosqlite` |
 | **IT Agent** | 8002 | OpenAI GPT-4o-mini | IT provisioning (VPN, GitHub, AWS). Routes through MCP Server |
 | **Approval Agent** | 8003 | Standard A2A | Approval workflows with autonomous approval logic |
+| **Finance & Payroll Agent** | 8004 | **CrewAI** | Registers employees in payroll, sets up expense accounts with monthly salary and spending limits |
 | **Booking Agent** | 8005 | **Google ADK** | Task scheduling & equipment delivery. Creates real **Google Calendar events** |
 | **IT MCP Server** | 8020 | FastMCP (SSE) | Intermediary between IT Agent and IT API. LLM-powered routing + scope-narrowing token exchange |
 | **Visualizer** | 8200 | WebSocket | Real-time UI showing token flows and agent interactions |
@@ -122,6 +123,28 @@ The HR Agent was migrated from a raw HTTP → OpenAI classification prompt to th
 - The LLM autonomously decides which tool(s) to call based on the natural language request — no classification prompt needed
 
 > **Design note:** `@ai.tool` must decorate **module-level** async functions. Applying it to class methods causes a Pydantic schema error on the implicit `self` parameter. The `ContextVar` pattern solves token sharing cleanly without workarounds.
+
+---
+
+### Optional Features Setup
+
+#### IT Agent Email Approval (SMTP)
+By default, the IT Agent prints an approval link to the terminal. To receive real emails:
+1. Create a Google App Password for your sending address.
+2. Add these to `.env`:
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-sending-email@gmail.com
+SMTP_PASSWORD=your-16-char-app-password
+IT_ADMIN_EMAIL=admin-receiving-email@company.com
+IT_SERVICE_BASE_URL=http://localhost:8002
+```
+
+#### Google Calendar Integration (Booking Agent)
+The Booking Agent interacts with the Google Calendar API. 
+1. Place a valid OAuth 2.0 Web Client credentials file at `mock_calendar_credentials.json` (or just leave the default mock file provided to run without crashing, which skips real calendar events).
+2. If using real credentials, the agent will prompt you to log into Google in your browser on the first run to authorize calendar access locally.
 
 ---
 
@@ -338,6 +361,7 @@ See [ASGARDEO_SETUP.md](ASGARDEO_SETUP.md) for detailed WSO2 IS configuration.
 | `hr-agent` | `onboarding-orchestrator` | HR worker identity |
 | `it-agent` | `onboarding-orchestrator` | IT worker identity |
 | `approval-agent` | `onboarding-orchestrator` | Approval worker identity |
+| `payroll-agent` | `onboarding-orchestrator` | Finance & Payroll worker identity |
 | `booking-agent` | `onboarding-orchestrator` | Booking worker identity |
 
 > **Note:** Worker agents don't need their own applications. They are registered as AI Agents linked to the orchestrator's application. The Token Exchanger app performs exchanges using agent actor tokens.
@@ -373,6 +397,8 @@ IT_AGENT_ID=<from it-agent>
 IT_AGENT_SECRET=<agent password>
 APPROVAL_AGENT_ID=<from approval-agent>
 APPROVAL_AGENT_SECRET=<agent password>
+PAYROLL_AGENT_ID=<from payroll-agent>
+PAYROLL_AGENT_SECRET=<agent password>
 BOOKING_AGENT_ID=<from booking-agent>
 BOOKING_AGENT_SECRET=<agent password>
 
@@ -383,6 +409,8 @@ TOKEN_EXCHANGER_CLIENT_SECRET=<from token-exchanger app>
 # MCP IT Server (optional, for scope narrowing demo)
 MCP_IT_CLIENT_ID=<from mcp-it-server app>
 MCP_IT_CLIENT_SECRET=<from mcp-it-server app>
+MCP_IT_AGENT_ID=<from mcp-it-agent>
+MCP_IT_AGENT_SECRET=<agent password>
 
 # OpenAI
 OPENAI_API_KEY=sk-proj-...
@@ -409,7 +437,7 @@ The quickest way is to use the provided startup script which opens each service 
 
 ### Manual Start (any OS)
 
-Open **7 separate terminals** using the `.venv` Python interpreter:
+Open **8 separate terminals** using the `.venv` Python interpreter:
 
 ```bash
 # Terminal 1: IT MCP Server (must start before IT Agent)
@@ -424,13 +452,16 @@ Open **7 separate terminals** using the `.venv` Python interpreter:
 # Terminal 4: Approval Agent  (CrewAI)
 .venv/bin/python -m agents.approval_agent
 
-# Terminal 5: Booking Agent  (Google ADK)
+# Terminal 5: Finance & Payroll Agent  (CrewAI)
+.venv/bin/python -m agents.payroll_agent
+
+# Terminal 6: Booking Agent  (Google ADK)
 .venv/bin/python -m agents.booking_agent_adk
 
-# Terminal 6: Orchestrator (start last)
+# Terminal 7: Orchestrator (start last)
 .venv/bin/python -m agents.orchestrator
 
-# Terminal 7: Visualizer
+# Terminal 8: Visualizer
 .venv/bin/python visualizer_server.py
 ```
 
@@ -442,6 +473,7 @@ Open **7 separate terminals** using the `.venv` Python interpreter:
 | HR Agent | http://localhost:8001/.well-known/agent-card.json |
 | IT Agent | http://localhost:8002/.well-known/agent-card.json |
 | Approval Agent | http://localhost:8003/.well-known/agent-card.json |
+| Finance & Payroll Agent | http://localhost:8004/.well-known/agent-card.json |
 | Booking Agent | http://localhost:8005/.well-known/agent-card.json |
 | IT MCP Server | http://localhost:8020/ |
 | Visualizer | http://localhost:8200/ |
@@ -519,6 +551,11 @@ Open http://localhost:8200/ to see real-time token flows, agent interactions, an
 │   │   ├── agent.py            #   crewai.Crew + @tool API wrappers
 │   │   │                       #   Token shared via ContextVar (current_token)
 │   │   └── executor.py         #   A2A executor adapter
+│   ├── payroll_agent/          # Port 8004 — Finance & Payroll (CrewAI)
+│   │   ├── __main__.py         #   Entry point, mounts Payroll API + A2A server
+│   │   ├── agent.py            #   crewai.Crew + @tool API wrappers
+│   │   │                       #   Token shared via ContextVar; scopes: approval:read, approval:write
+│   │   └── executor.py         #   A2A executor adapter
 │   └── booking_agent_adk/      # Port 8005 — Task scheduling (Google ADK)
 │       ├── __main__.py         #   Entry point, ADK Runner + custom A2aAgentExecutor
 │       └── agent.py            #   google.adk.agents.LlmAgent with booking tools
@@ -576,6 +613,14 @@ Open http://localhost:8200/ to see real-time token flows, agent interactions, an
 4. The agent autonomously calls `create_approval_request`, `approve_request`, etc.
 5. Crew final output is returned via A2A protocol
 
+### Finance & Payroll Agent (CrewAI)
+1. Receives A2A request with `approval:read + approval:write` scoped token
+2. Stores token in a ContextVar; CrewAI `@tool` functions read it for API calls
+3. A `crewai.Crew` with a `payroll_manager` agent handles the full payroll decision flow
+4. Uses `ChatOpenAI` (`gpt-4o-mini`) as the LLM backbone for autonomous tool selection
+5. Tools call the Payroll REST API (`/api/payroll/*`): `register_payroll` (salary, pay grade, frequency) and/or `setup_expense_account` (monthly limits)
+6. Crew final output is returned via A2A protocol
+
 ### Booking Agent (Google ADK)
 1. Receives A2A request with `booking:read + booking:write` scoped token
 2. Custom `A2aAgentExecutor` injects the token into `_current_token` ContextVar before ADK executes
@@ -614,6 +659,7 @@ Open http://localhost:8200/ to see real-time token flows, agent interactions, an
 | FastAPI | REST API endpoints |
 | Starlette | A2A agent HTTP servers |
 | a2a-sdk | Official A2A protocol SDK |
+| **crewai** | Finance & Payroll Agent + Approval Agent — autonomous task orchestration |
 | **aiosqlite** | HR Agent — async SQLite driver for employee persistence |
 | **google-adk** | Booking Agent — Google Agent Development Kit |
 | **litellm** | OpenAI bridge for Google ADK |

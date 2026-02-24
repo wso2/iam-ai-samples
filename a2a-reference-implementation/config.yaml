@@ -46,7 +46,7 @@ agents:
     # IT Agent routes through MCP Server instead of calling API directly
     # MCP Server is also registered as AI Agent in WSO2 IS
     mcp_server:
-      url: "http://localhost:8012"
+      url: "http://localhost:8020"
       client_id: "${MCP_IT_CLIENT_ID}"
       client_secret: "${MCP_IT_CLIENT_SECRET}"
       agent_id: "${MCP_IT_AGENT_ID}"
@@ -55,17 +55,19 @@ agents:
       - id: "provision_vpn"
         name: "Provision VPN"
 
-  approval_agent:
-    name: "Approval Agent"
-    description: "Handles approval workflows"
-    url: "http://localhost:8003"
+  payroll_agent:
+    name: "Finance & Payroll Agent"
+    description: "Registers employees in payroll and sets up expense accounts"
+    url: "http://localhost:8004"
     required_scopes: ["approval:read", "approval:write"]
     target_audience: "onboarding-api"
-    agent_id: "${APPROVAL_AGENT_ID}"
-    agent_secret: "${APPROVAL_AGENT_SECRET}"
+    agent_id: "${PAYROLL_AGENT_ID}"
+    agent_secret: "${PAYROLL_AGENT_SECRET}"
     skills:
-      - id: "request_approval"
-        name: "Request Approval"
+      - id: "register_payroll"
+        name: "Register Payroll"
+      - id: "setup_expense"
+        name: "Setup Expense Account"
 
   booking_agent:
     name: "Booking Agent"
@@ -93,10 +95,10 @@ orchestrator:
   
   discovery:
     agent_urls:
-      - "http://localhost:8001"
-      - "http://localhost:8002"
-      - "http://localhost:8003"
-      - "http://localhost:8005"
+      - "http://localhost:8001"   # HR Agent
+      - "http://localhost:8002"   # IT Agent
+      - "http://localhost:8004"   # Finance & Payroll Agent
+      - "http://localhost:8005"   # Booking Agent
   
   llm:
     provider: "openai"

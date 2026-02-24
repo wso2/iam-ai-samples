@@ -37,6 +37,7 @@ class TaskCreate(BaseModel):
     scheduled_date: date
     duration_hours: float = 2.0
     description: Optional[str] = None
+    start_time: Optional[str] = None  # "HH:MM" 24h format, e.g. "15:00"  defaults to "09:00"
 
 
 class TaskResponse(BaseModel):
@@ -61,6 +62,7 @@ class DeliverySchedule(BaseModel):
     delivery_address: str
     delivery_date: date
     approved_by: Optional[str] = None
+    start_time: Optional[str] = None  # "HH:MM" 24h format, e.g. "08:00". defaults to "10:00"
 
 
 class DeliveryResponse(BaseModel):
@@ -101,11 +103,19 @@ async def create_task(
         try:
             scheduled = scheduled.replace(year=current_year)
         except ValueError:
-            # Feb 29 edge case in non-leap year
             scheduled = scheduled.replace(year=current_year, day=28)
-    
-    # ── Build Google Calendar event times (default 09:00, duration from request) ──
-    start_dt = datetime.combine(scheduled, datetime.min.time()).replace(hour=9, minute=0)
+
+    # ── Parse start_time (e.g. "15:00") or default to 09:00 ──
+    if task.start_time:
+        try:
+            h, m = [int(x) for x in task.start_time.split(":")]
+        except Exception:
+            h, m = 9, 0
+    else:
+        h, m = 9, 0
+
+    # ── Build Google Calendar event times ──
+    start_dt = datetime.combine(scheduled, datetime.min.time()).replace(hour=h, minute=m)
     end_dt = start_dt + timedelta(hours=task.duration_hours)
     start_iso = start_dt.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
     end_iso   = end_dt.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
@@ -216,10 +226,18 @@ async def schedule_delivery(
             delivery_date = delivery_date.replace(year=current_year, day=28)
 
     # ── Build Google Calendar event for the delivery ──
-    start_dt = datetime.combine(delivery_date, datetime.min.time()).replace(hour=10, minute=0)
+    if delivery.start_time:
+        try:
+            dh, dm = [int(x) for x in delivery.start_time.split(":")]
+        except Exception:
+            dh, dm = 10, 0
+    else:
+        dh, dm = 10, 0
+    start_dt = datetime.combine(delivery_date, datetime.min.time()).replace(hour=dh, minute=dm)
     end_dt = start_dt + timedelta(hours=1)
     start_iso = start_dt.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
     end_iso   = end_dt.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'
+
 
     item_label = delivery.item_description or delivery.item_type.title()
     cal_result = create_calendar_event(

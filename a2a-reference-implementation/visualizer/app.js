@@ -77,7 +77,7 @@ function handleLogMessage(message) {
     if (message.includes('[SOURCE_TOKEN')) expectingToken = 'user_delegated';
 
     const agentMap = {
-        'HR': 'hr', 'IT': 'it', 'APPROVAL': 'approval', 'BOOKING': 'booking'
+        'HR': 'hr', 'IT': 'it', 'PAYROLL': 'payroll', 'BOOKING': 'booking'
     };
 
     for (const [key, val] of Object.entries(agentMap)) {
@@ -92,14 +92,39 @@ function handleLogMessage(message) {
 
     // Agent Flows
     if (message.includes('HR_AGENT')) triggerAgentFlow('hr');
-    if (message.includes('IT_AGENT')) triggerAgentFlow('it');
-    if (message.includes('APPROVAL_AGENT')) triggerAgentFlow('approval');
+    if (message.includes('IT_AGENT') && !message.includes('PAYROLL')) triggerAgentFlow('it');
+    if (message.includes('PAYROLL_AGENT')) triggerAgentFlow('payroll');
     if (message.includes('BOOKING_AGENT')) triggerAgentFlow('booking');
+
+    // IT Approval Gate — highlight IT node while waiting for admin
+    if (message.includes('Approval pending') || message.includes('waiting for admin')) {
+        const itNode = document.getElementById('node-it');
+        if (itNode) {
+            itNode.style.borderColor = '#f59e0b';
+            itNode.title = '⏳ Waiting for admin approval...';
+            // Add pulsing badge if not already there
+            if (!document.getElementById('it-pending-badge')) {
+                const badge = document.createElement('div');
+                badge.id = 'it-pending-badge';
+                badge.textContent = '⏳ Pending Admin';
+                badge.style.cssText = 'position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:#f59e0b;color:#000;font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap;animation:pulse 1.5s infinite';
+                itNode.style.position = 'relative';
+                itNode.appendChild(badge);
+            }
+        }
+    }
+    // Clear IT pending badge on approval
+    if (message.includes('Approved! Proceeding')) {
+        const badge = document.getElementById('it-pending-badge');
+        if (badge) badge.remove();
+        const itNode = document.getElementById('node-it');
+        if (itNode) itNode.style.borderColor = '#4CAF50';
+    }
 
     // Completion
     if (message.toUpperCase().includes('TOKEN FLOW SUMMARY')) {
         console.log('[Visualizer] Triggering Final Response Animation');
-        setTimeout(triggerFinalResponse, 500);
+        setTimeout(triggerFinalResponse, 100);
     }
 }
 
@@ -139,11 +164,11 @@ function triggerAgentFlow(agent) {
             // Agent -> Orchestrator (Implicit through Exchanger Visual)
             setTimeout(() => {
                 animatePathReverse('conn-orch-exchanger');
-            }, 1000);
+            }, 300);
 
-        }, 1500);
+        }, 400);
 
-    }, 1000);
+    }, 200);
 }
 
 function triggerFinalResponse() {

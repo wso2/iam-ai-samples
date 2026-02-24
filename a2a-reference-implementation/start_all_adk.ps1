@@ -16,14 +16,17 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", "& { $host.ui.RawU
 # 4. Start Approval Agent (8003)
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "& { $host.ui.RawUI.WindowTitle = 'Approval Agent (8003)'; .\.venv\Scripts\python -m agents.approval_agent }"
 
-# 5. Start NEW Booking Agent ADK (8005)
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "& { $host.ui.RawUI.WindowTitle = 'Booking Agent ADK (8005)'; .\.venv\Scripts\python -m agents.booking_agent_adk }"
+# 5. Start Finance & Payroll Agent (8004)
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "& { $host.ui.RawUI.WindowTitle = 'Finance & Payroll Agent (8004)'; .\.\.venv\Scripts\python -m agents.payroll_agent }"
 
-# 6. Start Orchestrator (8000) - FIXED MODULE PATH
+# 6. Start NEW Booking Agent ADK (8005)
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "& { $host.ui.RawUI.WindowTitle = 'Booking Agent ADK (8005)'; .\.\.venv\Scripts\python -m agents.booking_agent_adk }"
+
+# 7. Start Orchestrator (8000) - start after agents are ready
 Start-Sleep -Seconds 3
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "& { $host.ui.RawUI.WindowTitle = 'Orchestrator (8000)'; .\.venv\Scripts\python -m agents.orchestrator }"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "& { $host.ui.RawUI.WindowTitle = 'Orchestrator (8000)'; .\.\.venv\Scripts\python -m agents.orchestrator }"
 
-# 7. Start Visualizer Server (8200)
+# 8. Start Visualizer Server (8200)
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "& { $host.ui.RawUI.WindowTitle = 'Visualizer Server (8200)'; .\.venv\Scripts\python visualizer_server.py }"
 
 Write-Host "All agents started." -ForegroundColor Green

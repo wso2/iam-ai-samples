@@ -89,19 +89,84 @@ class ITAgent:
 
     async def process_request(self, query: str, token: str = None) -> str:
         """
-        Process IT request via the LangGraph workflow.
+        Process IT request — admin approval gate with immediate response.
 
-        The graph handles:
-          1. call_mcp_node  — forward raw query to MCP Server via SSE
-          2. format_results_node — format the MCP response for the Orchestrator
+        Flow:
+          1. Extract employee info + requested resources from query
+          2. Create pending approval record + notify admin (email or terminal)
+          3. Return IMMEDIATELY to the orchestrator with approval URL
+          4. Background task polls for admin decision then calls MCP to provision
         """
         if not token:
             return "[X] No token provided. Authentication required."
 
-        logger.info(f"[IT_AGENT] Starting LangGraph workflow for: {query[:80]}...")
+        import re, os
+        from agents.it_agent import approval_store
+        from agents.it_agent.email_sender import send_it_approval_email
 
-        from agents.it_agent.graph import run_it_agent_workflow
-        return await run_it_agent_workflow(query=query, token=token)
+        base_url = os.environ.get("IT_SERVICE_BASE_URL", "http://localhost:8002")
+
+        # ── Extract employee ID and name from query ──────────────────────────
+        emp_match     = re.search(r'EMP-\w+', query, re.IGNORECASE)
+        employee_id   = emp_match.group(0).upper() if emp_match else "EMP-UNKNOWN"
+        name_match    = re.search(r'(?:for|employee)\s+([A-Z][a-z]+)', query)
+        employee_name = name_match.group(1) if name_match else employee_id
+
+        # ── Extract requested resources ──────────────────────────────────────
+        resources = []
+        if re.search(r'github|git', query, re.IGNORECASE):              resources.append("GitHub")
+        if re.search(r'aws|cloud|iam|s3|ec2', query, re.IGNORECASE):   resources.append("AWS")
+        if re.search(r'vpn|network|remote', query, re.IGNORECASE):      resources.append("VPN")
+        if not resources:
+            resources = ["IT Resources"]
+
+        # ── Create pending approval record + notify admin ────────────────────
+        approval_token = await approval_store.create_pending(
+            employee_id=employee_id,
+            employee_name=employee_name,
+            resources=resources,
+        )
+        approval_url = f"{base_url}/it/approve/{approval_token}"
+        reject_url   = f"{base_url}/it/reject/{approval_token}"
+
+        await send_it_approval_email(
+            employee_id=employee_id,
+            employee_name=employee_name,
+            resources=resources,
+            approval_url=approval_url,
+            reject_url=reject_url,
+        )
+
+        logger.info(f"[IT_AGENT] Approval pending ({approval_token[:8]}…) — returning immediately, background task will provision.")
+
+        # ── Background task: poll → MCP provision ───────────────────────────
+        async def _wait_and_provision():
+            try:
+                final_status = await approval_store.wait_for_approval(approval_token, poll_interval=5.0)
+                if final_status == "approved":
+                    logger.info(f"[IT_AGENT] ✅ Approved! Proceeding with MCP provisioning.")
+                    from agents.it_agent.graph import run_it_agent_workflow
+                    result = await run_it_agent_workflow(query=query, token=token)
+                    logger.info(f"[IT_AGENT] MCP provisioning complete: {result[:120]}")
+                elif final_status == "rejected":
+                    logger.warning(f"[IT_AGENT] ❌ Rejected by admin — no resources provisioned for {employee_id}.")
+                else:
+                    logger.warning(f"[IT_AGENT] ⏰ Approval timed out for {employee_id}.")
+            except Exception as e:
+                logger.error(f"[IT_AGENT] Background provisioning failed: {e}", exc_info=True)
+
+        import asyncio
+        asyncio.create_task(_wait_and_provision())
+
+        # ── Return immediately ───────────────────────────────────────────────
+        resource_list = ", ".join(resources)
+        return (
+            f"⏳ **IT Access Approval Requested** for {employee_name} ({employee_id})\n\n"
+            f"Resources: **{resource_list}**\n\n"
+            f"An approval request has been sent to the IT admin.\n"
+            f"Once approved, access will be provisioned automatically.\n\n"
+            f"Admin approval link:\n`{approval_url}`"
+        )
 
     async def stream(self, query: str, token: str = None) -> AsyncIterable[Dict[str, Any]]:
         """Stream response — A2A pattern."""

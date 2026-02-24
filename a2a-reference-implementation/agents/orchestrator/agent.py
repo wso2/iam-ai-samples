@@ -108,6 +108,11 @@ class OrchestratorAgent:
         
         # Token broker (uses existing implementation)
         self._token_broker = None
+
+        # Lock to serialize token exchanges — concurrent exchanges to Asgardeo
+        # can fail with rate-limit / session conflicts when DAG waves run parallel.
+        import asyncio
+        self._token_exchange_lock = asyncio.Lock()
         
         # Session storage
         self._sessions: Dict[str, Dict[str, Any]] = {}
@@ -238,9 +243,9 @@ class OrchestratorAgent:
             agent_type = "IT_AGENT"
             agent_key = "it_agent"
             target_scopes = ["it:read", "it:write"]
-        elif "approval" in agent_name.lower():
-            agent_type = "APPROVAL_AGENT"
-            agent_key = "approval_agent"
+        elif "payroll" in agent_name.lower() or "finance" in agent_name.lower():
+            agent_type = "PAYROLL_AGENT"
+            agent_key = "payroll_agent"
             target_scopes = ["approval:read", "approval:write"]
         elif "booking" in agent_name.lower():
             agent_type = "BOOKING_AGENT"
@@ -260,42 +265,40 @@ class OrchestratorAgent:
                 vlog(f"\n[TOKEN EXCHANGE FOR {agent_type}]")
                 vlog(f"  Agent: {agent_name}")
                 vlog(f"  URL: {agent_url}")
-                
+
                 # Log the source token (user delegated token)
                 vlog(f"\n[SOURCE_TOKEN - User Delegated]:")
                 vlog(f"  {access_token}")
-                
-                # Perform actual token exchange if agent_key is valid
+
                 exchanged_token = access_token  # fallback to original
-                
+
                 if agent_key:
                     try:
                         broker = get_token_broker()
-                        # Extract target audience from agent URL
-                        # For now use a standard audience based on agent type
-                        target_audience = agent_key.replace("_", "-")  # e.g., "hr-agent"
-                        
+                        target_audience = agent_key.replace("_", "-")
+
                         vlog(f"\n[PERFORMING TOKEN EXCHANGE]")
                         vlog(f"  Subject Token: User Delegated Token")
                         vlog(f"  Target Audience: {target_audience}")
                         vlog(f"  Target Scopes: {target_scopes}")
-                        
-                        exchanged_token = await broker.exchange_token_for_agent(
-                            source_token=access_token,
-                            agent_key=agent_key,
-                            target_audience=target_audience,
-                            target_scopes=target_scopes
-                        )
-                        
+
+                        # Serialize token exchanges — concurrent Asgardeo calls
+                        # cause failures when multiple agents run in the same DAG wave.
+                        async with self._token_exchange_lock:
+                            exchanged_token = await broker.exchange_token_for_agent(
+                                source_token=access_token,
+                                agent_key=agent_key,
+                                target_audience=target_audience,
+                                target_scopes=target_scopes
+                            )
+
                         vlog(f"\n[{agent_type}_EXCHANGED_TOKEN]:")
                         vlog(f"  {exchanged_token}")
-                        
+
                     except Exception as exc:
                         vlog(f"\n[TOKEN EXCHANGE ERROR] {exc}")
-                        # Propagate error - don't silently fallback
                         return {"error": f"Token exchange failed for {agent_type}: {exc}"}
                 else:
-                    # Unknown agent type - still need token exchange
                     vlog(f"\n[WARNING] Unknown agent type: {agent_type} - cannot exchange token")
                     return {"error": f"Unknown agent type: {agent_type}"}
 
@@ -423,12 +426,25 @@ Rules:
   * IT Agent needs employee ID → depends on HR Agent step
   * Booking Agent needs employee ID → depends on HR Agent step
   * An execution step after an Approval step → depends on that Approval step
-  * If IT and Booking are both independent of each other but both need HR, they can both list only HR
-- Never skip an action the user explicitly asked for.
+
+CRITICAL — One action per task:
+- If the user asks for BOTH an orientation AND a laptop delivery, create TWO SEPARATE Booking Agent tasks — one for orientation, one for delivery. Never combine them.
+- If the user asks for BOTH GitHub AND AWS access, create ONE IT Agent task that explicitly lists BOTH resources in the task description (e.g. "Provision GitHub and AWS access for EMP-XXX").
+- Never skip any action the user explicitly asked for.
 
 Privilege / Access Workflow:
-- When the request involves elevated privileges, the Approval Agent MUST run first.
-- After approval, route to the appropriate agent (HR/IT) with a depends_on pointing to the Approval step.
+- When the request involves access provisioning (GitHub, AWS, VPN, etc.) the Approval Agent MUST run first.
+- After approval, the IT Agent step depends on both HR + Approval steps.
+
+Example (full onboarding with orientation + delivery + GitHub + AWS):
+[
+  {{"step": 1, "agent_name": "HR Agent",                   "depends_on": []}},
+  {{"step": 2, "agent_name": "Approval Agent",             "depends_on": [1]}},
+  {{"step": 3, "agent_name": "Booking Agent",              "task": "Schedule orientation session on <date> at <time> for <employee_id>", "depends_on": [1]}},
+  {{"step": 4, "agent_name": "Booking Agent",              "task": "Schedule laptop delivery on <date> at <time> for <employee_id>",    "depends_on": [1]}},
+  {{"step": 5, "agent_name": "IT Agent",                   "task": "Provision GitHub AND AWS access for <employee_id>",                "depends_on": [1, 2]}}
+]
+→ Wave1=[HR], Wave2=[Approval+Orientation+Delivery in parallel], Wave3=[IT]
 
 Respond with JSON in this exact format:
 {{
@@ -438,17 +454,7 @@ Respond with JSON in this exact format:
     {{"step": 3, "agent_url": "<url>", "agent_name": "<name>", "task": "<instruction>", "depends_on": [1]}}
   ],
   "summary": "<one-line summary>"
-}}
-
-Example (onboarding with parallel Booking + IT after Approval):
-[
-  {{"step": 1, "agent_name": "HR Agent",       "depends_on": []}},
-  {{"step": 2, "agent_name": "Approval Agent", "depends_on": [1]}},
-  {{"step": 3, "agent_name": "IT Agent",       "depends_on": [1, 2]}},
-  {{"step": 4, "agent_name": "Booking Agent",  "depends_on": [1]}}
-]
-→ Execution: Wave1=[HR], Wave2=[Approval+Booking in parallel], Wave3=[IT]
-"""
+}}"""
 
         if not self.openai_api_key:
             return self._fallback_decompose(user_input)

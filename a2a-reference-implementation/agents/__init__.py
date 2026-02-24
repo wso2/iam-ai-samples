@@ -1,14 +1,11 @@
 # Agents Package
-"""A2A Protocol Agents using official a2a-sdk."""
+"""
+A2A Protocol Agents.
 
-from .orchestrator import OrchestratorAgent
-from .hr_agent import HRAgent
-from .it_agent import ITAgent
-from .approval_agent import ApprovalAgent
-
-__all__ = [
-    'OrchestratorAgent',
-    'HRAgent',
-    'ITAgent',
-    'ApprovalAgent'
-]
+Individual agents are imported lazily to avoid cross-module dependency 
+issues (e.g. vercel_ai_sdk, crewai, google-adk not installed in all envs).
+Import directly from the sub-package when needed:
+  from agents.hr_agent import HRAgent
+  from agents.it_agent import ITAgent
+  etc.
+"""

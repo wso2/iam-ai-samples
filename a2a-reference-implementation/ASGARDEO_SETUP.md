@@ -40,7 +40,7 @@ Create the following API Resources to define the "Audiences" our agents will tar
 | `onboarding-api` | (All below) | Primary resource for Orchestrator |
 | `hr-api` | `hr:read`, `hr:write` | HR Service |
 | `it-api` | `it:read`, `it:write` | IT Service |
-| `approval-api` | `approval:read`, `approval:write` | Approval Service |
+| `approval-api` | `approval:read`, `approval:write` | Finance & Payroll Service |
 | `booking-api` | `booking:read`, `booking:write` | Booking Service |
 
 ---
@@ -63,32 +63,81 @@ Create the following API Resources to define the "Audiences" our agents will tar
 
 ## 3. Worker Agent Identities
 
-For each worker (HR, IT, Approval, Booking), you need an identity to perform **Token Exchange**.
+For each worker (HR, IT, Payroll, Booking), you need an identity to perform **Token Exchange**.
 
-### Example: HR Agent
-1. **Create an Application** (Service App):
-   - Name: `hr-service-app`
-   - Grant Types: **Token Exchange**, Client Credentials.
-   - Authorized for `hr-api`.
-2. **Create an Agent**:
-   - Name: `hr-agent`
-   - Linked App: `hr-service-app`
-3. **Configure**:
-   - `HR_AGENT_CLIENT_ID`: From `hr-service-app`.
-   - `HR_AGENT_CLIENT_SECRET`: From `hr-service-app`.
-   - `HR_AGENT_ID`: From `hr-agent`.
+> **Architecture note:** Worker agents do **not** need their own Applications. They are registered as AI Agents linked to the `onboarding-orchestrator` application. The `token-exchanger` app performs RFC 8693 token exchange using each agent's actor token.
 
-*Repeat for IT, Approval, and Booking agents.*
+### HR Agent
+1. Go to **User Management → Agents → New Agent**
+2. **Name**: `hr-agent` — **Linked App**: `onboarding-orchestrator`
+3. Copy the **Agent ID** (UUID) and set an **Agent Secret**
+4. Add to `.env`: `HR_AGENT_ID=<uuid>` and `HR_AGENT_SECRET=<password>`
+5. Scopes granted: `hr:read`, `hr:write`
+
+### IT Agent
+1. Go to **User Management → Agents → New Agent**
+2. **Name**: `it-agent` — **Linked App**: `onboarding-orchestrator`
+3. Copy the **Agent ID** and set an **Agent Secret**
+4. Add to `.env`: `IT_AGENT_ID=<uuid>` and `IT_AGENT_SECRET=<password>`
+5. Scopes granted: `it:read`, `it:write`
+
+### Finance & Payroll Agent
+1. Go to **User Management → Agents → New Agent**
+2. **Name**: `payroll-agent` — **Linked App**: `onboarding-orchestrator`
+3. Copy the **Agent ID** and set an **Agent Secret**
+4. Add to `.env`: `PAYROLL_AGENT_ID=<uuid>` and `PAYROLL_AGENT_SECRET=<password>`
+5. Scopes granted: `approval:read`, `approval:write` *(the payroll API reuses the approval-api resource)*
+
+### Booking Agent
+1. Go to **User Management → Agents → New Agent**
+2. **Name**: `booking-agent` — **Linked App**: `onboarding-orchestrator`
+3. Copy the **Agent ID** and set an **Agent Secret**
+4. Add to `.env`: `BOOKING_AGENT_ID=<uuid>` and `BOOKING_AGENT_SECRET=<password>`
+5. Scopes granted: `booking:read`, `booking:write`
+
+---
+
+## 4. Token Exchanger Application
+
+This is the **only** application that needs `Token Exchange` grant type. All RFC 8693 exchanges (orchestrator → worker agents) go through this app.
+
+1. Go to **Applications → New Application → Standard-Based App**
+2. **Name**: `token-exchanger`
+3. **Grant Types**: Token Exchange, Client Credentials
+4. **Authorized API Resources**: `onboarding-api` (all scopes)
+5. Copy **Client ID** and **Client Secret**
+6. Add to `.env`: `TOKEN_EXCHANGER_CLIENT_ID=<id>` and `TOKEN_EXCHANGER_CLIENT_SECRET=<secret>`
 
 ---
 
 ## 5. Deployment Checks
 
-Ensue your `.env` is updated:
+Ensure your `.env` is fully populated:
 
 ```env
-# HR Agent Identity
-HR_AGENT_CLIENT_ID=...
-HR_AGENT_CLIENT_SECRET=...
+# Orchestrator Application
+ORCHESTRATOR_CLIENT_ID=...
+ORCHESTRATOR_CLIENT_SECRET=...
+ORCHESTRATOR_AGENT_ID=...
+ORCHESTRATOR_AGENT_SECRET=...
+
+# Worker Agents (all linked to onboarding-orchestrator app)
 HR_AGENT_ID=...
+HR_AGENT_SECRET=...
+
+IT_AGENT_ID=...
+IT_AGENT_SECRET=...
+
+# Finance & Payroll Agent (uses approval:read, approval:write scopes)
+PAYROLL_AGENT_ID=...
+PAYROLL_AGENT_SECRET=...
+
+BOOKING_AGENT_ID=...
+BOOKING_AGENT_SECRET=...
+
+# Token Exchanger Application
+TOKEN_EXCHANGER_CLIENT_ID=...
+TOKEN_EXCHANGER_CLIENT_SECRET=...
 ```
+
+> **Tip:** The most common cause of `Missing agent_id` errors is a blank or missing `PAYROLL_AGENT_ID` / `PAYROLL_AGENT_SECRET` in `.env`. Double-check these are set to the UUID values from Asgardeo — not left blank.

@@ -8,7 +8,6 @@ import os
 import aiosqlite
 from datetime import date, datetime
 from typing import Optional
-from uuid import uuid4
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
@@ -95,6 +94,13 @@ def _row_to_response(row) -> EmployeeResponse:
     return EmployeeResponse(**dict(row))
 
 
+async def _next_employee_id(db: aiosqlite.Connection) -> str:
+    """Return the next sequential employee ID, e.g. EMP-001, EMP-002 ..."""
+    async with db.execute("SELECT COUNT(*) FROM employees") as cur:
+        row = await cur.fetchone()
+        count = row[0] if row else 0
+    return f"EMP-{count + 1:03d}"
+
 # ── Routes ─────────────────────────────────────────────────────────────────
 
 @router.post("/employees", response_model=EmployeeResponse, status_code=201)
@@ -112,10 +118,9 @@ async def create_employee(
     require_scope(token, "hr:write")
     require_audience(token, "onboarding-api")
 
-    employee_id = f"EMP-{uuid4().hex[:8].upper()}"
     now = datetime.utcnow().isoformat()
-
     db = await _get_db()
+    employee_id = await _next_employee_id(db)
     try:
         await db.execute("""
             INSERT INTO employees

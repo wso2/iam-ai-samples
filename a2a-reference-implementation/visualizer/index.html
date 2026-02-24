@@ -163,22 +163,22 @@
                             <div class="flow-node api" id="node-it-api">API</div>
                         </div>
 
-                        <!-- Approval -->
+                        <!-- Payroll -->
                         <div class="agent-path">
-                            <div class="flow-node agent" id="node-approval">
-                                <div class="node-icon approval">Approval Agent</div>
+                            <div class="flow-node agent" id="node-payroll">
+                                <div class="node-icon payroll">Payroll Agent</div>
                                 <div class="tooltip">
-                                    <strong>Approval Agent</strong><br>
-                                    Manages high-risk permission requests.<br>
-                                    Requires human sign-off for sensitive access.
+                                    <strong>Finance &amp; Payroll Agent</strong><br>
+                                    Registers salary grade &amp; pay schedule.<br>
+                                    Sets up expense accounts.
                                 </div>
                             </div>
-                            <div class="connector small" id="conn-approval-api">
+                            <div class="connector small" id="conn-payroll-api">
                                 <div class="connector-line"></div>
                                 <div class="packet forward"></div>
                                 <div class="packet reverse"></div>
                             </div>
-                            <div class="flow-node api" id="node-approval-api">API</div>
+                            <div class="flow-node api" id="node-payroll-api">API</div>
                         </div>
                     </div>
                 </div>
@@ -289,15 +289,15 @@
                             </div>
                         </div>
 
-                        <div class="agent-group approval">
-                            <h4>Approval</h4>
+                        <div class="agent-group payroll">
+                            <h4>Payroll</h4>
                             <div class="token-pair">
-                                <div class="token-badge" id="token-approval_actor"
-                                    onclick="copyToken('approval_actor')">
+                                <div class="token-badge" id="token-payroll_actor"
+                                    onclick="copyToken('payroll_actor')">
                                     Actor <span class="icon">📋</span>
                                 </div>
-                                <div class="token-badge" id="token-approval_exchanged"
-                                    onclick="copyToken('approval_exchanged')">
+                                <div class="token-badge" id="token-payroll_exchanged"
+                                    onclick="copyToken('payroll_exchanged')">
                                     Exchanged <span class="icon">🔄</span>
                                 </div>
                             </div>

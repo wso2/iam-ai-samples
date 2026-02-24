@@ -19,7 +19,8 @@ from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.routing import Mount
+from starlette.responses import HTMLResponse, JSONResponse
+from starlette.routing import Mount, Route
 
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
@@ -49,6 +50,57 @@ def main():
     logger = logging.getLogger(__name__)
     host, port = 'localhost', 8002
 
+    # ── Approval endpoints (mounted at /it/approve/* and /it/pending/*) ──────
+    from agents.it_agent import approval_store
+    from starlette.responses import HTMLResponse, JSONResponse
+
+    async def approve_endpoint(request: Request) -> HTMLResponse:
+        """Admin clicks this link from their email to approve IT access."""
+        token = request.path_params["token"]
+        ok = await approval_store.approve(token)
+        entry = await approval_store.get_pending(token)
+        if ok and entry:
+            name = entry.get("employee_name", "the employee")
+            emp  = entry.get("employee_id", "")
+            res  = ", ".join(entry.get("resources", []))
+            html = f"""
+            <!DOCTYPE html><html><head><meta charset=utf-8>
+            <title>IT Access Approved</title>
+            <style>body{{font-family:sans-serif;max-width:600px;margin:80px auto;text-align:center}}
+             h1{{color:#22c55e}} p{{color:#555}}</style></head>
+            <body>
+             <h1>&#10003; Access Approved</h1>
+             <p><strong>{name}</strong> ({emp})</p>
+             <p>Approved resources: <strong>{res}</strong></p>
+             <p>IT provisioning will proceed automatically.</p>
+            </body></html>"""
+            return HTMLResponse(html)
+        entry = await approval_store.get_pending(token)
+        status = entry["status"] if entry else "not found"
+        html = f"""<!DOCTYPE html><html><body style='font-family:sans-serif;text-align:center;margin-top:80px'>
+            <h2 style='color:#f59e0b'>Token status: {status}</h2>
+            <p>This link may have already been used or has expired.</p></body></html>"""
+        return HTMLResponse(html, status_code=400)
+
+    async def reject_endpoint(request: Request) -> HTMLResponse:
+        """Admin clicks this link to reject IT access."""
+        token = request.path_params["token"]
+        ok = await approval_store.reject(token)
+        if ok:
+            html = """<!DOCTYPE html><html><body style='font-family:sans-serif;text-align:center;margin-top:80px'>
+                <h1 style='color:#ef4444'>&#10007; Access Rejected</h1>
+                <p>IT provisioning has been cancelled.</p></body></html>"""
+            return HTMLResponse(html)
+        return HTMLResponse("Invalid or already-processed token", status_code=400)
+
+    async def pending_status_endpoint(request: Request) -> JSONResponse:
+        """Internal polling endpoint used by the IT Agent while waiting."""
+        token = request.path_params["token"]
+        entry = await approval_store.get_pending(token)
+        if not entry:
+            return JSONResponse({"status": "not_found"}, status_code=404)
+        return JSONResponse({"status": entry["status"], "decided_at": entry.get("decided_at")})
+
     agent_card = AgentCard(
         name="IT Agent",
         description="Provisions IT accounts and services",
@@ -74,18 +126,28 @@ def main():
     a2a_server = A2AStarletteApplication(agent_card=agent_card, http_handler=request_handler)
     app = a2a_server.build()
 
-    # Mount the IT REST API as a FastAPI sub-application
-    # This allows the agent to call its own API at /api/it/*
+    # Mount the IT REST API
     api_app = FastAPI(title="IT API", version="1.0.0")
     api_app.include_router(it_router, prefix="/it", tags=["IT"])
-    app.mount("/api", api_app)
 
+    # Approval routes (no auth — token IS the secret)
+    from starlette.routing import Route
+    approval_routes = [
+        Route("/it/approve/{token}",         approve_endpoint),
+        Route("/it/reject/{token}",          reject_endpoint),
+        Route("/it/pending/{token}/status",  pending_status_endpoint),
+    ]
+    for route in approval_routes:
+        app.routes.append(route)
+
+    app.mount("/api", api_app)
     app.add_middleware(TokenExtractMiddleware, executor=executor)
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
     print(f"\n🚀 Starting IT Agent")
     print(f"   Server: http://{host}:{port}")
     print(f"   Agent Card: http://{host}:{port}/.well-known/agent-card.json")
+    print(f"   Approval endpoint: http://{host}:{port}/it/approve/{{token}}")
     uvicorn.run(app, host=host, port=port, log_level="info")
 
 

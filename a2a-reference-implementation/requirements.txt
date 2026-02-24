@@ -19,9 +19,16 @@ langchain-openai>=1.1.10
 # Approval Agent (no extra framework needed - uses standard A2A)
 # crewai removed: incompatible with Python 3.14 (crewai requires Python <3.14)
 
-# Booking Agent (Google ADK + litellm for OpenAI via LiteLLM)
-# NOTE: do NOT pin litellm separately — google-adk manages its own compatible version
+# Booking Agent (Google ADK + Google Calendar API)
 google-adk>=1.25.1
+google-api-python-client>=2.126.0
+google-auth-httplib2>=0.2.0
+google-auth-oauthlib>=1.2.0
+litellm>=1.59.0
+
+# IT Agent + Payroll Agent
+aiosmtplib>=3.0.1
+crewai>=0.28.8
 
 # HR Agent (SQLite-backed employee database via aiosqlite)
 aiosqlite>=0.21.0

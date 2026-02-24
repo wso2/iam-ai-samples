@@ -1021,3 +1021,19 @@ header h1 {
 .action-btn.demo:hover {
     background: var(--wso2-orange-dark);
 }
+
+/* ── Finance & Payroll Agent ─────────────────────────────────────── */
+.agent-group.payroll {
+    border-color: #10b981;   /* emerald green — finance */
+}
+
+.node-icon.payroll {
+    color: #065f46;
+}
+
+/* ── IT Approval gate — pending pulse animation ──────────────────── */
+@keyframes pulse {
+    0%   { opacity: 1;   transform: translateX(-50%) scale(1);    }
+    50%  { opacity: 0.6; transform: translateX(-50%) scale(1.05); }
+    100% { opacity: 1;   transform: translateX(-50%) scale(1);    }
+}
