@@ -28,6 +28,8 @@ from dotenv import load_dotenv
 
 from crewai import Agent, Task, Crew, Process
 from crewai.tools import BaseTool
+from crewai.mcp import MCPServerHTTP
+
 from pydantic import Field
 
 # Asgardeo / Identity imports
@@ -38,22 +40,14 @@ from asgardeo_ai import AgentConfig, AgentAuthManager
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from common.oauth_callback import OAuthCallbackServer
 
+import warnings
+
+# Suppress RuntimeWarning related to coroutine not awaited
+warnings.filterwarnings("ignore", category=RuntimeWarning, message="coroutine '.*' was never awaited")
+
 # Load environment variables
 ROOT_DIR = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT_DIR / ".env")
-
-# --- Custom CrewAI Tool ---
-
-class MCPCalculatorTool(BaseTool):
-    name: str = "add_numbers"
-    description: str = "Adds two numbers using a secure remote MCP service. Input should be two integers."
-    access_token: str = Field(..., exclude=True) # Pass the OBO token here
-
-    def _run(self, a: int, b: int) -> str:
-        # Here you would perform the actual HTTP call to your MCP_SERVER_URL
-        # headers={"Authorization": f"Bearer {self.access_token}"}
-        # For now, we simulate the tool execution:
-        return f"The MCP server calculated that {a} + {b} equals {a + b}."
 
 # --- Auth Logic ---
 
@@ -103,45 +97,48 @@ async def main():
         print(f"Failed to authenticate: {e}")
         return
 
-    # 2. Initialize the CrewAI Tool with the token
-    math_tool = MCPCalculatorTool(access_token=access_token)
-
-    # 3. Define the CrewAI Agent
-    calculator_agent = Agent(
-        role="Calculation Specialist",
-        goal="Perform accurate arithmetic by calling the external MCP tool.",
-        backstory="You are a precise assistant that never guesses math; you always use your tools.",
-        tools=[math_tool],
-        llm=os.getenv("MODEL_NAME"), # Use 'gemini/gemini-1.5-flash' or similar
-        verbose=False
-    )
-
     while True:
-        # 4. Define the Task
-        user_question = input("\nEnter your question (e.g., 'Add 45 and 99') or type 'exit' to quit: ")
+        # 2. Get the user question
+        question = input("\nEnter your question (e.g., 'Add 45 and 99') or type 'exit' to quit: ")
 
         # Exit the loop if the user types "exit"
-        if user_question.lower() == "exit":
+        if question.lower() == "exit":
             print("Exiting the program. Goodbye!")
             break
-
-        calculation_task = Task(
-            description=f"Process this request: {user_question}",
-            expected_output="A clear sentence providing the final numeric result from the tool.",
-            agent=calculator_agent
+        # 3. Configure the MCP server for CrewAI
+        # We map StreamableHTTPConnectionParams directly to MCPServerHTTP
+        mcp_server = MCPServerHTTP(
+            url=os.getenv("MCP_SERVER_URL"),
+            headers={"Authorization": f"Bearer {access_token}"},
+            streamable=True
         )
 
-        # 5. Form the Crew and Execute
-        calculation_crew = Crew(
-            agents=[calculator_agent],
-            tasks=[calculation_task],
-            process=Process.sequential
+        # 4. Define the CrewAI Agent
+        agent = Agent(
+            role="Calculation Specialist",
+            goal="Add two numbers accurately using an MCP server.",
+            backstory="You are an intelligent agent that strictly uses the provided MCP tool 'add(a, b)' to compute the addition of numbers when requested by a user.",
+            mcps=[mcp_server],
+            llm=os.getenv("MODEL_NAME"), # Use 'gemini/gemini-1.5-flash' or similar
+            verbose=False
         )
 
-        result = calculation_crew.kickoff()
+        # 5. Define the Task
+        task = Task(
+            description=f"Address the user's request: '{question}'",
+            expected_output="The exact calculated sum of the numbers based on the MCP tool execution.",
+            agent=agent
+        )
+
+        # 6. Setup and run the Crew
+        crew = Crew(
+            agents=[agent],
+            tasks=[task]
+        )
+
+        result = crew.kickoff()
 
         print("\nAgent Response:", result.raw)
-
 
 if __name__ == "__main__":
     asyncio.run(main())

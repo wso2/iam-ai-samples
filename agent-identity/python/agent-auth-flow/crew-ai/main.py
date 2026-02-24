@@ -69,6 +69,7 @@ def main():
             goal="Add two numbers accurately using an MCP server.",
             backstory="You are an intelligent agent that strictly uses the provided MCP tool 'add(a, b)' to compute the addition of numbers when requested by a user.",
             mcps=[mcp_server],
+            llm=os.getenv("MODEL_NAME"), # Use 'gemini/gemini-1.5-flash' or similar
             verbose=False
         )
 
