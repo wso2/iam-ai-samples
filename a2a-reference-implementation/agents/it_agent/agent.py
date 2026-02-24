@@ -3,15 +3,15 @@ IT Agent - A2A Server for IT provisioning.
 Routes through the IT MCP Server which uses LLM to classify requests
 and performs token scope narrowing before calling the IT API.
 
-Flow: IT Agent → MCP handle_it_request tool → LLM classifies → 
-      Token Exchange (scope narrowing, no actor token) → IT API
+Flow: IT Agent (LangGraph) → call_mcp_node → MCP handle_it_request
+      → LLM classifies → Token Exchange (scope narrowing) → IT API
+      → format_results_node → A2A response
 """
 
 import os
 import sys
 import json
 import logging
-import re
 from typing import Dict, Any, AsyncIterable
 
 from dotenv import load_dotenv
@@ -23,11 +23,14 @@ sys.path.insert(0, project_root)
 load_dotenv(os.path.join(project_root, '.env'))
 
 from mcp import ClientSession
-from mcp.client.stdio import stdio_client, StdioServerParameters
+from mcp.client.sse import sse_client
 from src.config import get_settings
 from src.config_loader import load_yaml_config
 
 logger = logging.getLogger(__name__)
+
+# MCP Server SSE endpoint (started separately on port 8020)
+MCP_SSE_URL = "http://localhost:8020/sse"
 
 
 class ITAgent:
@@ -56,33 +59,19 @@ class ITAgent:
         agent_config = app_config.get("agents", {}).get("it_agent", {})
         self.required_scopes = agent_config.get("required_scopes", self.REQUIRED_SCOPES)
 
-        # MCP Server path
-        self.mcp_server_path = os.path.join(project_root, "src", "mcp", "it_mcp_server.py")
-
-        logger.info(f"IT Agent initialized (MCP + LLM routing mode)")
+        logger.info("IT Agent initialized (LangGraph + MCP SSE mode)")
         logger.info(f"  Required scopes: {self.required_scopes}")
-        logger.info(f"  MCP Server: {self.mcp_server_path}")
+        logger.info(f"  MCP SSE URL: {MCP_SSE_URL}")
 
     async def _call_mcp_tool(self, tool_name: str, arguments: dict) -> Dict[str, Any]:
         """
-        Connect to the IT MCP Server via stdio and invoke a tool.
-        
-        The MCP server runs as a subprocess. Each tool call:
-        1. Spawns the MCP server process
-        2. Sends the tool invocation
-        3. MCP server processes (LLM routing + token exchange + API call)
-        4. Returns the result
+        Connect to the IT MCP Server via SSE and invoke a tool.
+        Called by the LangGraph call_mcp_node.
         """
-        logger.info(f"[IT_AGENT] MCP tool call: {tool_name}")
-
-        server_params = StdioServerParameters(
-            command=sys.executable,
-            args=[self.mcp_server_path],
-            cwd=project_root
-        )
+        logger.info(f"[IT_AGENT] MCP tool call (SSE): {tool_name}")
 
         try:
-            async with stdio_client(server_params) as (read, write):
+            async with sse_client(MCP_SSE_URL) as (read, write):
                 async with ClientSession(read, write) as session:
                     await session.initialize()
                     result = await session.call_tool(tool_name, arguments)
@@ -90,8 +79,7 @@ class ITAgent:
                     if result.content:
                         for content_item in result.content:
                             if hasattr(content_item, 'text'):
-                                parsed = json.loads(content_item.text)
-                                return parsed
+                                return json.loads(content_item.text)
 
                     return {"success": False, "error": "No response from MCP server"}
 
@@ -101,102 +89,21 @@ class ITAgent:
 
     async def process_request(self, query: str, token: str = None) -> str:
         """
-        Process IT request by sending it to the MCP Server's LLM-routed tool.
-        
-        The IT Agent does NOT decide which operation to perform.
-        It sends the raw natural language request to the MCP Server's
-        handle_it_request tool, which uses an LLM to classify and route.
+        Process IT request via the LangGraph workflow.
+
+        The graph handles:
+          1. call_mcp_node  — forward raw query to MCP Server via SSE
+          2. format_results_node — format the MCP response for the Orchestrator
         """
         if not token:
             return "[X] No token provided. Authentication required."
 
-        logger.info(f"[IT_AGENT] Sending request to MCP handle_it_request: {query[:80]}...")
+        logger.info(f"[IT_AGENT] Starting LangGraph workflow for: {query[:80]}...")
 
-        # Send the raw request to MCP Server — LLM inside will classify it
-        result = await self._call_mcp_tool("handle_it_request", {
-            "request": query,
-            "token": token
-        })
-
-        # Format the response based on what happened
-        if not result.get("success"):
-            errors = []
-            for r in result.get("results", []):
-                if not r.get("success") and "error" in r:
-                    errors.append(r["error"])
-            err_msg = "; ".join(errors) if errors else result.get('error', 'Unknown error')
-            return f"[X] IT provisioning failed: {err_msg}"
-
-        results_array = result.get("results", [])
-        if not results_array:
-            return f"[X] IT provisioning failed: No results returned from MCP server"
-
-        formatted_responses = []
-        for action_result in results_array:
-            routing = action_result.get("_routing", {})
-            action = routing.get("action", "unknown")
-            scope_info = routing.get("scope_narrowing", "N/A")
-            classified_by = routing.get("routed_by", "N/A")
-            employee_id = action_result.get("employee_id", "N/A")
-
-            res_text = ""
-            if action == "provision_vpn":
-                res_text = (
-                    f"[OK] VPN access provisioned via MCP → IT API!\n"
-                    f"- Provision ID: {action_result.get('provision_id', 'N/A')}\n"
-                    f"- Employee: {action_result.get('employee_id', employee_id)}\n"
-                    f"- VPN Server: {action_result.get('details', {}).get('vpn_server', 'vpn.nebulasoft.internal')}\n"
-                    f"- Status: {action_result.get('status', 'active')}\n"
-                    f"- Routed by: {classified_by}\n"
-                    f"- Token scope narrowed: {scope_info}"
-                )
-            elif action == "provision_github":
-                res_text = (
-                    f"[OK] GitHub Enterprise access provisioned via MCP → IT API!\n"
-                    f"- Provision ID: {action_result.get('provision_id', 'N/A')}\n"
-                    f"- Employee: {action_result.get('employee_id', employee_id)}\n"
-                    f"- GitHub User: {action_result.get('details', {}).get('github_username', 'N/A')}\n"
-                    f"- Repos: {action_result.get('details', {}).get('repositories', [])}\n"
-                    f"- Status: {action_result.get('status', 'active')}\n"
-                    f"- Routed by: {classified_by}\n"
-                    f"- Token scope narrowed: {scope_info}"
-                )
-            elif action == "provision_aws":
-                res_text = (
-                    f"[OK] AWS environment provisioned via MCP → IT API!\n"
-                    f"- Provision ID: {action_result.get('provision_id', 'N/A')}\n"
-                    f"- Employee: {action_result.get('employee_id', employee_id)}\n"
-                    f"- IAM User: {action_result.get('details', {}).get('iam_user', 'N/A')}\n"
-                    f"- Account: {action_result.get('details', {}).get('account', 'N/A')}\n"
-                    f"- Status: {action_result.get('status', 'active')}\n"
-                    f"- Routed by: {classified_by}\n"
-                    f"- Token scope narrowed: {scope_info}"
-                )
-            elif action == "list_provisions":
-                provisions = action_result.get("data", [])
-                if not provisions:
-                    res_text = f"📋 No provisions found for {employee_id}."
-                else:
-                    lines = [f"📋 Provisions for {employee_id} ({len(provisions)} total):"]
-                    for p in provisions:
-                        lines.append(f"  - {p.get('provision_id')}: {p.get('service')} ({p.get('status')})")
-                    lines.append(f"  Routed by: {classified_by}")
-                    lines.append(f"  Token scope narrowed: {scope_info}")
-                    res_text = "\n".join(lines)
-            else:
-                # Generic success / unknown action
-                res_text = (
-                    f"[OK] IT request processed via MCP → IT API!\n"
-                    f"- Action: {action}\n"
-                    f"- Routed by: {classified_by}\n"
-                    f"- Token scope narrowed: {scope_info}\n"
-                    f"- Result: {json.dumps(action_result, indent=2)}"
-                )
-            formatted_responses.append(res_text)
-
-        return "\n\n".join(formatted_responses)
+        from agents.it_agent.graph import run_it_agent_workflow
+        return await run_it_agent_workflow(query=query, token=token)
 
     async def stream(self, query: str, token: str = None) -> AsyncIterable[Dict[str, Any]]:
-        """Stream response - A2A pattern."""
+        """Stream response — A2A pattern."""
         response = await self.process_request(query, token)
         yield {"content": response}
