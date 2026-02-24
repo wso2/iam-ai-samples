@@ -116,24 +116,31 @@ async def main():
         verbose=False
     )
 
-    # 4. Define the Task
-    user_question = input("\nEnter your question (e.g., 'Add 45 and 99'): ")
-    calculation_task = Task(
-        description=f"Process this request: {user_question}",
-        expected_output="A clear sentence providing the final numeric result from the tool.",
-        agent=calculator_agent
-    )
+    while True:
+        # 4. Define the Task
+        user_question = input("\nEnter your question (e.g., 'Add 45 and 99') or type 'exit' to quit: ")
 
-    # 5. Form the Crew and Execute
-    calculation_crew = Crew(
-        agents=[calculator_agent],
-        tasks=[calculation_task],
-        process=Process.sequential
-    )
+        # Exit the loop if the user types "exit"
+        if user_question.lower() == "exit":
+            print("Exiting the program. Goodbye!")
+            break
 
-    result = calculation_crew.kickoff()
+        calculation_task = Task(
+            description=f"Process this request: {user_question}",
+            expected_output="A clear sentence providing the final numeric result from the tool.",
+            agent=calculator_agent
+        )
 
-    print("\nAgent Response:", result.raw)
+        # 5. Form the Crew and Execute
+        calculation_crew = Crew(
+            agents=[calculator_agent],
+            tasks=[calculation_task],
+            process=Process.sequential
+        )
+
+        result = calculation_crew.kickoff()
+
+        print("\nAgent Response:", result.raw)
 
 
 if __name__ == "__main__":

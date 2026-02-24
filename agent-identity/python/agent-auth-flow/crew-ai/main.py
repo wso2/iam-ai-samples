@@ -47,42 +47,47 @@ def main():
     print("Authenticating with Asgardeo...")
     agent_token = asyncio.run(get_agent_token())
 
-    # 2. Get the user question
-    question = input("\nEnter your question (e.g., 'Add 45 and 99'): ")
+    while True:
+        # 2. Get the user question
+        question = input("\nEnter your question (e.g., 'Add 45 and 99') or type 'exit' to quit: ")
 
-    # 3. Configure the MCP server for CrewAI
-    # We map StreamableHTTPConnectionParams directly to MCPServerHTTP
-    mcp_server = MCPServerHTTP(
-        url=os.getenv("MCP_SERVER_URL"),
-        headers={"Authorization": f"Bearer {agent_token.access_token}"},
-        streamable=True
-    )
+        # Exit the loop if the user types "exit"
+        if question.lower() == "exit":
+            print("Exiting the program. Goodbye!")
+            break
+        # 3. Configure the MCP server for CrewAI
+        # We map StreamableHTTPConnectionParams directly to MCPServerHTTP
+        mcp_server = MCPServerHTTP(
+            url=os.getenv("MCP_SERVER_URL"),
+            headers={"Authorization": f"Bearer {agent_token.access_token}"},
+            streamable=True
+        )
 
-    # 4. Define the CrewAI Agent
-    agent = Agent(
-        role="Calculation Specialist",
-        goal="Add two numbers accurately using an MCP server.",
-        backstory="You are an intelligent agent that strictly uses the provided MCP tool 'add(a, b)' to compute the addition of numbers when requested by a user.",
-        mcps=[mcp_server],
-        verbose=False
-    )
+        # 4. Define the CrewAI Agent
+        agent = Agent(
+            role="Calculation Specialist",
+            goal="Add two numbers accurately using an MCP server.",
+            backstory="You are an intelligent agent that strictly uses the provided MCP tool 'add(a, b)' to compute the addition of numbers when requested by a user.",
+            mcps=[mcp_server],
+            verbose=False
+        )
 
-    # 5. Define the Task
-    task = Task(
-        description=f"Address the user's request: '{question}'",
-        expected_output="The exact calculated sum of the numbers based on the MCP tool execution.",
-        agent=agent
-    )
+        # 5. Define the Task
+        task = Task(
+            description=f"Address the user's request: '{question}'",
+            expected_output="The exact calculated sum of the numbers based on the MCP tool execution.",
+            agent=agent
+        )
 
-    # 6. Setup and run the Crew
-    crew = Crew(
-        agents=[agent],
-        tasks=[task]
-    )
+        # 6. Setup and run the Crew
+        crew = Crew(
+            agents=[agent],
+            tasks=[task]
+        )
 
-    result = crew.kickoff()
+        result = crew.kickoff()
 
-    print("\nAgent Response:", result.raw)
+        print("\nAgent Response:", result.raw)
 
 if __name__ == "__main__":
     main()
