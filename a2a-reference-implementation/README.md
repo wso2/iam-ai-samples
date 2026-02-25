@@ -63,7 +63,6 @@ Each agent uses a **modern AI framework** for autonomous request handling instea
 | **Orchestrator** | 8000 | OpenAI GPT-4o | Receives user requests, uses LLM to decompose into sub-tasks, exchanges tokens per agent, dispatches via A2A protocol |
 | **HR Agent** | 8001 | Standard A2A + **SQLite** | Manages employee profiles. Records persisted to `data/hr.db` via `aiosqlite` |
 | **IT Agent** | 8002 | OpenAI GPT-4o-mini | IT provisioning (VPN, GitHub, AWS). Routes through MCP Server |
-| **Approval Agent** | 8003 | Standard A2A | Approval workflows with autonomous approval logic |
 | **Finance & Payroll Agent** | 8004 | **CrewAI** | Registers employees in payroll, sets up expense accounts with monthly salary and spending limits |
 | **Booking Agent** | 8005 | **Google ADK** | Task scheduling & equipment delivery. Creates real **Google Calendar events** |
 | **IT MCP Server** | 8020 | FastMCP (SSE) | Intermediary between IT Agent and IT API. LLM-powered routing + scope-narrowing token exchange |
@@ -95,12 +94,12 @@ The Orchestrator task-decomposition loop was refactored to use **LangGraph**:
 - `run_with_langgraph()` in `agent.py` drives the compiled graph with the user query as initial state
 - This gives the orchestrator checkpointing, deterministic node ordering, and clean separation of planning vs. execution logic compared to a raw agentic loop
 
-### ✅ Approval Agent → CrewAI
+### ✅ Finance & Payroll Agent → CrewAI
 
-The Approval Agent was refactored from a raw HTTP → OpenAI classification loop to a **CrewAI**-powered autonomous agent:
+The Finance & Payroll Agent was built as a **CrewAI**-powered autonomous agent:
 
-- A `crewai.Agent` with an `approval_manager` role handles the full decision flow
-- Four `@crewai.tool` functions wrap the Approval REST API: `create_request`, `approve_request`, `reject_request`, `list_requests`
+- A `crewai.Agent` with a `payroll_manager` role handles the full payroll decision flow
+- `@crewai.tool` functions wrap the Payroll REST API: `register_payroll`, `setup_expense_account`, `get_payroll_summary`
 - Token propagation uses a `ContextVar` set before Crew kickoff so tools can make authenticated API calls without exposing secrets to the LLM
 - `Crew.kickoff_async()` drives execution; the result is returned directly to the A2A client
 
@@ -360,7 +359,6 @@ See [ASGARDEO_SETUP.md](ASGARDEO_SETUP.md) for detailed WSO2 IS configuration.
 | `orchestrator-agent` | `onboarding-orchestrator` | Orchestrator identity |
 | `hr-agent` | `onboarding-orchestrator` | HR worker identity |
 | `it-agent` | `onboarding-orchestrator` | IT worker identity |
-| `approval-agent` | `onboarding-orchestrator` | Approval worker identity |
 | `payroll-agent` | `onboarding-orchestrator` | Finance & Payroll worker identity |
 | `booking-agent` | `onboarding-orchestrator` | Booking worker identity |
 
@@ -395,8 +393,6 @@ HR_AGENT_ID=<from hr-agent>
 HR_AGENT_SECRET=<agent password>
 IT_AGENT_ID=<from it-agent>
 IT_AGENT_SECRET=<agent password>
-APPROVAL_AGENT_ID=<from approval-agent>
-APPROVAL_AGENT_SECRET=<agent password>
 PAYROLL_AGENT_ID=<from payroll-agent>
 PAYROLL_AGENT_SECRET=<agent password>
 BOOKING_AGENT_ID=<from booking-agent>
@@ -437,7 +433,7 @@ The quickest way is to use the provided startup script which opens each service 
 
 ### Manual Start (any OS)
 
-Open **8 separate terminals** using the `.venv` Python interpreter:
+Open **7 separate terminals** using the `.venv` Python interpreter:
 
 ```bash
 # Terminal 1: IT MCP Server (must start before IT Agent)
@@ -449,10 +445,7 @@ Open **8 separate terminals** using the `.venv` Python interpreter:
 # Terminal 3: IT Agent
 .venv/bin/python -m agents.it_agent
 
-# Terminal 4: Approval Agent  (CrewAI)
-.venv/bin/python -m agents.approval_agent
-
-# Terminal 5: Finance & Payroll Agent  (CrewAI)
+# Terminal 4: Finance & Payroll Agent  (CrewAI)
 .venv/bin/python -m agents.payroll_agent
 
 # Terminal 6: Booking Agent  (Google ADK)
@@ -472,7 +465,6 @@ Open **8 separate terminals** using the `.venv` Python interpreter:
 | Orchestrator | http://localhost:8000/health |
 | HR Agent | http://localhost:8001/.well-known/agent-card.json |
 | IT Agent | http://localhost:8002/.well-known/agent-card.json |
-| Approval Agent | http://localhost:8003/.well-known/agent-card.json |
 | Finance & Payroll Agent | http://localhost:8004/.well-known/agent-card.json |
 | Booking Agent | http://localhost:8005/.well-known/agent-card.json |
 | IT MCP Server | http://localhost:8020/ |
@@ -546,11 +538,6 @@ Open http://localhost:8200/ to see real-time token flows, agent interactions, an
 │   │   │                       #   _call_mcp_tool connects via SSE to port 8020
 │   │   ├── graph.py            #   LangGraph StateGraph: call_mcp → format_results
 │   │   └── executor.py         #   A2A executor adapter
-│   ├── approval_agent/         # Port 8003 — Approval workflows (CrewAI)
-│   │   ├── __main__.py         #   Entry point, mounts Approval API + A2A server
-│   │   ├── agent.py            #   crewai.Crew + @tool API wrappers
-│   │   │                       #   Token shared via ContextVar (current_token)
-│   │   └── executor.py         #   A2A executor adapter
 │   ├── payroll_agent/          # Port 8004 — Finance & Payroll (CrewAI)
 │   │   ├── __main__.py         #   Entry point, mounts Payroll API + A2A server
 │   │   ├── agent.py            #   crewai.Crew + @tool API wrappers
@@ -606,13 +593,6 @@ Open http://localhost:8200/ to see real-time token flows, agent interactions, an
 5. Tools call the HR REST API directly using the token from ContextVar
 6. Streamed `text_delta` output is aggregated and returned via A2A
 
-### Approval Agent (CrewAI)
-1. Receives A2A request with `approval:read + approval:write` scoped token
-2. Stores token in a ContextVar; CrewAI `@tool` functions read it for API calls
-3. A single `crewai.Crew` with an `approval_manager` agent and a task wrapping the query is kicked off
-4. The agent autonomously calls `create_approval_request`, `approve_request`, etc.
-5. Crew final output is returned via A2A protocol
-
 ### Finance & Payroll Agent (CrewAI)
 1. Receives A2A request with `approval:read + approval:write` scoped token
 2. Stores token in a ContextVar; CrewAI `@tool` functions read it for API calls
@@ -659,7 +639,7 @@ Open http://localhost:8200/ to see real-time token flows, agent interactions, an
 | FastAPI | REST API endpoints |
 | Starlette | A2A agent HTTP servers |
 | a2a-sdk | Official A2A protocol SDK |
-| **crewai** | Finance & Payroll Agent + Approval Agent — autonomous task orchestration |
+| **crewai** | Finance & Payroll Agent — autonomous payroll and expense orchestration |
 | **aiosqlite** | HR Agent — async SQLite driver for employee persistence |
 | **google-adk** | Booking Agent — Google Agent Development Kit |
 | **litellm** | OpenAI bridge for Google ADK |

@@ -121,6 +121,43 @@ function handleLogMessage(message) {
         if (itNode) itNode.style.borderColor = '#4CAF50';
     }
 
+    // IT Approval link received — show clickable URL in response panel (console fallback case)
+    if (message.includes('[IT_APPROVAL]')) {
+        const urlMatch = message.match(/APPROVE:\s*(https?:\/\/\S+)/);
+        if (urlMatch) {
+            const url = urlMatch[1];
+            // Add as a response step so admin can see the link in the chat panel
+            const content = document.getElementById('response-content');
+            const placeholder = content.querySelector('.response-placeholder');
+            if (placeholder) placeholder.remove();
+            const div = document.createElement('div');
+            div.className = 'response-message agent';
+            div.innerHTML = `
+                <div class="response-label">⏳ IT Agent — Admin Approval Required</div>
+                <div class="response-text">
+                    An IT access request is pending admin approval.<br>
+                    <strong>Click to approve:</strong> <a href="${url}" target="_blank" style="color:#4CAF50;word-break:break-all">${url}</a>
+                </div>`;
+            content.appendChild(div);
+            content.scrollTop = content.scrollHeight;
+        }
+    }
+
+    // IT Provisioning outcome (broadcast by background task after admin approves/rejects)
+    if (message.includes('[IT_PROVISIONED]')) {
+        // Clear the pending badge if still present
+        const badge = document.getElementById('it-pending-badge');
+        if (badge) badge.remove();
+        const itNode = document.getElementById('node-it');
+        const approved = message.includes('✅');
+        if (itNode) itNode.style.borderColor = approved ? '#4CAF50' : '#ef4444';
+
+        // Strip the [IT_PROVISIONED] marker and display in response panel
+        const resultText = message.replace(/\[IT_PROVISIONED\]\s*/, '').trim();
+        addResponseMessage('IT Agent (Provisioning Result)', resultText, 'agent');
+        if (approved) triggerAgentFlow('it');
+    }
+
     // Completion
     if (message.toUpperCase().includes('TOKEN FLOW SUMMARY')) {
         console.log('[Visualizer] Triggering Final Response Animation');

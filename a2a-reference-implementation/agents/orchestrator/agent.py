@@ -346,28 +346,82 @@ class OrchestratorAgent:
             return {"error": str(e) or repr(e)}
 
     def _parse_agent_response(self, result: Dict[str, Any]) -> str:
-        """Parse A2A response to extract text."""
+        """Parse A2A response to extract text.
+
+        Handles both message-kind and task-kind (Google ADK) responses.
+        """
         if "result" in result:
             message_result = result.get("result", {})
 
-            # Handle message response
+            # ── kind: "message" (most agents) ───────────────────────────────
             if message_result.get("kind") == "message":
                 parts = message_result.get("parts", [])
                 for part in parts:
                     if part.get("kind") == "text" or part.get("type") == "text":
-                        return part.get("text", "")
+                        text = part.get("text", "").strip()
+                        if text:
+                            return text
 
-            # Handle task response with artifacts
+            # ── kind: "task" (Google ADK Booking Agent) ─────────────────────
+            if message_result.get("kind") == "task":
+                state = message_result.get("status", {}).get("state", "unknown")
+
+                # 1. Try status.message.parts first
+                status_msg = message_result.get("status", {}).get("message", {})
+                for part in status_msg.get("parts", []):
+                    if part.get("kind") == "text":
+                        text = part.get("text", "").strip()
+                        if text:
+                            return text
+
+                # 2. Walk history in reverse and return last agent text
+                history = message_result.get("history", [])
+                for item in reversed(history):
+                    if item.get("role") == "agent":
+                        for part in item.get("parts", []):
+                            if part.get("kind") == "text":
+                                text = part.get("text", "").strip()
+                                if text:
+                                    return text
+
+                # 3. Build a summary from the function call in history
+                for item in reversed(history):
+                    for part in item.get("parts", []):
+                        data = part.get("data", {})
+                        if data.get("name") and data.get("args"):
+                            fn  = data["name"]
+                            args = data["args"]
+                            if state == "completed":
+                                return f"✅ {fn} completed: {args}"
+                            else:
+                                return (
+                                    f"⚠️ {fn} attempted but task ended with state '{state}'. "
+                                    f"Args: {args}. Please check the Booking Agent logs."
+                                )
+
+                # 4. Generic task state fallback
+                if state == "completed":
+                    return "✅ Task completed successfully."
+                else:
+                    return f"⚠️ Task ended with state '{state}'. Please check the Booking Agent."
+
+            # ── artifacts (some agents) ──────────────────────────────────────
             artifacts = message_result.get("artifacts", [])
             if artifacts:
                 parts = artifacts[0].get("parts", [])
                 if parts:
-                    return parts[0].get("text", "")
+                    text = parts[0].get("text", "").strip()
+                    if text:
+                        return text
 
         if "error" in result:
             return f"Error: {result.get('error')}"
 
-        return str(result)
+        # Only use raw repr as absolute last resort
+        err = result.get("error", {})
+        if err:
+            return f"Error: {err}"
+        return "⚠️ Unexpected response format from agent."
 
     # ==================== SESSION MANAGEMENT ====================
 

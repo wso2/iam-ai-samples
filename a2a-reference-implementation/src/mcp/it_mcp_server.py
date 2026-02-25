@@ -56,12 +56,24 @@ logger = logging.getLogger(__name__)
 
 VISUALIZER_URL = "http://localhost:8200/log"
 
+# Persistent async client for visualizer broadcasts — created once, reused every vlog() call.
+# Creating a new AsyncClient per call was the main source of MCP server slowness
+# (each call paid TCP + TLS handshake overhead ~25+ times per provision operation).
+_vlog_client: Optional[httpx.AsyncClient] = None
+
+
+def _get_vlog_client() -> httpx.AsyncClient:
+    global _vlog_client
+    if _vlog_client is None or _vlog_client.is_closed:
+        _vlog_client = httpx.AsyncClient(timeout=1.0)
+    return _vlog_client
+
+
 async def vlog(message: str):
     """Log to stderr + broadcast to visualizer. Never touches stdout."""
     print(message, file=sys.stderr)
     try:
-        async with httpx.AsyncClient(timeout=1.0) as client:
-            await client.post(VISUALIZER_URL, json={"message": message})
+        await _get_vlog_client().post(VISUALIZER_URL, json={"message": message})
     except Exception:
         pass  # Visualizer may not be running
 

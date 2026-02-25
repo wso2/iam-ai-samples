@@ -139,22 +139,31 @@ class ITAgent:
 
         logger.info(f"[IT_AGENT] Approval pending ({approval_token[:8]}…) — returning immediately, background task will provision.")
 
+        # Broadcast approval URL to visualizer so it's visible in the UI log
+        from src.log_broadcaster import broadcast_log
+        await broadcast_log(f"[IT_AGENT] Approval pending — Admin approval URL: {approval_url}")
+
         # ── Background task: poll → MCP provision ───────────────────────────
         async def _wait_and_provision():
+            from src.log_broadcaster import broadcast_log as _broadcast
             try:
                 final_status = await approval_store.wait_for_approval(approval_token, poll_interval=5.0)
                 if final_status == "approved":
                     logger.info(f"[IT_AGENT] ✅ Approved! Proceeding with MCP provisioning.")
+                    await _broadcast(f"[IT_AGENT] ✅ Approved! Proceeding with MCP provisioning for {employee_name} ({employee_id}).")
                     from agents.it_agent.graph import run_it_agent_workflow
                     result = await run_it_agent_workflow(query=query, token=token)
                     logger.info(f"[IT_AGENT] MCP provisioning complete: {result[:120]}")
+                    await _broadcast(f"[IT_PROVISIONED] ✅ IT access provisioned for {employee_name} ({employee_id}): {result[:300]}")
                 elif final_status == "rejected":
                     logger.warning(f"[IT_AGENT] ❌ Rejected by admin — no resources provisioned for {employee_id}.")
+                    await _broadcast(f"[IT_PROVISIONED] ❌ IT access request rejected for {employee_name} ({employee_id}). No resources were provisioned.")
                 else:
                     logger.warning(f"[IT_AGENT] ⏰ Approval timed out for {employee_id}.")
+                    await _broadcast(f"[IT_PROVISIONED] ⏰ IT access approval timed out for {employee_name} ({employee_id}). Please retry.")
             except Exception as e:
                 logger.error(f"[IT_AGENT] Background provisioning failed: {e}", exc_info=True)
-
+                await _broadcast(f"[IT_PROVISIONED] ❌ IT provisioning error for {employee_name} ({employee_id}): {e}")
         import asyncio
         asyncio.create_task(_wait_and_provision())
 

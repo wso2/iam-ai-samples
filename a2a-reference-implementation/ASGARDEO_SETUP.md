@@ -7,8 +7,8 @@ The A2A architecture requires specific entities in Asgardeo to manage identity, 
 | Component | Asgardeo Entity | Purpose |
 |-----------|-----------------|---------|
 | **Orchestrator** | App + Agent | Initiates workflows, acts on behalf of users. |
-| **Worker Agents (HR, IT, etc.)** | App (optional) + Agent | Performs token exchange using its own identity. |
-| **APIs (HR, IT, etc.)** | API Resource | Validates tokens (audiences & scopes). |
+| **Worker Agents (HR, IT, Payroll, Booking)** | Agent only | Linked to the orchestrator app; perform token exchange using their own identity. |
+| **All APIs** | Single API Resource (`onboarding-api`) | One shared resource with all scopes; validates tokens by audience and scope. |
 
 ---
 
@@ -31,17 +31,18 @@ This belongs to the **Agent**.
 
 ---
 
-## 1. API Resources (Audiences)
+## 1. API Resource (Audience)
 
-Create the following API Resources to define the "Audiences" our agents will target.
+Create **one single API Resource** — all agents and APIs share the same identifier as the token audience.
 
-| Identifier | Scopes | Description |
-|------------|--------|-------------|
-| `onboarding-api` | (All below) | Primary resource for Orchestrator |
-| `hr-api` | `hr:read`, `hr:write` | HR Service |
-| `it-api` | `it:read`, `it:write` | IT Service |
-| `approval-api` | `approval:read`, `approval:write` | Finance & Payroll Service |
-| `booking-api` | `booking:read`, `booking:write` | Booking Service |
+| Identifier | Scopes | Used by |
+|------------|--------|---------|
+| `onboarding-api` | `hr:read`, `hr:write` | HR Agent + HR API |
+| `onboarding-api` | `it:read`, `it:write` | IT Agent + IT API |
+| `onboarding-api` | `approval:read`, `approval:write` | Finance & Payroll Agent + Payroll API |
+| `onboarding-api` | `booking:read`, `booking:write` | Booking Agent + Booking API |
+
+> **Important:** This is a **single API resource** with identifier `onboarding-api`. All scopes above are added to this one resource. Do **not** create separate `hr-api`, `it-api`, etc. resources.
 
 ---
 
@@ -72,28 +73,28 @@ For each worker (HR, IT, Payroll, Booking), you need an identity to perform **To
 2. **Name**: `hr-agent` — **Linked App**: `onboarding-orchestrator`
 3. Copy the **Agent ID** (UUID) and set an **Agent Secret**
 4. Add to `.env`: `HR_AGENT_ID=<uuid>` and `HR_AGENT_SECRET=<password>`
-5. Scopes granted: `hr:read`, `hr:write`
+5. Scopes granted (from `onboarding-api`): `hr:read`, `hr:write`
 
 ### IT Agent
 1. Go to **User Management → Agents → New Agent**
 2. **Name**: `it-agent` — **Linked App**: `onboarding-orchestrator`
 3. Copy the **Agent ID** and set an **Agent Secret**
 4. Add to `.env`: `IT_AGENT_ID=<uuid>` and `IT_AGENT_SECRET=<password>`
-5. Scopes granted: `it:read`, `it:write`
+5. Scopes granted (from `onboarding-api`): `it:read`, `it:write`
 
 ### Finance & Payroll Agent
 1. Go to **User Management → Agents → New Agent**
 2. **Name**: `payroll-agent` — **Linked App**: `onboarding-orchestrator`
 3. Copy the **Agent ID** and set an **Agent Secret**
 4. Add to `.env`: `PAYROLL_AGENT_ID=<uuid>` and `PAYROLL_AGENT_SECRET=<password>`
-5. Scopes granted: `approval:read`, `approval:write` *(the payroll API reuses the approval-api resource)*
+5. Scopes granted: `approval:read`, `approval:write` (on the shared `onboarding-api` resource)
 
 ### Booking Agent
 1. Go to **User Management → Agents → New Agent**
 2. **Name**: `booking-agent` — **Linked App**: `onboarding-orchestrator`
 3. Copy the **Agent ID** and set an **Agent Secret**
 4. Add to `.env`: `BOOKING_AGENT_ID=<uuid>` and `BOOKING_AGENT_SECRET=<password>`
-5. Scopes granted: `booking:read`, `booking:write`
+5. Scopes granted (from `onboarding-api`): `booking:read`, `booking:write`
 
 ---
 
