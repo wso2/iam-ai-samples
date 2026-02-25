@@ -1,0 +1,654 @@
+# A2A + MCP Reference Implementation with WSO2 Identity Server
+
+A reference implementation demonstrating the **Agent-to-Agent (A2A) protocol** with **Model Context Protocol (MCP)**, secured by **WSO2 Identity Server** using OAuth 2.0 token exchange (RFC 8693).
+
+Each agent uses a **modern AI framework** for autonomous request handling instead of hardcoded keyword matching:
+- **Orchestrator** — OpenAI GPT-4o for LLM task decomposition
+- **HR Agent** — Standard A2A + **SQLite** (`aiosqlite`) for persistent employee records
+- **IT Agent** — OpenAI GPT-4o-mini for LLM-routing via MCP + **Human-in-the-Loop Approval Gate**
+- **Finance & Payroll Agent** — **CrewAI** autonomous payroll and expense registration
+- **Booking Agent** — [Google ADK](https://google.github.io/adk-docs/) + **Google Calendar** integration
+
+---
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          USER REQUEST                                   │
+│              "Onboard John Doe as Software Engineer"                    │
+└──────────────────────────────┬──────────────────────────────────────────┘
+                               │
+                               ▼
+               ┌───────────────────────────────┐
+               │     ORCHESTRATOR (port 8000)   │
+               │  ┌──────────────────────────┐  │
+               │  │ LLM Task Decomposition   │  │◄── OpenAI GPT-4o
+               │  │ (breaks into sub-tasks)  │  │
+               │  └──────────────────────────┘  │
+               │  ┌──────────────────────────┐  │
+               │  │ Token Broker             │  │◄── WSO2 IS (RFC 8693)
+               │  │ (exchanges tokens per    │  │    Token Exchange
+               │  │  agent with actor token) │  │
+               │  └──────────────────────────┘  │
+               └───┬──────┬──────┬──────┬───────┘
+       A2A         │      │      │      │    A2A
+     ┌─────────────┘      │      │      └─────────────┐
+     ▼                    ▼      ▼                    ▼
+┌──────────────┐  ┌──────────┐ ┌──────────┐ ┌────────────────┐
+│  HR Agent    │  │ IT Agent │ │ Payroll  │ │ Booking Agent  │
+│  port 8001   │  │ port 8002│ │ port 8004│ │   port 8005    │
+│ Vercel AI SDK│  │ LLM+MCP  │ │  CrewAI  │ │  Google ADK    │
+└──────┬───────┘  └────┬─────┘ └────┬─────┘ └───────┬────────┘
+       │               │            │               │
+       ▼               ▼            ▼               ▼
+ ┌──────────┐  ┌─────────────┐ ┌──────────┐ ┌──────────┐
+ │ HR API   │  │ MCP Server  │ │Payroll   │ │Booking   │
+ │ /api/hr  │  │  port 8020  │ │  API     │ │  API     │
+ └──────────┘  │ LLM routing │ └──────────┘ └──────────┘
+               │ + scope      │
+               │   narrowing  │
+               └──────┬──────┘
+                      ▼
+                ┌──────────┐
+                │ IT API   │
+                │ /api/it  │
+                └──────────┘
+```
+
+### Key Components
+
+| Component | Port | Framework | Description |
+|-----------|------|-----------|-------------|
+| **Orchestrator** | 8000 | OpenAI GPT-4o | Receives user requests, uses LLM to decompose into sub-tasks, exchanges tokens per agent, dispatches via A2A protocol |
+| **HR Agent** | 8001 | Standard A2A + **SQLite** | Manages employee profiles. Records persisted to `data/hr.db` via `aiosqlite` |
+| **IT Agent** | 8002 | OpenAI GPT-4o-mini | IT provisioning (VPN, GitHub, AWS). Routes through MCP Server |
+| **Finance & Payroll Agent** | 8004 | **CrewAI** | Registers employees in payroll, sets up expense accounts with monthly salary and spending limits |
+| **Booking Agent** | 8005 | **Google ADK** | Task scheduling & equipment delivery. Creates real **Google Calendar events** |
+| **IT MCP Server** | 8020 | FastMCP (SSE) | Intermediary between IT Agent and IT API. LLM-powered routing + scope-narrowing token exchange |
+| **Visualizer** | 8200 | WebSocket | Real-time UI showing token flows and agent interactions |
+
+---
+
+## What's New — Agent Framework Upgrades
+
+This implementation modernised each agent's LLM integration from raw OpenAI HTTP calls to production-grade AI frameworks:
+
+### ✅ IT Agent → LangGraph
+
+The IT Agent was migrated from a monolithic `process_request` method to a **LangGraph** `StateGraph`:
+
+- A new `graph.py` defines `ITAgentState` (TypedDict) and two graph nodes:
+  - `call_mcp_node` — connects to the IT MCP Server via SSE (port 8020) and invokes `handle_it_request`
+  - `format_results_node` — transforms the raw MCP dict into a formatted human-readable string
+- `run_it_agent_workflow(query, token)` compiles and runs the graph, returning the final string
+- `process_request` in `agent.py` is now a thin one-liner that calls `run_it_agent_workflow`
+- The MCP transport was also upgraded from `stdio` (spawning a subprocess per call) to **SSE** (`sse_client` on the already-running port 8020 MCP server)
+
+### ✅ Orchestrator → LangGraph
+
+The Orchestrator task-decomposition loop was refactored to use **LangGraph**:
+
+- A `StateGraph` (`graph.py`) models the orchestration flow as explicit nodes: `plan_tasks` → `execute_task` → conditional edge back to `execute_task` or `END`
+- `ToolNode` from `langgraph.prebuilt` handles A2A dispatch calls
+- `run_with_langgraph()` in `agent.py` drives the compiled graph with the user query as initial state
+- This gives the orchestrator checkpointing, deterministic node ordering, and clean separation of planning vs. execution logic compared to a raw agentic loop
+
+### ✅ Finance & Payroll Agent → CrewAI
+
+The Finance & Payroll Agent was built as a **CrewAI**-powered autonomous agent:
+
+- A `crewai.Agent` with a `payroll_manager` role handles the full payroll decision flow
+- `@crewai.tool` functions wrap the Payroll REST API: `register_payroll`, `setup_expense_account`, `get_payroll_summary`
+- Token propagation uses a `ContextVar` set before Crew kickoff so tools can make authenticated API calls without exposing secrets to the LLM
+- `Crew.kickoff_async()` drives execution; the result is returned directly to the A2A client
+
+### ✅ Booking Agent → Google ADK
+
+The Booking Agent was migrated from a custom FastAPI+executor stack to **Google ADK** (`google-adk`):
+
+- Uses `google.adk.agents.LlmAgent` with `google.adk.runners.Runner` for the agent loop
+- A custom `A2aAgentExecutor` subclass captures the auth token from Starlette middleware and injects it via `ContextVar` before ADK tool execution
+- `litellm` bridges ADK to the OpenAI `gpt-4o-mini` model
+- ADK's native A2A support eliminates the need for a custom executor and message-passing boilerplate
+
+### ✅ HR Agent → Vercel AI SDK (Python)
+
+The HR Agent was migrated from a raw HTTP → OpenAI classification prompt to the **Vercel AI SDK Python package** (`vercel-ai-sdk`):
+
+- Four module-level `@ai.tool` async functions (`create_employee`, `get_employee`, `list_employees`, `grant_privileges`) expose the HR API to the LLM
+- Auth token is shared via a `contextvars.ContextVar` (`_current_token`), set by `HRAgent.process_request()` before calling `ai.run()`
+- `ai.run(_hr_agent_fn, llm, query)` provides the Runtime context required by `@ai.tool` and `ai.stream_loop()`
+- The LLM autonomously decides which tool(s) to call based on the natural language request — no classification prompt needed
+
+> **Design note:** `@ai.tool` must decorate **module-level** async functions. Applying it to class methods causes a Pydantic schema error on the implicit `self` parameter. The `ContextVar` pattern solves token sharing cleanly without workarounds.
+
+---
+
+### Optional Features Setup
+
+#### IT Agent Email Approval (SMTP)
+By default, the IT Agent prints an approval link to the terminal. To receive real emails:
+1. Create a Google App Password for your sending address.
+2. Add these to `.env`:
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-sending-email@gmail.com
+SMTP_PASSWORD=your-16-char-app-password
+IT_ADMIN_EMAIL=admin-receiving-email@company.com
+IT_SERVICE_BASE_URL=http://localhost:8002
+```
+
+#### Google Calendar Integration (Booking Agent)
+The Booking Agent interacts with the Google Calendar API. 
+1. Place a valid OAuth 2.0 Web Client credentials file at `mock_calendar_credentials.json` (or just leave the default mock file provided to run without crashing, which skips real calendar events).
+2. If using real credentials, the agent will prompt you to log into Google in your browser on the first run to authorize calendar access locally.
+
+---
+
+## Token Flow
+
+```
+User ──login──► WSO2 IS ──delegated token──► Orchestrator
+                                                  │
+                                    Token Broker performs
+                                    RFC 8693 Token Exchange
+                                    per agent (with actor token)
+                                                  │
+                              ┌───────────────────┼───────────────────┐
+                              ▼                   ▼                   ▼
+                      HR Token              IT Token            Booking Token
+                    (hr:read,             (it:read,           (booking:read,
+                     hr:write)             it:write)           booking:write)
+                              │                   │
+                              ▼                   ▼
+                         HR API          MCP Server narrows scope:
+                                         it:read+it:write → it:write only
+                                         (Token Exchange, no actor token)
+                                                  │
+                                                  ▼
+                                              IT API
+```
+
+### Token Exchange Flow (Orchestrator → Agent)
+
+1. User authenticates via OAuth 2.0 Authorization Code + PKCE (`response_mode=direct`)
+2. Orchestrator obtains a **delegated token** (all scopes)
+3. For each agent, Token Broker performs **RFC 8693 Token Exchange**:
+   - Gets **agent actor token** (3-step flow: authorize → authn → token)
+   - Exchanges: subject_token (user) + actor_token (agent) → scoped token
+   - Uses **Token Exchanger App** credentials for authentication
+4. Agent receives a **scoped token** (only its required scopes)
+
+### MCP Server Token Narrowing (IT Agent → IT API)
+
+The IT MCP Server (SSE transport on port 8020) demonstrates an additional scope-narrowing layer:
+- Receives IT Agent's token (`it:read + it:write`)
+- For write operations: exchanges to **`it:write` only**
+- Uses simplified exchange (no actor token, just Token Exchanger credentials)
+
+---
+
+## Prerequisites
+
+- **Python 3.12** (required for CrewAI and Google ADK pre-built wheels)
+- **WSO2 Identity Server** (local at `https://localhost:9443` or Asgardeo cloud)
+- **OpenAI API Key** (for LLM classification and task decomposition)
+- **Node.js** (optional, for MCP Inspector testing)
+
+### Python Virtual Environment
+
+```bash
+python3.12 -m venv .venv
+.venv\Scripts\activate        # Windows
+# or: source .venv/bin/activate  # macOS/Linux
+pip install -r requirements.txt
+```
+
+> **Important:** All services must be started using the `.venv` Python interpreter to ensure `google-adk` and `litellm` are available.
+
+---
+
+### HR Employee Database (SQLite)
+
+The HR API uses **SQLite** for persistent employee storage via [`aiosqlite`](https://aiosqlite.omnilib.dev/).
+
+**No manual setup required** — the database and table are created automatically on first run at:
+```
+data/hr.db
+```
+
+#### Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS employees (
+    employee_id   TEXT PRIMARY KEY,        -- e.g. EMP-A1B2C3D4
+    name          TEXT NOT NULL,
+    email         TEXT NOT NULL UNIQUE,    -- duplicate emails rejected (409)
+    role          TEXT NOT NULL,
+    team          TEXT NOT NULL,
+    manager_email TEXT NOT NULL,
+    start_date    TEXT NOT NULL,           -- ISO date string
+    status        TEXT NOT NULL DEFAULT 'pending_onboarding',
+    created_at    TEXT NOT NULL,           -- ISO datetime (UTC)
+    created_by    TEXT NOT NULL            -- token subject (audit trail)
+);
+```
+
+#### Valid status values
+
+| Status | Meaning |
+|--------|----------|
+| `pending_onboarding` | Default — newly created employee |
+| `active` | Fully onboarded |
+| `on_leave` | Temporarily away |
+| `suspended` | Access revoked pending review |
+| `offboarded` | Soft-deleted via `DELETE /employees/{id}` |
+
+#### Reset / inspect the database
+
+```powershell
+# View all employees
+.venv\Scripts\python.exe -c "
+import sqlite3, json
+con = sqlite3.connect('data/hr.db')
+con.row_factory = sqlite3.Row
+rows = con.execute('SELECT * FROM employees').fetchall()
+print(json.dumps([dict(r) for r in rows], indent=2))
+"
+
+# Clear all records (reset)
+.venv\Scripts\python.exe -c "import sqlite3; sqlite3.connect('data/hr.db').execute('DELETE FROM employees').connection.commit()"
+
+# Delete the database entirely (will be recreated on next start)
+Remove-Item data\hr.db
+```
+
+---
+
+### Google Calendar Integration (Booking Agent)
+
+The Booking Agent creates **real Google Calendar events** for orientation sessions and equipment deliveries. This uses a Google Cloud **Service Account** — no user login required.
+
+#### Step 1 — Create a Google Cloud Project & Enable the Calendar API
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Create a new project (or select an existing one)
+3. Navigate to **APIs & Services → Library**
+4. Search for **Google Calendar API** and click **Enable**
+
+#### Step 2 — Create a Service Account
+
+1. Go to **APIs & Services → Credentials → Create Credentials → Service Account**
+2. Give it a name (e.g. `a2a-booking-agent`)
+3. Click **Create and Continue** → skip optional role/user steps → **Done**
+4. Click the service account → **Keys** tab → **Add Key → Create new key → JSON**
+5. Download the `.json` file — this is your credentials file
+
+> **Template:** A mock credentials file with the expected structure is provided at:
+> [`google-service-account.example.json`](google-service-account.example.json)
+> Copy it, fill in your real values, and rename it (e.g. `my-service-account.json`).
+
+#### Step 3 — Create & Share a Google Calendar
+
+1. Open [Google Calendar](https://calendar.google.com) → **+ Other calendars → Create new calendar**
+2. Name it (e.g. `A2A Onboarding Calendar`)
+3. After creation, click the calendar → **Settings and sharing**
+4. Under **Share with specific people**, add the service account email:
+   ```
+   your-service-account-name@your-gcp-project-id.iam.gserviceaccount.com
+   ```
+   Set permission to **Make changes to events**
+5. Copy the **Calendar ID** from **Integrate calendar** section (looks like `abc123...@group.calendar.google.com`)
+
+#### Step 4 — Configure Environment Variables
+
+Add to your `.env` file:
+
+```env
+# Path to your downloaded service account JSON file
+GOOGLE_APPLICATION_CREDENTIALS=./my-service-account.json
+
+# Your shared calendar's Calendar ID (from Step 3)
+GOOGLE_CALENDAR_ID=your-calendar-id@group.calendar.google.com
+```
+
+#### Fallback — Mock Mode
+
+If credentials are missing or invalid, the Booking Agent **automatically falls back to mock mode** — bookings are still recorded in-memory and the system continues working. The calendar links returned will be placeholder URLs. This means Google Calendar is **optional** for local development.
+
+---
+
+## Setup Guide
+
+### 1. Clone and Install Dependencies
+
+
+```bash
+git clone <repository-url>
+cd a2a-reference-impl
+python3.12 -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+```
+
+### 2. Configure WSO2 Identity Server
+
+See [ASGARDEO_SETUP.md](ASGARDEO_SETUP.md) for detailed WSO2 IS configuration.
+
+#### Summary of Required Entities
+
+**API Resources** — Create in WSO2 IS Console:
+
+| Identifier | Scopes |
+|------------|--------|
+| `onboarding-api` | `hr:read`, `hr:write`, `it:read`, `it:write`, `approval:read`, `approval:write`, `booking:read`, `booking:write` |
+
+**Applications:**
+
+| Application | Grant Types | Purpose |
+|-------------|------------|---------| 
+| `onboarding-orchestrator` | Authorization Code, Client Credentials, Refresh Token | Main application for the orchestrator |
+| `token-exchanger` | Token Exchange, Client Credentials | Performs all token exchanges on behalf of agents |
+| `mcp-it-server` (optional) | Token Exchange | Registered for MCP server scope narrowing |
+
+**AI Agents** (User Management → Agents):
+
+| Agent Name | Linked Application | Purpose |
+|------------|-------------------|---------| 
+| `orchestrator-agent` | `onboarding-orchestrator` | Orchestrator identity |
+| `hr-agent` | `onboarding-orchestrator` | HR worker identity |
+| `it-agent` | `onboarding-orchestrator` | IT worker identity |
+| `payroll-agent` | `onboarding-orchestrator` | Finance & Payroll worker identity |
+| `booking-agent` | `onboarding-orchestrator` | Booking worker identity |
+
+> **Note:** Worker agents don't need their own applications. They are registered as AI Agents linked to the orchestrator's application. The Token Exchanger app performs exchanges using agent actor tokens.
+
+### 3. Configure Environment Variables
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```env
+# WSO2 Identity Server
+ASGARDEO_ORG_NAME=carbon.super
+ASGARDEO_BASE_URL=https://localhost:9443
+ASGARDEO_TOKEN_URL=https://localhost:9443/oauth2/token
+ASGARDEO_AUTHORIZE_URL=https://localhost:9443/oauth2/authorize
+ASGARDEO_JWKS_URL=https://localhost:9443/oauth2/jwks
+
+# Orchestrator Application
+ORCHESTRATOR_CLIENT_ID=<from onboarding-orchestrator app>
+ORCHESTRATOR_CLIENT_SECRET=<from onboarding-orchestrator app>
+
+# Orchestrator Agent
+ORCHESTRATOR_AGENT_ID=<from orchestrator-agent>
+ORCHESTRATOR_AGENT_SECRET=<agent password>
+
+# Worker Agent IDs (registered as AI Agents in WSO2 IS)
+HR_AGENT_ID=<from hr-agent>
+HR_AGENT_SECRET=<agent password>
+IT_AGENT_ID=<from it-agent>
+IT_AGENT_SECRET=<agent password>
+PAYROLL_AGENT_ID=<from payroll-agent>
+PAYROLL_AGENT_SECRET=<agent password>
+BOOKING_AGENT_ID=<from booking-agent>
+BOOKING_AGENT_SECRET=<agent password>
+
+# Token Exchanger Application
+TOKEN_EXCHANGER_CLIENT_ID=<from token-exchanger app>
+TOKEN_EXCHANGER_CLIENT_SECRET=<from token-exchanger app>
+
+# MCP IT Server (optional, for scope narrowing demo)
+MCP_IT_CLIENT_ID=<from mcp-it-server app>
+MCP_IT_CLIENT_SECRET=<from mcp-it-server app>
+MCP_IT_AGENT_ID=<from mcp-it-agent>
+MCP_IT_AGENT_SECRET=<agent password>
+
+# OpenAI
+OPENAI_API_KEY=sk-proj-...
+
+# API Audience
+API_AUDIENCE=onboarding-api
+```
+
+### 4. Configuration File
+
+`config.yaml` defines agent URLs, required scopes, and discovery settings. The Orchestrator reads this file at startup to dynamically discover agent endpoints — no hardcoded port mappings in code.
+
+---
+
+## Running the Application
+
+### Start All Services (Windows — PowerShell)
+
+The quickest way is to use the provided startup script which opens each service in its own terminal window:
+
+```powershell
+.\start_all_adk.ps1
+```
+
+### Manual Start (any OS)
+
+Open **7 separate terminals** using the `.venv` Python interpreter:
+
+```bash
+# Terminal 1: IT MCP Server (must start before IT Agent)
+.venv/bin/python src/mcp/it_mcp_server.py --transport sse --port 8020
+
+# Terminal 2: HR Agent  (Vercel AI SDK)
+.venv/bin/python -m agents.hr_agent
+
+# Terminal 3: IT Agent
+.venv/bin/python -m agents.it_agent
+
+# Terminal 4: Finance & Payroll Agent  (CrewAI)
+.venv/bin/python -m agents.payroll_agent
+
+# Terminal 6: Booking Agent  (Google ADK)
+.venv/bin/python -m agents.booking_agent_adk
+
+# Terminal 7: Orchestrator (start last)
+.venv/bin/python -m agents.orchestrator
+
+# Terminal 8: Visualizer
+.venv/bin/python visualizer_server.py
+```
+
+### Verify Services
+
+| Service | Health / Discovery URL |
+|---------|------------------------|
+| Orchestrator | http://localhost:8000/health |
+| HR Agent | http://localhost:8001/.well-known/agent-card.json |
+| IT Agent | http://localhost:8002/.well-known/agent-card.json |
+| Finance & Payroll Agent | http://localhost:8004/.well-known/agent-card.json |
+| Booking Agent | http://localhost:8005/.well-known/agent-card.json |
+| IT MCP Server | http://localhost:8020/ |
+| Visualizer | http://localhost:8200/ |
+
+---
+
+## Usage
+
+### Step 1: Authenticate
+
+```
+http://localhost:8000/auth/login
+```
+
+This starts the OAuth 2.0 Authorization Code + PKCE flow with WSO2 IS.
+
+### Step 2: Send Requests
+
+```bash
+# Full onboarding (all 5 agents)
+curl -X POST http://localhost:8000/api/demo \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Onboard Alice as Senior Software Engineer with IT tools and a booking for orientation"}'
+
+# HR only
+curl -X POST http://localhost:8000/api/demo \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Create employee profile for John Doe as Data Scientist"}'
+
+# IT provisioning (routes through MCP)
+curl -X POST http://localhost:8000/api/demo \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Set up GitHub and AWS access for employee EMP-001"}'
+
+# Approval workflow (CrewAI)
+curl -X POST http://localhost:8000/api/demo \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Approve HR privilege grant for Bob"}'
+
+# Booking (Google ADK)
+curl -X POST http://localhost:8000/api/demo \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Schedule orientation and equipment delivery for EMP-001"}'
+```
+
+### Step 3: Watch the Visualizer
+
+Open http://localhost:8200/ to see real-time token flows, agent interactions, and LLM decisions.
+
+---
+
+## Project Structure
+
+```
+├── agents/
+│   ├── orchestrator/           # Port 8000 — LangGraph-powered task decomposition + routing
+│   │   ├── __main__.py         #   Entry point, OAuth endpoints, A2A server
+│   │   ├── agent.py            #   run_with_langgraph(), A2A client, token exchange
+│   │   │                       #   Reads agent URLs dynamically from config.yaml
+│   │   ├── graph.py            #   LangGraph StateGraph: plan_tasks → execute_task nodes
+│   │   └── executor.py         #   A2A executor adapter
+│   ├── hr_agent/               # Port 8001 — Employee management (Vercel AI SDK)
+│   │   ├── __main__.py         #   Entry point, mounts HR API + A2A server
+│   │   ├── agent.py            #   @ai.tool module-level functions + ai.run() loop
+│   │   │                       #   Token shared via ContextVar (_current_token)
+│   │   └── executor.py         #   A2A executor adapter
+│   ├── it_agent/               # Port 8002 — IT provisioning (LangGraph + MCP SSE)
+│   │   ├── __main__.py         #   Entry point, mounts IT API + A2A server
+│   │   ├── agent.py            #   Thin wrapper; delegates to run_it_agent_workflow
+│   │   │                       #   _call_mcp_tool connects via SSE to port 8020
+│   │   ├── graph.py            #   LangGraph StateGraph: call_mcp → format_results
+│   │   └── executor.py         #   A2A executor adapter
+│   ├── payroll_agent/          # Port 8004 — Finance & Payroll (CrewAI)
+│   │   ├── __main__.py         #   Entry point, mounts Payroll API + A2A server
+│   │   ├── agent.py            #   crewai.Crew + @tool API wrappers
+│   │   │                       #   Token shared via ContextVar; scopes: approval:read, approval:write
+│   │   └── executor.py         #   A2A executor adapter
+│   └── booking_agent_adk/      # Port 8005 — Task scheduling (Google ADK)
+│       ├── __main__.py         #   Entry point, ADK Runner + custom A2aAgentExecutor
+│       └── agent.py            #   google.adk.agents.LlmAgent with booking tools
+├── src/
+│   ├── apis/                   # FastAPI REST API routers
+│   │   ├── hr_api.py           #   CRUD /employees — persisted to data/hr.db (aiosqlite)
+│   │   ├── it_api.py           #   POST/GET /provision/* (requires it:read, it:write)
+│   │   ├── approval_api.py     #   POST/GET /requests (requires approval:*)
+│   │   ├── booking_api.py      #   POST/GET /tasks, /deliveries + Google Calendar events
+│   │   └── google_calendar.py  #   Google Calendar service account helper
+│   ├── auth/                   # Authentication & token management
+│   │   ├── asgardeo.py         #   WSO2 IS client (OAuth, actor tokens, token exchange)
+│   │   ├── token_broker.py     #   Centralized token broker (session, exchange, audit)
+│   │   ├── jwt_validator.py    #   JWT validation for API endpoints
+│   │   └── utils.py            #   PKCE utilities
+│   ├── mcp/                    # Model Context Protocol
+│   │   └── it_mcp_server.py    #   MCP server (SSE, port 8020) with LLM routing + scope narrowing
+│   ├── config.py               #   Pydantic settings (loads from .env)
+│   ├── config_loader.py        #   YAML config loader (config.yaml)
+│   └── log_broadcaster.py      #   Visualizer log broadcasting
+├── visualizer/                 # Token flow visualization UI
+├── config.yaml                 #   Agent config (URLs, scopes, discovery seed URLs)
+├── requirements.txt            #   Python dependencies
+├── start_all_adk.ps1           #   Windows PowerShell startup script
+├── visualizer_server.py        #   WebSocket server for visualizer (port 8200)
+├── ASGARDEO_SETUP.md           #   WSO2 IS configuration guide
+└── .env.example                #   Environment variable template
+```
+
+---
+
+## How Each Agent Works
+
+### Orchestrator (LangGraph + GPT-4o)
+1. Receives natural language request from user
+2. **LangGraph `StateGraph`** drives the flow through `plan_tasks_node` → `execute_task_node`
+3. `plan_tasks_node`: GPT-4o decomposes the request into an ordered list of agent sub-tasks
+4. Agent URLs are loaded **dynamically from `config.yaml`** — no hardcoded port mappings
+5. `execute_task_node`: for each task, performs **RFC 8693 token exchange** then dispatches via **A2A protocol**
+6. A conditional edge loops back until all tasks are done, then exits to `END`
+7. Results are aggregated and returned
+
+### HR Agent (Vercel AI SDK)
+1. Receives A2A request with `hr:read + hr:write` scoped token
+2. Sets `_current_token` ContextVar so module-level tools can authenticate
+3. `ai.run(_hr_agent_fn, llm, query)` drives an autonomous `stream_loop`
+4. The LLM decides which `@ai.tool` to call (`create_employee`, `get_employee`, etc.)
+5. Tools call the HR REST API directly using the token from ContextVar
+6. Streamed `text_delta` output is aggregated and returned via A2A
+
+### Finance & Payroll Agent (CrewAI)
+1. Receives A2A request with `approval:read + approval:write` scoped token
+2. Stores token in a ContextVar; CrewAI `@tool` functions read it for API calls
+3. A `crewai.Crew` with a `payroll_manager` agent handles the full payroll decision flow
+4. Uses `ChatOpenAI` (`gpt-4o-mini`) as the LLM backbone for autonomous tool selection
+5. Tools call the Payroll REST API (`/api/payroll/*`): `register_payroll` (salary, pay grade, frequency) and/or `setup_expense_account` (monthly limits)
+6. Crew final output is returned via A2A protocol
+
+### Booking Agent (Google ADK)
+1. Receives A2A request with `booking:read + booking:write` scoped token
+2. Custom `A2aAgentExecutor` injects the token into `_current_token` ContextVar before ADK executes
+3. `google.adk.agents.LlmAgent` drives tool selection (schedule tasks, order equipment)
+4. ADK tools call the Booking REST API with the scoped token
+5. ADK response is translated back to A2A format
+
+### IT Agent (LangGraph + MCP)
+1. Receives A2A request with `it:read + it:write` scoped token
+2. **LangGraph `StateGraph`** drives execution through `call_mcp_node` → `format_results_node`
+3. `call_mcp_node`: connects to the IT MCP Server via **SSE** on port 8020 and calls `handle_it_request`
+4. MCP Server's internal LLM classifies the request (vpn/github/aws/list) and narrows the token scope
+5. Calls IT API with the narrowed token
+6. `format_results_node`: transforms the MCP result dict into a readable provisioning summary
+7. Returns formatted result via A2A protocol
+
+---
+
+## Protocols & Standards
+
+| Protocol | Usage |
+|----------|-------|
+| **A2A (Agent-to-Agent)** | Communication between orchestrator and worker agents. JSON-RPC over HTTP with AgentCard discovery at `/.well-known/agent-card.json` |
+| **MCP (Model Context Protocol)** | Communication between IT Agent and IT MCP Server. SSE transport (port 8020) |
+| **OAuth 2.0 (Authorization Code + PKCE)** | User authentication via WSO2 IS with `response_mode=direct` |
+| **RFC 8693 (Token Exchange)** | Delegated token exchange — orchestrator exchanges user token for agent-scoped tokens |
+| **JWT** | Token format with scope and audience validation at API endpoints |
+
+---
+
+## Tech Stack
+
+| Technology | Purpose |
+|------------|---------|
+| Python 3.12 | Runtime (required for framework compatibility) |
+| FastAPI | REST API endpoints |
+| Starlette | A2A agent HTTP servers |
+| a2a-sdk | Official A2A protocol SDK |
+| **crewai** | Finance & Payroll Agent — autonomous payroll and expense orchestration |
+| **aiosqlite** | HR Agent — async SQLite driver for employee persistence |
+| **google-adk** | Booking Agent — Google Agent Development Kit |
+| **litellm** | OpenAI bridge for Google ADK |
+| **google-api-python-client** | Booking Agent — Google Calendar event creation |
+| mcp (FastMCP) | IT MCP Server — Model Context Protocol SDK |
+| OpenAI GPT-4o | LLM task decomposition (orchestrator) |
+| OpenAI GPT-4o-mini | LLM request routing (IT Agent + MCP) |
+| WSO2 Identity Server | OAuth 2.0, token exchange, JWT validation |
+| httpx | Async HTTP client |
+| pydantic-settings | Configuration management |
+| structlog | Structured logging |
+| WebSocket | Real-time visualizer updates |
