@@ -19,7 +19,6 @@ from pathlib import Path
 from asgardeo import AsgardeoConfig
 from asgardeo_ai import AgentConfig, AgentAuthManager
 
-# Import the official Vercel AI SDK for Python
 import vercel_ai_sdk as ai
 
 # Load environment variables
@@ -37,9 +36,6 @@ AGENT_CONFIG = AgentConfig(
     agent_secret=os.getenv("AGENT_SECRET")
 )
 
-# --- THE FIX ---
-# Removed @ai.stream! We just define it as a normal async function.
-# Since it is called by ai.run(), the connection pool is still safely active.
 async def my_agent(llm, messages, auth_token):
 
     tools = await ai.mcp.get_http_tools(
@@ -57,7 +53,6 @@ async def main():
     async with AgentAuthManager(ASGARDEO_CONFIG, AGENT_CONFIG) as auth_manager:
         agent_token = await auth_manager.get_agent_token(["openid"])
 
-    # Map your Google API key to the OpenAI environment variable for compatibility
     google_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
     os.environ["OPENAI_API_KEY"] = google_key
     os.environ["OPENAI_BASE_URL"] = "https://generativelanguage.googleapis.com/v1beta/openai/"
@@ -79,7 +74,5 @@ async def main():
 
     print()
 
-
-# Run app
 if __name__ == "__main__":
     asyncio.run(main())
