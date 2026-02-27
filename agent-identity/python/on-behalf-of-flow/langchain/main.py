@@ -106,8 +106,8 @@ async def main():
 
         # Exit the loop if the user types "exit"
         if question.lower() == "exit":
-           print("Exiting the program. Goodbye!")
-           break
+            print("Exiting the program. Goodbye!")
+            break
 
         # Invoke the agent
         response = await agent.ainvoke(

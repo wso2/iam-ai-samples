@@ -95,13 +95,13 @@ async def main():
 
     while True:
         user_input = input("\nEnter your question (e.g., 'Add 45 and 99') or type 'exit' to quit: ")
-        messages = ai.make_messages(user=user_input)
 
         # Exit the loop if the user types "exit"
         if user_input.lower() == "exit":
             print("Exiting the program. Goodbye!")
             break
 
+        messages = ai.make_messages(user=user_input)
         result = ai.run(my_agent, llm, messages, obo_token.access_token)
 
         print("\nAgent Response: ", end="")

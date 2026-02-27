@@ -24,6 +24,9 @@ from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams
 from google.genai import types
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, message=".*BaseAuthenticatedTool.*")
+
 # Load environment variables from .env file
 ROOT_DIR = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT_DIR / ".env")
