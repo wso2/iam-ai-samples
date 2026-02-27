@@ -57,6 +57,10 @@ async def my_agent(llm, messages, auth_token):
 
 
 async def main():
+    print("##########################################################################################################")
+    print("##     This is an On-Behalf-Of (OBO) authentication sample application for authenticating AI agents     ##")
+    print("##                         using Asgardeo and Vercel AI framework                                       ##")
+    print("##########################################################################################################")
 
     async with AgentAuthManager(ASGARDEO_CONFIG, AGENT_CONFIG) as auth_manager:
         agent_token = await auth_manager.get_agent_token(["openid", "email"])

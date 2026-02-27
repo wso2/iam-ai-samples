@@ -53,6 +53,10 @@ async def build_toolset():
     )
 
 async def main():
+    print("##########################################################################################################")
+    print("##      This is an Agent Authentication Flow sample application for authenticating AI agents            ##")
+    print("##                         using Asgardeo and Google ADK framework                                      ##")
+    print("##########################################################################################################")
 
     mcp_toolset = await build_toolset()
 

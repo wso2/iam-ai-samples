@@ -89,6 +89,11 @@ async def get_obo_token():
 # --- Main CrewAI Execution ---
 
 async def main():
+    print("##########################################################################################################")
+    print("##     This is an On-Behalf-Of (OBO) authentication sample application for authenticating AI agents     ##")
+    print("##                         using Asgardeo and Crew AI framework                                         ##")
+    print("##########################################################################################################")
+
     # 1. Get the Token via OBO Flow
     try:
         access_token = await get_obo_token()

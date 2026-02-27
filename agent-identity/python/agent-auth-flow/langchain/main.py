@@ -41,6 +41,10 @@ AGENT_CONFIG = AgentConfig(
 
 
 async def main():
+    print("##########################################################################################################")
+    print("##      This is an Agent Authentication Flow sample application for authenticating AI agents            ##")
+    print("##                         using Asgardeo and LangChain framework                                       ##")
+    print("##########################################################################################################")
 
     async with AgentAuthManager(ASGARDEO_CONFIG, AGENT_CONFIG) as auth_manager:
         # Get agent token
