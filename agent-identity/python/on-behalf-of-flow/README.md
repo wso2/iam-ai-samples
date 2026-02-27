@@ -26,13 +26,16 @@ This sample is located under:
 ```
 agent-identity/python/on-behalf-of-flow/
 ├── README.md               # You are here
+├── common/
+│   └── oauth_callback.py   # lightweight callback server for Authorization code + PKCE flow
+├── crew-ai/                # OBO flow using crew-ai framework
+│   ├── main.py
+│   └── requirements.txt
 ├── google-adk/             # OBO flow using the Google Agent Development Kit
 │   ├── main.py
-│   ├── oauth_callback.py   # lightweight callback server for Authorization code + PKCE flow
 │   └── requirements.txt
 └── langchain/              # OBO flow using LangChain
     ├── main.py
-    ├── oauth_callback.py
     └── requirements.txt
 ```
 Each framework folder (`google-adk` and `langchain`) contains the **OBO-enabled agent** plus the local callback server implementation.

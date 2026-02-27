@@ -12,6 +12,7 @@
 
 import os
 import asyncio
+import sys
 
 from dotenv import load_dotenv
 from pathlib import Path
@@ -23,8 +24,9 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain.agents import create_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from oauth_callback import OAuthCallbackServer
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from common.oauth_callback import OAuthCallbackServer
 
 # Load environment variables from .env file
 ROOT_DIR = Path(__file__).resolve().parents[2]

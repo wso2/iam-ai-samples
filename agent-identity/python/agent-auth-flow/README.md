@@ -18,6 +18,9 @@ This example corresponds to the _“AI agent acting on its own”_ scenario desc
 ```
 agent-identity/python/agent-auth-flow/
 ├── README.md           # You are here
+├── crew-ai/            # Agent Authentication flow using crew-ai framework
+│   ├── main.py
+│   └── requirements.txt
 ├── google-adk/         # Agent Authentication flow using the Google Agent Development Kit
 │   ├── main.py
 │   └── requirements.txt
