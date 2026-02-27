@@ -27,12 +27,16 @@ import { AsgardeoJavaScriptClient } from "@asgardeo/javascript";
 import dotenv from "dotenv";
 import open from "open";
 
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 const port = '3001';
 
 dotenv.config({
-  path: "../../.env",
+  path: resolve(__dirname, "../../.env"),
 });
- 
 
 const asgardeoConfig = {
     afterSignInUrl: process.env.REDIRECT_URI || "",
@@ -111,7 +115,7 @@ async function runAgent() {
 
     const rootAgent = new LlmAgent({
         name: "example_agent",
-        model: process.env.GOOGLE_GENAI_MODEL || "gemini-2.5-flash",
+        model: process.env.MODEL_NAME || "gemini-2.5-flash",
         instruction: `You are a helpful AI assistant.`,
         apiKey: process.env.GOOGLE_API_KEY,
         tools: [
@@ -143,14 +147,33 @@ async function runAgent() {
             const userInput = await rl.question("\nEnter your question (e.g., 'Add 45 and 99') or type 'exit' to quit: ");
 
             if (userInput.toLowerCase() === "exit") {
-                await runner.sessionService.deleteSession({
-                    appName: "my-custom-app",
-                    sessionId: session.id,
-                });
+                console.log("Goodbye!");
                 break;
             }
 
-            // ...existing code...
+            const userMessage = {
+                role: "user",
+                parts: [{ text: userInput }],
+            };
+
+            const eventStream = runner.runAsync({
+                userId: userId,
+                sessionId: session.id,
+                newMessage: userMessage,
+            });
+
+            try {
+                for await (const event of eventStream) {
+                    if (event.content && event.content.parts) {
+                        const text = event.content.parts.map((p) => p.text).join("");
+                        if (text) {
+                            console.log(`Agent : ${text}`);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Error running agent:", error);
+            }
         }
     } finally {
         rl.close();

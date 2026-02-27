@@ -23,8 +23,13 @@ import { LlmAgent, MCPToolset, InMemoryRunner } from "@google/adk";
 
 import { AsgardeoJavaScriptClient } from "@asgardeo/javascript";
 
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 dotenv.config({
-  path: "../../.env",
+  path: resolve(__dirname, "../../.env"),
 });
 
 const asgardeoConfig = {
