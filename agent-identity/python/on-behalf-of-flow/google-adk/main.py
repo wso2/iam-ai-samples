@@ -12,6 +12,8 @@
 
 import os
 import asyncio
+import sys
+
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -24,8 +26,9 @@ from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams
 from google.genai import types
 
-from oauth_callback import OAuthCallbackServer
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from common.oauth_callback import OAuthCallbackServer
 
 # Load environment variables from .env file
 ROOT_DIR = Path(__file__).resolve().parents[2]
