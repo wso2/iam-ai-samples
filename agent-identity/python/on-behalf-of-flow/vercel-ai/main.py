@@ -85,7 +85,7 @@ async def main():
         obo_token = await auth_manager.get_obo_token(auth_code, agent_token=agent_token, code_verifier=code_verifier)
 
 
-    google_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
+    google_key = os.getenv("GOOGLE_API_KEY", "")
     os.environ["OPENAI_API_KEY"] = google_key
     os.environ["OPENAI_BASE_URL"] = "https://generativelanguage.googleapis.com/v1beta/openai/"
 

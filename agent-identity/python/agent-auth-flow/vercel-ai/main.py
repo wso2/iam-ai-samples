@@ -57,7 +57,7 @@ async def main():
     async with AgentAuthManager(ASGARDEO_CONFIG, AGENT_CONFIG) as auth_manager:
         agent_token = await auth_manager.get_agent_token(["openid"])
 
-    google_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
+    google_key = os.getenv("GOOGLE_API_KEY", "")
     os.environ["OPENAI_API_KEY"] = google_key
     os.environ["OPENAI_BASE_URL"] = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
