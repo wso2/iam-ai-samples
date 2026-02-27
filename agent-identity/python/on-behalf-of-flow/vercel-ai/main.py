@@ -93,19 +93,25 @@ async def main():
         model=os.getenv("MODEL_NAME")
     )
 
-    user_input = input("Enter your question: ")
-    messages = ai.make_messages(user=user_input)
+    while True:
+        user_input = input("\nEnter your question (e.g., 'Add 45 and 99') or type 'exit' to quit: ")
+        messages = ai.make_messages(user=user_input)
 
-    result = ai.run(my_agent, llm, messages, obo_token.access_token)
+        # Exit the loop if the user types "exit"
+        if user_input.lower() == "exit":
+            print("Exiting the program. Goodbye!")
+            break
 
-    print("\nAgent Response: ", end="")
+        result = ai.run(my_agent, llm, messages, obo_token.access_token)
 
-    # Stream the output token-by-token
-    async for msg in result:
-        if getattr(msg, "text_delta", None):
-            print(msg.text_delta, end="", flush=True)
+        print("\nAgent Response: ", end="")
 
-    print()
+        # Stream the output token-by-token
+        async for msg in result:
+            if getattr(msg, "text_delta", None):
+                print(msg.text_delta, end="", flush=True)
+
+        print()
 
 if __name__ == "__main__":
     asyncio.run(main())

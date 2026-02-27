@@ -101,14 +101,20 @@ async def main():
     tools = await client.get_tools()
     agent = create_agent(llm, tools)
 
-    user_input = input("Enter your question: ")
+    while True:
+        question = input("\nEnter your question (e.g., 'Add 45 and 99') or type 'exit' to quit: ")
 
-    # Invoke the agent
-    response = await agent.ainvoke(
-        {"messages": [{"role": "user", "content": user_input}]}
-    )
+        # Exit the loop if the user types "exit"
+        if question.lower() == "exit":
+           print("Exiting the program. Goodbye!")
+           break
 
-    print("Agent Response:", response["messages"][-1].content)
+        # Invoke the agent
+        response = await agent.ainvoke(
+            {"messages": [{"role": "user", "content": question}]}
+        )
+
+        print("Agent Response:", response["messages"][-1].content)
 
 
 # Run app
