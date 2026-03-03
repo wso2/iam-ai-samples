@@ -1,6 +1,6 @@
 # Agent Identity Quickstart — Agent Authentication Flow
 
-This guide walks you through running the **Agent Authentication Flow** sample for authenticating AI agents using **Asgardeo** and securely connecting to an MCP server through modern agent frameworks such as **LangChain** and **Google ADK**.
+This guide walks you through running the **Agent Authentication Flow** sample for authenticating AI agents using **Asgardeo** and securely connecting to an MCP server through modern agent frameworks such as **LangChain**, **Google ADK**, **Crew AI** and **Vercel AI**.
 
 In this flow, the AI agent authenticates by itself (not on behalf of a user) using its Agent Credentials and obtains a valid access token to call MCP tools securely.
 
@@ -24,12 +24,15 @@ agent-identity/python/agent-auth-flow/
 ├── google-adk/         # Agent Authentication flow using the Google Agent Development Kit
 │   ├── main.py
 │   └── requirements.txt
-└── langchain/          # Agent Authentication flow using LangChain framework
+├── langchain/          # Agent Authentication flow using LangChain framework
+│   ├── main.py
+│   └── requirements.txt
+└── vercel-ai/          # Agent Authentication flow using vercel-ai framework
     ├── main.py
     └── requirements.txt
 ```
 
-Each framework folder (`google-adk` and `langchain`) contains a runnable `main.py` demonstrating how an agent:
+Each framework folder (`crew-ai`,`google-adk`,`langchain`,`vercel-ai`) contains a runnable `main.py` demonstrating how an agent:
 
 - Authenticates itself with Asgardeo using Agent Credentials, and
 - Calls a secured MCP server using the issued token.
@@ -69,7 +72,7 @@ Make note of:
 
 ## Set Up the Project Locally
 
-Navigate into either the `google-adk` or `langchain` folder depending on which framework you want to run.
+Navigate into `crew-ai`,`google-adk`,`langchain` or `vercel-ai` folder depending on which framework you want to run.
 
 Example:
 ```bash
@@ -107,7 +110,7 @@ If you don’t already have an MCP server running, you can quickly set one up by
 
 Ensure the secured MCP Server is up and running.
 
-Navigate into either the `google-adk` or `langchain` folder depending on the framework of your choice and simply run:
+Navigate into either the `crew-ai`,`google-adk`,`langchain` or `vercel-ai` folder depending on the framework of your choice and simply run:
 
 ```bash
 python main.py

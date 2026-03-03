@@ -1,5 +1,5 @@
 """
- Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
+ Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
 
   This software is the property of WSO2 LLC. and its suppliers, if any.
   Dissemination of any information or reproduction of any material contained
@@ -14,15 +14,13 @@ import os
 import asyncio
 import sys
 
+import vercel_ai_sdk as ai
+
 from dotenv import load_dotenv
 from pathlib import Path
 
 from asgardeo import AsgardeoConfig
 from asgardeo_ai import AgentConfig, AgentAuthManager
-
-from langchain_mcp_adapters.client import MultiServerMCPClient
-from langchain.agents import create_agent
-from langchain_google_genai import ChatGoogleGenerativeAI
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -43,18 +41,30 @@ AGENT_CONFIG = AgentConfig(
     agent_secret=os.getenv("AGENT_SECRET")
 )
 
+# 1. Define the agent logic (no decorators needed)
+async def my_agent(llm, messages, auth_token):
+
+    # Connect to MCP Server using the user's OBO token
+    tools = await ai.mcp.get_http_tools(
+        os.getenv("MCP_SERVER_URL"),
+        headers={
+            "Authorization": f"Bearer {auth_token}"
+        }
+    )
+
+    # Execute the agent tool loop
+    return await ai.stream_loop(llm, messages, tools=tools)
+
 
 async def main():
     print("##########################################################################################################")
     print("##     This is an On-Behalf-Of (OBO) authentication sample application for authenticating AI agents     ##")
-    print("##                         using Asgardeo and LangChain framework                                       ##")
+    print("##                         using Asgardeo and Vercel AI framework                                       ##")
     print("##########################################################################################################")
 
     async with AgentAuthManager(ASGARDEO_CONFIG, AGENT_CONFIG) as auth_manager:
-        # Get agent token
         agent_token = await auth_manager.get_agent_token(["openid", "email"])
 
-        # Generate user authorization URL
         auth_url, state, code_verifier = auth_manager.get_authorization_url_with_pkce(["openid", "email"])
 
         print("Open this URL in your browser to authenticate:")
@@ -65,7 +75,6 @@ async def main():
 
         print("Waiting for authorization code from redirect...")
 
-        # Wait for redirect
         auth_code, returned_state, error = await callback.wait_for_code()
         callback.stop()
 
@@ -73,50 +82,36 @@ async def main():
             print(f"Authorization failed or cancelled. Error: {error}")
             return
 
-        print("Received authorization code")
-
-        # Exchange auth code for user token (OBO flow)
         obo_token = await auth_manager.get_obo_token(auth_code, agent_token=agent_token, code_verifier=code_verifier)
 
 
-    # Connect to MCP Server with Auth Header
-    client = MultiServerMCPClient(
-        {
-            "mcp_server": {
-                "transport": "streamable_http",
-                "url":os.getenv("MCP_SERVER_URL"),
-                "headers": {
-                    "Authorization": f"Bearer {obo_token.access_token}",
-                }
-            }
-        }
-    )
+    google_key = os.getenv("GOOGLE_API_KEY", "")
+    os.environ["OPENAI_API_KEY"] = google_key
+    os.environ["OPENAI_BASE_URL"] = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
-    # LLM (Gemini) + LangChain Agent
-    llm = ChatGoogleGenerativeAI(
-        model=os.getenv("MODEL_NAME"),
-        temperature=0.9
+    llm = ai.openai.OpenAIModel(
+        model=os.getenv("MODEL_NAME")
     )
-
-    tools = await client.get_tools()
-    agent = create_agent(llm, tools)
 
     while True:
-        question = input("\nEnter your question (e.g., 'Add 45 and 99') or type 'exit' to quit: ")
+        user_input = input("\nEnter your question (e.g., 'Add 45 and 99') or type 'exit' to quit: ")
 
         # Exit the loop if the user types "exit"
-        if question.lower() == "exit":
+        if user_input.lower() == "exit":
             print("Exiting the program. Goodbye!")
             break
 
-        # Invoke the agent
-        response = await agent.ainvoke(
-            {"messages": [{"role": "user", "content": question}]}
-        )
+        messages = ai.make_messages(user=user_input)
+        result = ai.run(my_agent, llm, messages, obo_token.access_token)
 
-        print("Agent Response:", response["messages"][-1].content)
+        print("\nAgent Response: ", end="")
 
+        # Stream the output token-by-token
+        async for msg in result:
+            if getattr(msg, "text_delta", None):
+                print(msg.text_delta, end="", flush=True)
 
-# Run app
+        print()
+
 if __name__ == "__main__":
     asyncio.run(main())

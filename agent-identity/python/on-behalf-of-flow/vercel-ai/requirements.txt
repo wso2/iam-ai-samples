@@ -1,0 +1,6 @@
+asgardeo==0.2.1
+asgardeo_ai==0.2.2
+
+vercel-ai-sdk==0.0.1.dev4
+
+python-dotenv~=1.0.0

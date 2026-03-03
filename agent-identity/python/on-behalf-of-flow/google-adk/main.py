@@ -83,7 +83,10 @@ async def build_toolset():
     )
 
 async def main():
-
+    print("##########################################################################################################")
+    print("##     This is an On-Behalf-Of (OBO) authentication sample application for authenticating AI agents     ##")
+    print("##                         using Asgardeo and Google ADK framework                                      ##")
+    print("##########################################################################################################")
     mcp_toolset = await build_toolset()
 
     if mcp_toolset is None:
@@ -107,25 +110,30 @@ async def main():
         user_id="user"
     )
 
-    question = input("Enter your question: ")
+    while True:
+        question = input("\nEnter your question (e.g., 'Add 45 and 99') or type 'exit' to quit: ")
 
-    try:
-        async for event in runner.run_async(
-                user_id="user",
-                session_id=session.id,
-                new_message=types.Content(
-                    role="user",
-                    parts=[types.Part(text=question)]
-                ),
-        ):
-            if event.content and event.content.parts:
-                text = event.content.parts[0].text
-                if text:
-                    print(text)
+        # Exit the loop if the user types "exit"
+        if question.lower() == "exit":
+            print("Exiting the program. Goodbye!")
+            break
+        try:
+            async for event in runner.run_async(
+                    user_id="user",
+                    session_id=session.id,
+                    new_message=types.Content(
+                        role="user",
+                        parts=[types.Part(text=question)]
+                    ),
+            ):
+                if event.content and event.content.parts:
+                    text = event.content.parts[0].text
+                    if text:
+                        print(text)
 
-    finally:
-        await mcp_toolset.close()
-        await runner.close()
+        finally:
+            await mcp_toolset.close()
+            await runner.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
