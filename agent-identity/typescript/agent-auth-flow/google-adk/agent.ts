@@ -1,0 +1,143 @@
+/*
+Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+import { stdin as input, stdout as output } from "node:process";
+import * as readline from "node:readline/promises";
+
+import dotenv from "dotenv";
+
+import { LlmAgent, MCPToolset, InMemoryRunner } from "@google/adk";
+
+import { AsgardeoJavaScriptClient } from "@asgardeo/javascript";
+
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+dotenv.config({
+  path: resolve(__dirname, "../../.env"),
+});
+
+const asgardeoConfig = {
+    afterSignInUrl: process.env.REDIRECT_URI,
+    clientId: process.env.CLIENT_ID,
+    baseUrl: process.env.ASGARDEO_BASE_URL,
+};
+
+const agentConfig = {
+    agentID: process.env.AGENT_ID,
+    agentSecret: process.env.AGENT_SECRET,
+};
+
+process.env.GOOGLE_GENAI_API_KEY = process.env.GOOGLE_API_KEY;
+
+async function runAgent() {
+    silenceADK();
+
+    console.log("##########################################################################################################")
+    console.log("##      This is an Agent Authentication Flow sample application for authenticating AI agents            ##")
+    console.log("##                         using Asgardeo and Google ADK framework                                      ##")
+    console.log("##########################################################################################################")
+
+    const asgardeoJavaScriptClient = new AsgardeoJavaScriptClient(asgardeoConfig);
+    const agentToken = await asgardeoJavaScriptClient.getAgentToken(agentConfig);
+
+    const rootAgent = new LlmAgent({
+        name: "example_agent",
+        model: "gemini-2.5-flash",
+        instruction: `You are a helpful AI assistant.`,
+        apiKey: process.env.GOOGLE_API_KEY,
+        tools: [
+            new MCPToolset({
+                type: "StreamableHTTPConnectionParams",
+                url: process.env.MCP_SERVER_URL,
+                header: {
+                    Authorization: `Bearer ${agentToken.accessToken}`,
+                },
+            }),
+        ],
+    });
+
+    const runner = new InMemoryRunner({
+        agent: rootAgent,
+        appName: "my-custom-app",
+    });
+
+    const userId = "user-123";
+    const session = await runner.sessionService.createSession({
+        appName: "my-custom-app",
+        userId: userId,
+    });
+
+    const rl = readline.createInterface({ input, output });
+
+    try {
+        while (true) {
+            const userInput = await rl.question("\nEnter your question (e.g., 'Add 45 and 99') or type 'exit' to quit: ");
+
+            if (userInput.toLowerCase() === "exit") {
+                await runner.sessionService.deleteSession({
+                    appName: "my-custom-app",
+                    sessionId: session.id,
+                });
+                console.log("Goodbye!");
+                break;
+            }
+
+            const userMessage = {
+                role: "user",
+                parts: [{ text: userInput }],
+            };
+
+            const eventStream = runner.runAsync({
+                userId: userId,
+                sessionId: session.id,
+                newMessage: userMessage,
+            });
+
+            try {
+                for await (const event of eventStream) {
+                    // Check if the event has text content to display
+                    if (event.content && event.content.parts) {
+                        const text = event.content.parts.map((p) => p.text).join("");
+                        if (text) {
+                            console.log(`Agent : ${text}`);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Error running agent:", error);
+            }
+        }
+    } finally {
+        rl.close();
+        process.exit(0);
+    }
+}
+
+function silenceADK() {
+    const originalWrite = process.stdout.write;
+    // @ts-ignore
+    process.stdout.write = function (chunk, encoding, callback) {
+        if (typeof chunk === 'string' && chunk.includes('[ADK INFO]')) {
+            return true; // Skip this log
+        }
+        return originalWrite.apply(process.stdout, [chunk, encoding, callback]);
+    };
+}
+
+runAgent().catch(console.error);
