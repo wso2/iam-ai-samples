@@ -5,6 +5,7 @@ Mounts both the A2A protocol handler and the IT REST API.
 
 import sys
 import os
+import html
 import yaml
 import logging
 from dotenv import load_dotenv
@@ -60,10 +61,10 @@ def main():
         ok = await approval_store.approve(token)
         entry = await approval_store.get_pending(token)
         if ok and entry:
-            name = entry.get("employee_name", "the employee")
-            emp  = entry.get("employee_id", "")
-            res  = ", ".join(entry.get("resources", []))
-            html = f"""
+            name = html.escape(entry.get("employee_name", "the employee"))
+            emp  = html.escape(entry.get("employee_id", ""))
+            res  = html.escape(", ".join(entry.get("resources", [])))
+            html_body = f"""
             <!DOCTYPE html><html><head><meta charset=utf-8>
             <title>IT Access Approved</title>
             <style>body{{font-family:sans-serif;max-width:600px;margin:80px auto;text-align:center}}
@@ -74,23 +75,23 @@ def main():
              <p>Approved resources: <strong>{res}</strong></p>
              <p>IT provisioning will proceed automatically.</p>
             </body></html>"""
-            return HTMLResponse(html)
+            return HTMLResponse(html_body)
         entry = await approval_store.get_pending(token)
         status = entry["status"] if entry else "not found"
-        html = f"""<!DOCTYPE html><html><body style='font-family:sans-serif;text-align:center;margin-top:80px'>
-            <h2 style='color:#f59e0b'>Token status: {status}</h2>
+        html_err = f"""<!DOCTYPE html><html><body style='font-family:sans-serif;text-align:center;margin-top:80px'>
+            <h2 style='color:#f59e0b'>Token status: {html.escape(str(status))}</h2>
             <p>This link may have already been used or has expired.</p></body></html>"""
-        return HTMLResponse(html, status_code=400)
+        return HTMLResponse(html_err, status_code=400)
 
     async def reject_endpoint(request: Request) -> HTMLResponse:
         """Admin clicks this link to reject IT access."""
         token = request.path_params["token"]
         ok = await approval_store.reject(token)
         if ok:
-            html = """<!DOCTYPE html><html><body style='font-family:sans-serif;text-align:center;margin-top:80px'>
+            html_body = """<!DOCTYPE html><html><body style='font-family:sans-serif;text-align:center;margin-top:80px'>
                 <h1 style='color:#ef4444'>&#10007; Access Rejected</h1>
                 <p>IT provisioning has been cancelled.</p></body></html>"""
-            return HTMLResponse(html)
+            return HTMLResponse(html_body)
         return HTMLResponse("Invalid or already-processed token", status_code=400)
 
     async def pending_status_endpoint(request: Request) -> JSONResponse:

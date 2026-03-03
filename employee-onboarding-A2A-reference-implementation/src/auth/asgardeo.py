@@ -168,7 +168,14 @@ class AsgardeoClient:
             
             logger.info("delegated_token_received", scope=result.get("scope"))
             
-            return TokenResponse(**result)
+            return TokenResponse(
+                access_token=result["access_token"],
+                token_type=result.get("token_type", "Bearer"),
+                expires_in=result.get("expires_in", 3600),
+                refresh_token=result.get("refresh_token"),
+                scope=result.get("scope", ""),
+                id_token=result.get("id_token"),
+            )
 
 
     # ─────────────────────────────────────────────────────────────────

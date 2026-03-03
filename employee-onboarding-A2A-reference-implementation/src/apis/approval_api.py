@@ -154,8 +154,10 @@ async def approve_request(
     
     if record["status"] != "pending":
         raise HTTPException(400, f"Request already {record['status']}")
-    
-    # In production, verify token.sub matches approver_email
+
+    if token.sub != record.get("approver_email"):
+        raise HTTPException(403, f"Forbidden: approver mismatch for {request_id}")
+
     record["status"] = "approved"
     record["approved_at"] = datetime.utcnow().isoformat()
     record["approved_by"] = token.sub
@@ -186,10 +188,13 @@ async def reject_request(
     
     if record["status"] != "pending":
         raise HTTPException(400, f"Request already {record['status']}")
-    
+
+    if token.sub != record.get("approver_email"):
+        raise HTTPException(403, f"Forbidden: approver mismatch for {request_id}")
+
     record["status"] = "rejected"
-    record["approved_at"] = datetime.utcnow().isoformat()
-    record["approved_by"] = token.sub
+    record["rejected_at"] = datetime.utcnow().isoformat()
+    record["rejected_by"] = token.sub
     
     logger.info(
         "approval_rejected",

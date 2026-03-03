@@ -169,136 +169,6 @@ async def create_employee(
     )
 
 
-@router.get("/employees/{employee_id}", response_model=EmployeeResponse)
-async def get_employee(
-    employee_id: str,
-    token: TokenClaims = Depends(validate_token)
-):
-    """Get a single employee by ID."""
-    require_scope(token, "hr:read")
-    require_audience(token, "onboarding-api")
-
-    db = await _get_db()
-    try:
-        cursor = await db.execute(
-            "SELECT * FROM employees WHERE employee_id = ?", (employee_id,)
-        )
-        row = await cursor.fetchone()
-    finally:
-        await db.close()
-
-    if not row:
-        raise HTTPException(404, f"Employee not found: {employee_id}")
-
-    return _row_to_response(row)
-
-
-@router.get("/employees", response_model=list[EmployeeResponse])
-async def list_employees(
-    team: Optional[str] = None,
-    status: Optional[str] = None,
-    token: TokenClaims = Depends(validate_token)
-):
-    """List all employees. Filter by team or status."""
-    require_scope(token, "hr:read")
-    require_audience(token, "onboarding-api")
-
-    query = "SELECT * FROM employees WHERE 1=1"
-    params = []
-    if team:
-        query += " AND team = ?"
-        params.append(team)
-    if status:
-        query += " AND status = ?"
-        params.append(status)
-    query += " ORDER BY created_at DESC"
-
-    db = await _get_db()
-    try:
-        cursor = await db.execute(query, params)
-        rows = await cursor.fetchall()
-    finally:
-        await db.close()
-
-    return [_row_to_response(r) for r in rows]
-
-
-@router.patch("/employees/{employee_id}/status", response_model=EmployeeResponse)
-async def update_employee_status(
-    employee_id: str,
-    body: StatusUpdate,
-    token: TokenClaims = Depends(validate_token)
-):
-    """Update employee status (e.g. pending_onboarding → active)."""
-    require_scope(token, "hr:write")
-    require_audience(token, "onboarding-api")
-
-    if body.status not in _VALID_STATUSES:
-        raise HTTPException(
-            400,
-            f"Invalid status '{body.status}'. Valid values: {sorted(_VALID_STATUSES)}"
-        )
-
-    db = await _get_db()
-    try:
-        cursor = await db.execute(
-            "SELECT * FROM employees WHERE employee_id = ?", (employee_id,)
-        )
-        row = await cursor.fetchone()
-        if not row:
-            raise HTTPException(404, f"Employee not found: {employee_id}")
-
-        await db.execute(
-            "UPDATE employees SET status = ? WHERE employee_id = ?",
-            (body.status, employee_id)
-        )
-        await db.commit()
-
-        cursor = await db.execute(
-            "SELECT * FROM employees WHERE employee_id = ?", (employee_id,)
-        )
-        row = await cursor.fetchone()
-    finally:
-        await db.close()
-
-    logger.info(
-        "employee_status_updated",
-        employee_id=employee_id,
-        new_status=body.status,
-        updated_by=token.sub
-    )
-    return _row_to_response(row)
-
-
-@router.delete("/employees/{employee_id}", status_code=204)
-async def delete_employee(
-    employee_id: str,
-    token: TokenClaims = Depends(validate_token)
-):
-    """Soft-delete: sets status to 'offboarded'."""
-    require_scope(token, "hr:write")
-    require_audience(token, "onboarding-api")
-
-    db = await _get_db()
-    try:
-        cursor = await db.execute(
-            "SELECT employee_id FROM employees WHERE employee_id = ?", (employee_id,)
-        )
-        row = await cursor.fetchone()
-        if not row:
-            raise HTTPException(404, f"Employee not found: {employee_id}")
-
-        await db.execute(
-            "UPDATE employees SET status = 'offboarded' WHERE employee_id = ?",
-            (employee_id,)
-        )
-        await db.commit()
-    finally:
-        await db.close()
-
-    logger.info("employee_offboarded", employee_id=employee_id, by=token.sub)
-
-
 @router.get("/employees/search/by-email", response_model=EmployeeResponse)
 async def get_employee_by_email(
     email: str,
@@ -319,5 +189,29 @@ async def get_employee_by_email(
 
     if not row:
         raise HTTPException(404, f"No employee found with email: {email}")
+
+    return _row_to_response(row)
+
+
+@router.get("/employees/{employee_id}", response_model=EmployeeResponse)
+async def get_employee(
+    employee_id: str,
+    token: TokenClaims = Depends(validate_token)
+):
+    """Get a single employee by ID."""
+    require_scope(token, "hr:read")
+    require_audience(token, "onboarding-api")
+
+    db = await _get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT * FROM employees WHERE employee_id = ?", (employee_id,)
+        )
+        row = await cursor.fetchone()
+    finally:
+        await db.close()
+
+    if not row:
+        raise HTTPException(404, f"Employee not found: {employee_id}")
 
     return _row_to_response(row)

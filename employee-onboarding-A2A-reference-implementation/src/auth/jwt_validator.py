@@ -127,11 +127,16 @@ class JWTValidator:
                 act_data = claims["act"]
                 act_claim = ActorClaim(sub=act_data.get("sub", ""))
             
+            if not claims.get("sub"):
+                raise HTTPException(401, "Invalid token: missing 'sub' claim")
+            if claims.get("exp") is None:
+                raise HTTPException(401, "Invalid token: missing 'exp' claim")
+
             token_claims = TokenClaims(
-                sub=claims.get("sub"),
+                sub=claims["sub"],
                 aud=claims.get("aud"),
                 scope=claims.get("scope", ""),
-                exp=claims.get("exp"),
+                exp=claims["exp"],
                 iss=claims.get("iss"),
                 act=act_claim,
                 azp=claims.get("azp"),
