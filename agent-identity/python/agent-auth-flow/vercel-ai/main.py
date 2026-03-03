@@ -1,5 +1,5 @@
 """
- Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
+ Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
 
   This software is the property of WSO2 LLC. and its suppliers, if any.
   Dissemination of any information or reproduction of any material contained
@@ -19,12 +19,9 @@ from pathlib import Path
 from asgardeo import AsgardeoConfig
 from asgardeo_ai import AgentConfig, AgentAuthManager
 
-from langchain_mcp_adapters.client import MultiServerMCPClient
-from langchain.agents import create_agent
-from langchain_google_genai import ChatGoogleGenerativeAI
+import vercel_ai_sdk as ai
 
-
-# Load environment variables from .env file
+# Load environment variables
 ROOT_DIR = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT_DIR / ".env")
 
@@ -39,56 +36,52 @@ AGENT_CONFIG = AgentConfig(
     agent_secret=os.getenv("AGENT_SECRET")
 )
 
+async def my_agent(llm, messages, auth_token):
+
+    tools = await ai.mcp.get_http_tools(
+        os.getenv("MCP_SERVER_URL"),
+        headers={
+            "Authorization": f"Bearer {auth_token}"
+        }
+    )
+
+    return await ai.stream_loop(llm, messages, tools=tools)
+
 
 async def main():
     print("##########################################################################################################")
     print("##      This is an Agent Authentication Flow sample application for authenticating AI agents            ##")
-    print("##                         using Asgardeo and LangChain framework                                       ##")
+    print("##                         using Asgardeo and Vercel AI framework                                       ##")
     print("##########################################################################################################")
 
     async with AgentAuthManager(ASGARDEO_CONFIG, AGENT_CONFIG) as auth_manager:
-        # Get agent token
         agent_token = await auth_manager.get_agent_token(["openid"])
 
+    google_key = os.getenv("GOOGLE_API_KEY", "")
+    os.environ["OPENAI_API_KEY"] = google_key
+    os.environ["OPENAI_BASE_URL"] = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
-    # Connect to MCP Server with Auth Header
-    client = MultiServerMCPClient(
-        {
-            "mcp_server": {
-                "transport": "streamable_http",
-                "url":os.getenv("MCP_SERVER_URL"),
-                "headers": {
-                    "Authorization": f"Bearer {agent_token.access_token}"
-                }
-            }
-        }
+    llm = ai.openai.OpenAIModel(
+        model=os.getenv("MODEL_NAME")
     )
-
-    # LLM (Gemini) + LangChain Agent
-    llm = ChatGoogleGenerativeAI(
-        model=os.getenv("MODEL_NAME"),
-        temperature=0.9
-    )
-
-    tools = await client.get_tools()
-    agent = create_agent(llm, tools)
 
     while True:
-        user_input = input("\nEnter your question (e.g., 'Add 45 and 99') or type 'exit' to quit:  ")
+        user_input = input("\nEnter your question (e.g., 'Add 45 and 99') or type 'exit' to quit: ")
+        messages = ai.make_messages(user=user_input)
 
         # Exit the loop if the user types "exit"
         if user_input.lower() == "exit":
             print("Exiting the program. Goodbye!")
             break
+        result = ai.run(my_agent, llm, messages, agent_token.access_token)
 
-        # Invoke the agent
-        response = await agent.ainvoke(
-            {"messages": [{"role": "user", "content": user_input}]}
-        )
+        print("\nAgent Response: ", end="")
 
-        print("Agent Response:", response["messages"][-1].content)
+        async for msg in result:
+            if getattr(msg, "text_delta", None):
+                print(msg.text_delta, end="", flush=True)
 
+        print()
 
-# Run app
 if __name__ == "__main__":
     asyncio.run(main())

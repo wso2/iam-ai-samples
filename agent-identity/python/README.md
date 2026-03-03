@@ -1,6 +1,6 @@
 # Agent Identity Quickstart — Python Samples
 
-This directory contains two Python-based sample implementations demonstrating how to authenticate AI agents with Asgardeo and securely interact with MCP servers. Each scenario showcases a different authentication model.
+This directory contains four Python-based sample implementations demonstrating how to authenticate AI agents with Asgardeo and securely interact with MCP servers. Each scenario showcases a different authentication model.
 
 ## Available Scenarios
 

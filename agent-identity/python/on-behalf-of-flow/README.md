@@ -1,6 +1,6 @@
 # Agent Identity Quickstart - On-Behalf-Of (OBO) Flow
 
-This guide explains how to run the `On-Behalf-Of (OBO) authentication flow` using Asgardeo with modern agent frameworks such as **LangChain** and **Google ADK**.
+This guide explains how to run the `On-Behalf-Of (OBO) authentication flow` using Asgardeo with modern agent frameworks such as **LangChain**, **Google ADK**, **Crew AI** and **Vercel AI**.
 
 In this scenario, the AI agent authenticates on behalf of a user, using:
 
@@ -34,11 +34,14 @@ agent-identity/python/on-behalf-of-flow/
 ├── google-adk/             # OBO flow using the Google Agent Development Kit
 │   ├── main.py
 │   └── requirements.txt
-└── langchain/              # OBO flow using LangChain
+├── langchain/              # OBO flow using LangChain
+│   ├── main.py
+│   └── requirements.txt
+└── vercel-ai/              # OBO flow using vercel-ai framework
     ├── main.py
     └── requirements.txt
 ```
-Each framework folder (`google-adk` and `langchain`) contains the **OBO-enabled agent** plus the local callback server implementation.
+Each framework folder (`crew-ai`,`google-adk`,`langchain`,`vercel-ai`) contains the **OBO-enabled agent** plus the local callback server implementation.
 
 ## Register an AI Agent in Asgardeo
 
@@ -74,7 +77,7 @@ Make note of:
 
 ## Set Up the Project Locally
 
-Navigate into either the `google-adk` or `langchain` folder depending on which framework you want to run.
+Navigate into `crew-ai`,`google-adk`,`langchain` or `vercel-ai` folder depending on which framework you want to run.
 
 Example:
 ```bash
@@ -140,7 +143,7 @@ to call your MCP server.
 
 Ensure the secured MCP Server is up and running.
 
-Navigate into either the `google-adk` or `langchain` folder depending on the framework of your choice and simply run:
+Navigate into `crew-ai`,`google-adk`,`langchain` or `vercel-ai` folder depending on the framework of your choice and simply run:
 
 ```bash
 python main.py

@@ -42,9 +42,13 @@ async def get_agent_token():
         return await auth_manager.get_agent_token(["openid"])
 
 def main():
+    print("##########################################################################################################")
+    print("##      This is an Agent Authentication Flow sample application for authenticating AI agents            ##")
+    print("##                         using Asgardeo and Crew AI framework                                         ##")
+    print("##########################################################################################################")
+
     # 1. Fetch authentication token
     # We do this first to keep the CrewAI execution fully synchronous and avoid event loop conflicts.
-    print("Authenticating with Asgardeo...")
     agent_token = asyncio.run(get_agent_token())
 
     while True:
