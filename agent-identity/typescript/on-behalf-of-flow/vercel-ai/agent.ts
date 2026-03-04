@@ -35,11 +35,20 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const port = "3001";
-
 dotenv.config({
   path: resolve(__dirname, "../../.env"),
 });
+
+const redirectUri = process.env.REDIRECT_URI || "";
+
+if (!redirectUri) {
+        throw new Error("Missing required env var: REDIRECT_URI");
+}
+const redirectURL = new URL(redirectUri);
+const callbackPath = redirectURL.pathname;
+const callbackPort = Number(
+    redirectURL.port || (redirectURL.protocol === "https:" ? 443 : 80)
+);
 
 const asgardeoConfig = {
     afterSignInUrl: process.env.REDIRECT_URI || "",
@@ -117,7 +126,7 @@ async function runAgent() {
     let authCodeResponse: AuthCodeResponse | undefined;
 
     const authCodePromise = new Promise<AuthCodeResponse>((resolve) => {
-        app.get("/callback", async (req, res) => {
+        app.get(callbackPath, async (req, res) => {
             try {
                 const code = req.query.code as string;
                 const session_state = req.query.session_state as string;
@@ -148,7 +157,7 @@ async function runAgent() {
     });
 
     server = app
-        .listen(port, () => {
+        .listen(callbackPort, () => {
         })
         .on("error", (error) => {
             console.error("Server error:", error);
