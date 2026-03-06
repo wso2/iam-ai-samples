@@ -1,6 +1,6 @@
 # Agent Identity Quickstart - On-Behalf-Of (OBO) Flow
 
-This guide explains how to run the `On-Behalf-Of (OBO) authentication flow` using Asgardeo with modern agent frameworks such as **LangChain**, **Google ADK**, **Crew AI** and **Vercel AI**.
+This guide explains how to run the `On-Behalf-Of (OBO) authentication flow` using Asgardeo with modern agent frameworks such as **LangChain**, **Google ADK** and **Vercel AI**.
 
 In this scenario, the AI agent authenticates on behalf of a user, using:
 
@@ -26,10 +26,6 @@ This sample is located under:
 ```
 agent-identity/typescript/on-behalf-of-flow/
 ├── README.md           # You are here
-├── crew-ai/            # OBO flow using crew-ai framework
-│   ├── agent.ts
-│   └── package.json
-│   └── tsconfig.json
 ├── google-adk/         # OBO flow using the Google Agent Development Kit
 │   ├── agent.ts
 │   └── package.json
@@ -43,7 +39,7 @@ agent-identity/typescript/on-behalf-of-flow/
     └── package.json
     └── tsconfig.json
 ```
-Each framework folder (`crew-ai`,`google-adk`,`langchain` or `vercel-ai`) contains the **OBO-enabled agent** plus the local callback server implementation.
+Each framework folder (`google-adk`,`langchain` or `vercel-ai`) contains the **OBO-enabled agent** plus the local callback server implementation.
 
 ## Register an AI Agent in Asgardeo
 
@@ -79,7 +75,7 @@ Make note of:
 
 ## Set Up the Project Locally
 
-Navigate into `crew-ai`,`google-adk`,`langchain` or `vercel-ai` folder depending on which framework you want to run.
+Navigate into `google-adk`,`langchain` or `vercel-ai` folder depending on which framework you want to run.
 
 Example:
 ```bash
@@ -138,7 +134,7 @@ to call your MCP server.
 
 Ensure the secured MCP Server is up and running.
 
-Navigate into either the `crew-ai`,`google-adk`,`langchain` or `vercel-ai` folder depending on the framework of your choice and simply run:
+Navigate into either the `google-adk`,`langchain` or `vercel-ai` folder depending on the framework of your choice and simply run:
 
 ```bash
 npm start

@@ -1,6 +1,6 @@
 # Agent Identity Quickstart — Agent Authentication Flow
 
-This guide walks you through running the **Agent Authentication Flow** sample for authenticating AI agents using **Asgardeo** and securely connecting to an MCP server through modern agent frameworks such as **LangChain**, **Google ADK**, **Crew AI** and **Vercel AI**.
+This guide walks you through running the **Agent Authentication Flow** sample for authenticating AI agents using **Asgardeo** and securely connecting to an MCP server through modern agent frameworks such as **LangChain**, **Google ADK** and **Vercel AI**.
 
 In this flow, the AI agent authenticates by itself (not on behalf of a user) using its Agent Credentials and obtains a valid access token to call MCP tools securely.
 
@@ -18,10 +18,6 @@ This example corresponds to the _“AI agent acting on its own”_ scenario desc
 ```
 agent-identity/typescript/agent-auth-flow/
 ├── README.md           # You are here
-├── crew-ai/            # Agent Authentication flow using crew-ai framework
-│   ├── agent.ts
-│   └── package.json
-│   └── tsconfig.json
 ├── google-adk/         # Agent Authentication flow using the Google Agent Development Kit
 │   ├── agent.ts
 │   └── package.json
@@ -36,7 +32,7 @@ agent-identity/typescript/agent-auth-flow/
     └── tsconfig.json
 ```
 
-Each framework folder (`crew-ai`,`google-adk`,`langchain` or `vercel-ai`) contains a runnable `agent.ts` demonstrating how an agent:
+Each framework folder (`google-adk`,`langchain` or `vercel-ai`) contains a runnable `agent.ts` demonstrating how an agent:
 
 - Authenticates itself with Asgardeo using Agent Credentials, and
 - Calls a secured MCP server using the issued token.
@@ -76,7 +72,7 @@ Make note of:
 
 ## Set Up the Project Locally
 
-Navigate into `crew-ai`,`google-adk`,`langchain` or `vercel-ai` folder depending on which framework you want to run.
+Navigate into `google-adk`,`langchain` or `vercel-ai` folder depending on which framework you want to run.
 
 Example:
 ```bash
@@ -107,7 +103,7 @@ If you don’t already have an MCP server running, you can quickly set one up by
 
 Ensure the secured MCP Server is up and running.
 
-Navigate to `crew-ai`,`google-adk`,`langchain` or `vercel-ai` folder depending on the framework of your choice and simply run:
+Navigate to `google-adk`,`langchain` or `vercel-ai` folder depending on the framework of your choice and simply run:
 
 ```bash
 npm start

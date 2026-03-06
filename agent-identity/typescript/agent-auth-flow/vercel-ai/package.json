@@ -1,0 +1,26 @@
+{
+  "name": "agent-auth-vercel-ai",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "agent.ts",
+  "scripts": {
+    "start": "npx tsx agent.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^1.2.0",
+    "@asgardeo/javascript": "^0.8.1",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "ai": "^4.0.0",
+    "base64url": "^3.0.1",
+    "dotenv": "^17.3.1",
+    "fast-sha256": "^1.3.0",
+    "jose": "^6.1.3",
+    "secure-random-bytes": "^6.0.2",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "tsx": "^4.21.0"
+  }
+}
+
