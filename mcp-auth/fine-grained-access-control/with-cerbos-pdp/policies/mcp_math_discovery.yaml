@@ -1,0 +1,14 @@
+---
+apiVersion: "api.cerbos.dev/v1"
+resourcePolicy:
+  version: "default"
+  resource: "mcp::math_discovery"
+  rules:
+    - actions: ["add", "subtract", "multiply", "divide"]
+      effect: EFFECT_ALLOW
+      roles: ["admin"]
+
+    - actions: ["add", "subtract", "multiply"]
+      effect: EFFECT_ALLOW
+      roles: ["user", "guest"]
+      
