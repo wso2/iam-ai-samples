@@ -45,8 +45,8 @@ Before you begin, ensure you have the following:
 
 Choose your preferred AI Gateway and follow the corresponding setup guide:
 
-- **WSO2 AI Gateway[Link neeeds to be added]** — Configure WSO2 with Asgardeo for agent authentication
-- **Kong AI Gateway[Link neeeds to be added]** — Configure Kong with Asgardeo for agent authentication
+- **[WSO2 AI Gateway](https://wso2.com/asgardeo/docs/tutorials/wso2-ai-gateway-with-agent-identity-aware-access-control)** — Configure WSO2 with Asgardeo for agent authentication
+- **[Kong AI Gateway](https://wso2.com/asgardeo/docs/tutorials/kong-ai-gateway-with-agent-identity-aware-access-control)** — Configure Kong with Asgardeo for agent authentication
 
 ---
 
