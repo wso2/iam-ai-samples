@@ -1,0 +1,22 @@
+{
+  "name": "mcp-auth-quickstart",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.ts",
+  "scripts": {
+    "start": "npx tsx server.ts"
+  },
+  "dependencies": {
+    "@asgardeo/mcp-express": "^0.3.0",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.0",
+    "typescript": "^5.9.3"
+  }
+}
