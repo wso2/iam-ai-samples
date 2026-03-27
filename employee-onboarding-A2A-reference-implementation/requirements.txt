@@ -45,6 +45,8 @@ python-multipart>=0.0.22
 
 # --- HTTP Client (Provides 'import httpx') ---
 httpx>=0.28.1
+# Synchronous HTTP client used by setup_wso2_is.py
+requests>=2.32.0
 httpx-sse>=0.4.3
 websockets>=15.0.1
 aiohttp>=3.11.12
