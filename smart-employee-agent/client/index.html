@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<!--
+  Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
+
+  Smart Employee Agent v2 — Client Application
+
+  Split-panel UI: Login overlay, Chat panel (left), Dashboard (right).
+  Authenticates directly with Asgardeo via PKCE.
+  HR leave management only. No internal employee IDs.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Employee Agent</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+  <!-- Login Overlay -->
+  <div id="login-overlay">
+    <div class="login-box">
+      <h1>Smart Employee Agent</h1>
+      <p class="subtitle">Your AI Concierge for Leave Management</p>
+      <button class="login-btn" id="login-btn" onclick="app.initiateLogin()">
+        Sign In
+      </button>
+      <p class="login-footer">Secure login via Asgardeo</p>
+    </div>
+  </div>
+
+  <!-- Main App (hidden until authenticated) -->
+  <div id="app">
+
+    <!-- Chat Panel (Left) -->
+    <div id="chat-panel">
+      <div id="chat-header">
+        <h2>
+          Concierge AI
+          <span id="role-badge" class="role-badge" style="display:none;"></span>
+          <span id="user-name" style="display:none;"></span>
+        </h2>
+        <button id="sign-out-btn" onclick="app.signOut()">Sign Out</button>
+      </div>
+
+      <div id="chat-messages">
+        <!-- Messages rendered here -->
+      </div>
+
+      <div id="authorize-section">
+        <button id="authorize-btn" onclick="app.initiateOBOFlow()">
+          Authorize Me
+        </button>
+      </div>
+
+      <div id="chat-input-area">
+        <form id="chat-form" onsubmit="return app.handleChatSubmit(event)">
+          <input
+            type="text"
+            id="message-input"
+            placeholder="Ask me anything about leave..."
+            autocomplete="off"
+            disabled
+          />
+          <button type="submit" id="send-btn" disabled>Send</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Dashboard Panel (Right) -->
+    <div id="dashboard-panel">
+      <h2>Leave Dashboard</h2>
+      <div id="dashboard-content">
+        <p class="dashboard-loading">Sign in to view your dashboard.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Markdown rendering (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
