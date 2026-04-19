@@ -77,7 +77,7 @@ function handleLogMessage(message) {
     if (message.includes('[SOURCE_TOKEN')) expectingToken = 'user_delegated';
 
     const agentMap = {
-        'HR': 'hr', 'IT': 'it', 'PAYROLL': 'payroll', 'BOOKING': 'booking'
+        'HR': 'hr', 'IT': 'it', 'PAYROLL': 'payroll', 'BOOKING': 'booking', 'APPROVAL': 'approval'
     };
 
     for (const [key, val] of Object.entries(agentMap)) {

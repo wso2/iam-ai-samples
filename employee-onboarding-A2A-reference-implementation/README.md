@@ -203,7 +203,7 @@ The IT MCP Server (SSE transport on port 8020) demonstrates an additional scope-
 python3.12 -m venv .venv
 .venv\Scripts\activate        # Windows
 # or: source .venv/bin/activate  # macOS/Linux
-pip install -r requirements.txt
+pip install --pre -r requirements.tx
 ```
 
 > **Important:** All services must be started using the `.venv` Python interpreter to ensure `google-adk` and `litellm` are available.

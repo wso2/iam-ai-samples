@@ -503,64 +503,47 @@ class AsgardeoClient:
     # 2b. Agent Actor Token via Client Credentials + Agent Binding
     # ─────────────────────────────────────────────────────────────────
 
-    async def get_agent_actor_token_credentials(
+    async def get_token_exchanger_actor_token(
         self,
         client_id: str,
         client_secret: str,
-        agent_id: str,
-        agent_secret: str
     ) -> ActorToken:
         """
-        Get an agent's actor token using client credentials grant with agent binding.
-        This is for worker agents that are registered as agents (not users) in WSO2 IS.
-        
-        Uses: POST /oauth2/token with grant_type=client_credentials and agent binding.
+        Get an actor token for the Token Exchanger Application using client_credentials.
+        The TEApp authenticates as itself — its access token is used as the actor token
+        in the subsequent RFC 8693 exchange, proving the agent's identity to WSO2 IS.
         """
         vlog(f"\n{'='*80}")
-        vlog(f"[AGENT ACTOR TOKEN - CLIENT CREDENTIALS]")
-        vlog(f"  Application Client ID: {client_id}")
-        vlog(f"  Agent ID: {agent_id}")
+        vlog(f"[TEApp ACTOR TOKEN - CLIENT CREDENTIALS]")
+        vlog(f"  TEApp Client ID: {client_id}")
         vlog(f"{'='*80}")
-        
+
+        import base64
+        basic_auth = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+
         async with self._create_fresh_client() as client:
-            # Client credentials grant with agent binding
-            data = {
-                "grant_type": "client_credentials",
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "scope": "openid",
-                "agent_id": agent_id,
-                "agent_secret": agent_secret
-            }
-            
-            vlog(f"\n[REQUEST]")
-            vlog(f"  URL: POST {self.settings.asgardeo_token_url}")
-            vlog(f"  grant_type: client_credentials")
-            vlog(f"  agent_id: {agent_id}")
-            
             response = await client.post(
                 self.settings.asgardeo_token_url,
-                data=data,
-                headers={"Content-Type": "application/x-www-form-urlencoded"}
+                data={"grant_type": "client_credentials", "scope": "openid"},
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Authorization": f"Basic {basic_auth}",
+                },
             )
-            
-            vlog(f"\n[RESPONSE]")
+
             vlog(f"  Status: {response.status_code}")
-            
             if response.status_code != 200:
                 vlog(f"  Error: {response.text}")
-                raise ValueError(f"Failed to get agent actor token: {response.status_code} - {response.text}")
-            
+                raise ValueError(f"TEApp client_credentials failed: {response.status_code} - {response.text}")
+
             result = response.json()
-            expires_in = result.get("expires_in", 3600)
-            
-            vlog(f"  Access Token: {result.get('access_token', '')[:50]}...")
+            vlog(f"  Actor Token: {result.get('access_token', '')[:50]}...")
             vlog(f"{'='*80}\n")
-            
+
             return ActorToken(
                 token=result["access_token"],
-                actor_id=agent_id,
-                expires_at=datetime.utcnow() + timedelta(seconds=expires_in)
+                actor_id=client_id,
+                expires_at=datetime.utcnow() + timedelta(seconds=result.get("expires_in", 3600)),
             )
 
     # ─────────────────────────────────────────────────────────────────

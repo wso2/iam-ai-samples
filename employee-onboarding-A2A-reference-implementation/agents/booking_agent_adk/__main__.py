@@ -46,18 +46,47 @@ from a2a.server.events import EventQueue
 class CustomA2aAgentExecutor(A2aAgentExecutor):
     """
     Subclass of A2A Executor that bridges the Starlette token middleware
-    into the ADK event loop context.
+    into the ADK event loop context, with token exchange.
     """
-    def __init__(self, runner: Runner):
+    def __init__(self, runner: Runner, agent_id: str, required_scopes: list,
+                 token_exchanger_client_id: str, token_exchanger_client_secret: str):
         super().__init__(runner=runner)
         self._current_request_token = None
+        self._agent_id = agent_id
+        self._required_scopes = required_scopes
+        self._token_exchanger_client_id = token_exchanger_client_id
+        self._token_exchanger_client_secret = token_exchanger_client_secret
 
     def set_auth_token(self, token: str):
         self._current_request_token = token
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        # Crucial: set the contextvar right before ADK Runner execution
-        _current_token.set(self._current_request_token)
+        token = self._current_request_token
+        if token and self._agent_id:
+            try:
+                from src.auth.asgardeo import get_asgardeo_client
+                from src.log_broadcaster import log_and_broadcast
+                asgardeo = get_asgardeo_client()
+                actor = await asgardeo._fetch_agent_actor_token(
+                    client_id=self._token_exchanger_client_id,
+                    client_secret=self._token_exchanger_client_secret,
+                    agent_id=self._agent_id,
+                )
+                log_and_broadcast(f"\n[BOOKING_AGENT_ACTOR_TOKEN]:")
+                log_and_broadcast(actor.token)
+                token = await asgardeo.perform_token_exchange(
+                    subject_token=token,
+                    client_id=self._token_exchanger_client_id,
+                    client_secret=self._token_exchanger_client_secret,
+                    actor_token=actor.token,
+                    target_audience=None,
+                    target_scopes=self._required_scopes,
+                )
+                log_and_broadcast(f"\n[BOOKING_AGENT_EXCHANGED_TOKEN]:")
+                log_and_broadcast(token)
+            except Exception as e:
+                logging.getLogger(__name__).error(f"[BOOKING_AGENT] Token exchange failed: {e}")
+        _current_token.set(token)
         return await super().execute(context, event_queue)
 
 
@@ -83,8 +112,17 @@ def main():
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
 
-    host = "localhost"
-    port = 8005
+    from urllib.parse import urlparse
+    from src.config_loader import load_yaml_config
+    from src.config import get_settings
+    _cfg = load_yaml_config()
+    _parsed = urlparse(_cfg.get("agents", {}).get("booking_agent", {}).get("url", "http://localhost:8005"))
+    host = _parsed.hostname or "localhost"
+    port = _parsed.port or 8005
+    _agent_cfg = _cfg.get("agents", {}).get("booking_agent", {})
+    _settings = get_settings()
+    _agent_id = _agent_cfg.get("agent_id")
+    _required_scopes = _agent_cfg.get("required_scopes", ["booking:read", "booking:write"])
 
     # Agent Card — describes this agent to other agents (A2A protocol)
     agent_card = AgentCard(
@@ -95,8 +133,8 @@ def main():
         ),
         url=f"http://{host}:{port}/",
         version="1.0.0",
-        defaultInputModes=["text"],
-        defaultOutputModes=["text"],
+        default_input_modes=["text"],
+        default_output_modes=["text"],
         capabilities=AgentCapabilities(streaming=False),
         skills=[
             AgentSkill(
@@ -135,9 +173,13 @@ def main():
         session_service=session_service,
     )
 
-    # Custom Executor bridges ADK Runner to A2A protocol and injects context token
+    # Custom Executor bridges ADK Runner to A2A protocol, injects token after exchange
     agent_executor = CustomA2aAgentExecutor(
         runner=runner,
+        agent_id=_agent_id,
+        required_scopes=_required_scopes,
+        token_exchanger_client_id=_settings.token_exchanger_client_id,
+        token_exchanger_client_secret=_settings.token_exchanger_client_secret,
     )
 
     # DefaultRequestHandler manages A2A task lifecycle

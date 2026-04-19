@@ -229,78 +229,20 @@ class OrchestratorAgent:
             if not agent_info:
                 return {"error": f"Agent not discovered: {agent_url}"}
 
-        # Determine agent type for logging
+        # Derive log label from the agent card name (discovered dynamically)
         agent_name = agent_info.get("name", "Agent")
-        agent_type = "AGENT"
-        agent_key = None
-        target_scopes = []
-        
-        if "hr" in agent_name.lower():
-            agent_type = "HR_AGENT"
-            agent_key = "hr_agent"
-            target_scopes = ["hr:read", "hr:write"]
-        elif "it" in agent_name.lower():
-            agent_type = "IT_AGENT"
-            agent_key = "it_agent"
-            target_scopes = ["it:read", "it:write"]
-        elif "payroll" in agent_name.lower() or "finance" in agent_name.lower():
-            agent_type = "PAYROLL_AGENT"
-            agent_key = "payroll_agent"
-            target_scopes = ["approval:read", "approval:write"]
-        elif "booking" in agent_name.lower():
-            agent_type = "BOOKING_AGENT"
-            agent_key = "booking_agent"
-            target_scopes = ["booking:read", "booking:write"]
+        agent_type = agent_name.upper().replace(" ", "_")
 
         try:
-            # Use pre-exchanged token if provided, otherwise perform token exchange
-            if pre_exchanged_token:
-                vlog(f"\n[USING PRE-EXCHANGED TOKEN FOR {agent_type}]")
-                vlog(f"  Agent: {agent_name}")
-                vlog(f"  URL: {agent_url}")
-                vlog(f"  Token already exchanged by LangGraph")
-                exchanged_token = pre_exchanged_token
-            else:
-                # Log token exchange for visualizer
-                vlog(f"\n[TOKEN EXCHANGE FOR {agent_type}]")
-                vlog(f"  Agent: {agent_name}")
-                vlog(f"  URL: {agent_url}")
-
-                # Log the source token (user delegated token)
-                vlog(f"\n[SOURCE_TOKEN - User Delegated]:")
-                vlog(f"  {access_token}")
-
-                exchanged_token = access_token  # fallback to original
-
-                if agent_key:
-                    try:
-                        broker = get_token_broker()
-                        target_audience = agent_key.replace("_", "-")
-
-                        vlog(f"\n[PERFORMING TOKEN EXCHANGE]")
-                        vlog(f"  Subject Token: User Delegated Token")
-                        vlog(f"  Target Audience: {target_audience}")
-                        vlog(f"  Target Scopes: {target_scopes}")
-
-                        # Serialize token exchanges — concurrent Asgardeo calls
-                        # cause failures when multiple agents run in the same DAG wave.
-                        async with self._token_exchange_lock:
-                            exchanged_token = await broker.exchange_token_for_agent(
-                                source_token=access_token,
-                                agent_key=agent_key,
-                                target_audience=target_audience,
-                                target_scopes=target_scopes
-                            )
-
-                        vlog(f"\n[{agent_type}_EXCHANGED_TOKEN]:")
-                        vlog(f"  {exchanged_token}")
-
-                    except Exception as exc:
-                        vlog(f"\n[TOKEN EXCHANGE ERROR] {exc}")
-                        return {"error": f"Token exchange failed for {agent_type}: {exc}"}
-                else:
-                    vlog(f"\n[WARNING] Unknown agent type: {agent_type} - cannot exchange token")
-                    return {"error": f"Unknown agent type: {agent_type}"}
+            # Forward the user-delegated token directly.
+            # Each worker agent performs its own RFC 8693 token exchange
+            # (using Token Exchanger App credentials + its own actor token).
+            exchanged_token = pre_exchanged_token if pre_exchanged_token else access_token
+            vlog(f"\n[FORWARDING USER DELEGATED TOKEN TO {agent_type}]")
+            vlog(f"  Agent: {agent_name}")
+            vlog(f"  URL: {agent_url}")
+            vlog(f"\n[USER_DELEGATED_TOKEN]:")
+            vlog(f"  {exchanged_token}")
 
             async with httpx.AsyncClient() as httpx_client:
                 # Build message using SDK types

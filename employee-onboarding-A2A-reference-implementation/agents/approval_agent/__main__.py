@@ -45,15 +45,20 @@ class TokenExtractMiddleware(BaseHTTPMiddleware):
 
 def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    host, port = 'localhost', 8003
+    from urllib.parse import urlparse
+    from src.config_loader import load_yaml_config
+    _parsed = urlparse(load_yaml_config().get("agents", {}).get("approval_agent", {}).get("url", "http://localhost:8003"))
+    host = _parsed.hostname or "localhost"
+    port = _parsed.port or 8003
+
 
     agent_card = AgentCard(
         name="Approval Agent",
         description="Handles approval workflows",
         url=f"http://{host}:{port}/",
         version="1.0.0",
-        defaultInputModes=["text"],
-        defaultOutputModes=["text"],
+        default_input_modes=["text"],
+        default_output_modes=["text"],
         capabilities=AgentCapabilities(streaming=True),
         skills=[
             AgentSkill(id="create_approval", name="Create Approval", description="Create approval request", tags=["approval"]),

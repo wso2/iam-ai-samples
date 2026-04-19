@@ -23,6 +23,7 @@ sys.path.insert(0, project_root)
 load_dotenv(os.path.join(project_root, '.env'))
 
 from google.adk.agents import LlmAgent
+from src.config_loader import load_yaml_config
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 _current_token: ContextVar[Optional[str]] = ContextVar("booking_token", default=None)
 
-BOOKING_API_BASE = "http://localhost:8005/api/booking"
+BOOKING_API_BASE = load_yaml_config().get("agents", {}).get("booking_agent", {}).get("url", "http://localhost:8005") + "/api/booking"
 
 
 def _get_token() -> Optional[str]:

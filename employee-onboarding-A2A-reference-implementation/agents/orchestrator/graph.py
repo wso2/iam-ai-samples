@@ -13,7 +13,6 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 from src.config import get_settings
-from src.auth.token_broker import get_token_broker
 
 logger = logging.getLogger(__name__)
 
@@ -229,55 +228,10 @@ async def execute_task_node(state: OrchestratorState) -> OrchestratorState:
     
     # Import here to avoid circular dependencies
     from agents.orchestrator.agent import OrchestratorAgent
-    
-    # Get token broker for token exchange
-    token_broker = get_token_broker()
-    
-    # Dynamically determine agent key from discovered agents
-    agent_key = None
-    target_agent = None
-    
-    for agent in state["available_agents"]:
-        if agent["url"] == current_task["agent_url"]:
-            target_agent = agent
-            # Derive key from agent name (e.g., "HR Agent" -> "hr_agent")
-            agent_key = agent["name"].lower().replace(" ", "_")
-            break
-    
-    if not agent_key:
-        # Fallback: derive from agent name in task
-        agent_key = current_task["agent_name"].lower().replace(" ", "_")
-    
-    # Get scopes from config dynamically
-    from src.config_loader import load_yaml_config
-    config = load_yaml_config()
-    agents_config = config.get("agents", {})
-    
-    # Find agent config by key or name
-    agent_config = agents_config.get(agent_key)
-    if agent_config:
-        # Get scopes from config
-        agent_scopes = agent_config.get("scopes", [])
-        if not agent_scopes:
-            # Fallback: derive from agent name
-            scope_prefix = agent_key.replace("_agent", "")
-            agent_scopes = [f"{scope_prefix}:read", f"{scope_prefix}:write"]
-    else:
-        # Fallback: derive scopes from agent name
-        scope_prefix = agent_key.replace("_agent", "")
-        agent_scopes = [f"{scope_prefix}:read", f"{scope_prefix}:write"]
 
-    
     try:
-        # Exchange token for this specific agent
-        agent_token = await token_broker.exchange_token_for_agent(
-            source_token=state["access_token"],
-            agent_key=agent_key,
-            target_audience=current_task["agent_name"].lower().replace(" ", "-"),
-            target_scopes=agent_scopes  # agent_scopes is already a list
-        )
-        
-        # Combine query with previous task results for context
+        # Forward USER_DELEGATED_TOKEN directly — each worker agent performs
+        # its own RFC 8693 token exchange using Token Exchanger App credentials.
         enhanced_query = current_task["task"]
         if state.get("task_results"):
             context_pieces = [f"Step {r['step']} ({r['agent']}): {r['result']}" for r in state["task_results"] if r.get("success")]
@@ -285,13 +239,11 @@ async def execute_task_node(state: OrchestratorState) -> OrchestratorState:
                 context_str = "\n".join(context_pieces)
                 enhanced_query = f"{current_task['task']}\n\nContext from previous steps:\n{context_str}"
 
-        # Call the agent with pre-exchanged token (avoid duplicate exchange)
         orchestrator = OrchestratorAgent()
         agent_response = await orchestrator.call_agent(
             agent_url=current_task["agent_url"],
             query=enhanced_query,
-            access_token=state["access_token"],
-            pre_exchanged_token=agent_token  # Pass pre-exchanged token to skip duplicate exchange
+            access_token=state["access_token"]
         )
         
         # Extract result from A2A response

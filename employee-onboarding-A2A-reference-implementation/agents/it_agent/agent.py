@@ -29,8 +29,8 @@ from src.config_loader import load_yaml_config
 
 logger = logging.getLogger(__name__)
 
-# MCP Server SSE endpoint (started separately on port 8020)
-MCP_SSE_URL = "http://localhost:8020/sse"
+# MCP Server SSE endpoint derived from config.yaml agents.it_agent.mcp_server.url
+MCP_SSE_URL = load_yaml_config().get("agents", {}).get("it_agent", {}).get("mcp_server", {}).get("url", "http://localhost:8020") + "/sse"
 
 
 class ITAgent:
@@ -92,13 +92,46 @@ class ITAgent:
         Process IT request — admin approval gate with immediate response.
 
         Flow:
-          1. Extract employee info + requested resources from query
-          2. Create pending approval record + notify admin (email or terminal)
-          3. Return IMMEDIATELY to the orchestrator with approval URL
-          4. Background task polls for admin decision then calls MCP to provision
+          1. Token exchange (get scoped IT token)
+          2. Extract employee info + requested resources from query
+          3. Create pending approval record + notify admin (email or terminal)
+          4. Return IMMEDIATELY to the orchestrator with approval URL
+          5. Background task polls for admin decision then calls MCP to provision
         """
         if not token:
             return "[X] No token provided. Authentication required."
+
+        # ── Token exchange: get actor token + RFC 8693 exchange ─────────────
+        from src.config import get_settings
+        from src.config_loader import load_yaml_config
+        from src.log_broadcaster import log_and_broadcast as _lbc
+        _settings = get_settings()
+        _agent_cfg = load_yaml_config().get("agents", {}).get("it_agent", {})
+        _agent_id  = _agent_cfg.get("agent_id")
+        try:
+            from src.auth.asgardeo import get_asgardeo_client
+            asgardeo = get_asgardeo_client()
+            actor = await asgardeo._fetch_agent_actor_token(
+                client_id=_settings.token_exchanger_client_id,
+                client_secret=_settings.token_exchanger_client_secret,
+                agent_id=_agent_id,
+            )
+            _lbc(f"\n[IT_AGENT_ACTOR_TOKEN]:")
+            _lbc(actor.token)
+            token = await asgardeo.perform_token_exchange(
+                subject_token=token,
+                client_id=_settings.token_exchanger_client_id,
+                client_secret=_settings.token_exchanger_client_secret,
+                actor_token=actor.token,
+                target_audience=None,
+                target_scopes=self.required_scopes,
+            )
+            _lbc(f"\n[IT_AGENT_EXCHANGED_TOKEN]:")
+            _lbc(token)
+            logger.info("[IT_AGENT] Token exchange successful")
+        except Exception as e:
+            logger.error(f"[IT_AGENT] Token exchange failed: {e}", exc_info=True)
+            return f"[X] Token exchange failed: {str(e)}"
 
         import re, os
         from agents.it_agent import approval_store
@@ -107,10 +140,19 @@ class ITAgent:
         base_url = os.environ.get("IT_SERVICE_BASE_URL", "http://localhost:8002")
 
         # ── Extract employee ID and name from query ──────────────────────────
-        emp_match     = re.search(r'EMP-\w+', query, re.IGNORECASE)
-        employee_id   = emp_match.group(0).upper() if emp_match else "EMP-UNKNOWN"
-        name_match    = re.search(r'(?:for|employee)\s+([A-Z][a-z]+)', query)
-        employee_name = name_match.group(1) if name_match else employee_id
+        emp_match   = re.search(r'EMP-\w+', query, re.IGNORECASE)
+        employee_id = emp_match.group(0).upper() if emp_match else "EMP-UNKNOWN"
+        # Also try ID=EMP-XXX pattern (HR agent response format in context)
+        if employee_id == "EMP-UNKNOWN":
+            id_match = re.search(r'ID=(EMP-\w+)', query, re.IGNORECASE)
+            if id_match:
+                employee_id = id_match.group(1).upper()
+        # Extract name — stop before keywords like "Context", "from", EMP pattern
+        name_match = re.search(
+            r'(?:for|employee)\s+([A-Z][a-z]+(?:\s+(?!Context\b|from\b|EMP-)[A-Z][a-z]+)*)',
+            query
+        )
+        employee_name = name_match.group(1).strip() if name_match else employee_id
 
         # ── Extract requested resources ──────────────────────────────────────
         resources = []

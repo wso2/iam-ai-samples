@@ -25,11 +25,12 @@ load_dotenv(os.path.join(project_root, '.env'))
 
 from src.config import get_settings
 from src.config_loader import load_yaml_config
+from src.log_broadcaster import log_and_broadcast
 
 logger = logging.getLogger(__name__)
 
-# The Approval API is mounted on the same server
-APPROVAL_API_BASE = "http://localhost:8003/api/approval"
+# Approval API base URL derived from config.yaml agents.approval_agent.url
+APPROVAL_API_BASE = load_yaml_config().get("agents", {}).get("approval_agent", {}).get("url", "http://localhost:8003") + "/api/approval"
 
 
 class ApprovalAgent:
@@ -47,6 +48,7 @@ class ApprovalAgent:
         app_config = load_yaml_config()
         agent_config = app_config.get("agents", {}).get("approval_agent", {})
         self.required_scopes = agent_config.get("required_scopes", self.REQUIRED_SCOPES)
+        self.agent_id = agent_config.get("agent_id")
         self.openai_api_key = self.settings.openai_api_key
         # We instantiate a specialized default LLM context for the Crew nodes
         self.llm = ChatOpenAI(model="gpt-4o-mini", api_key=self.openai_api_key, temperature=0.2)
@@ -81,6 +83,33 @@ class ApprovalAgent:
         """Process approval request using CrewAI to orchestrate the internal tools."""
         if not token:
             return "❌ No token provided. Authentication required."
+
+        # Get actor token: 3-step flow using TEApp credentials (OAuth app) + agent credentials (authn)
+        # Then RFC 8693 exchange: OBO token as subject, agent actor token as actor
+        try:
+            from src.auth.asgardeo import get_asgardeo_client
+            asgardeo = get_asgardeo_client()
+            actor = await asgardeo._fetch_agent_actor_token(
+                client_id=self.settings.token_exchanger_client_id,
+                client_secret=self.settings.token_exchanger_client_secret,
+                agent_id=self.agent_id,
+            )
+            log_and_broadcast(f"\n[APPROVAL_AGENT_ACTOR_TOKEN]:")
+            log_and_broadcast(actor.token)
+            token = await asgardeo.perform_token_exchange(
+                subject_token=token,
+                client_id=self.settings.token_exchanger_client_id,
+                client_secret=self.settings.token_exchanger_client_secret,
+                actor_token=actor.token,
+                target_audience=None,
+                target_scopes=self.required_scopes
+            )
+            log_and_broadcast(f"\n[APPROVAL_AGENT_EXCHANGED_TOKEN]:")
+            log_and_broadcast(token)
+            logger.info("[APPROVAL_AGENT] Token exchange successful")
+        except Exception as e:
+            logger.error(f"[APPROVAL_AGENT] Token exchange failed: {e}", exc_info=True)
+            return f"❌ Token exchange failed: {str(e)}"
 
         # Define tools within closure so they can access `self._call_api` and `token`
         

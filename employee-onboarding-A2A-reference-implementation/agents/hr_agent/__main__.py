@@ -76,9 +76,11 @@ def main():
     )
     logger = logging.getLogger(__name__)
 
-    # Server configuration
-    host = 'localhost'
-    port = 8001
+    # Server configuration — derived from config.yaml agents.hr_agent.url
+    from urllib.parse import urlparse
+    _parsed = urlparse(agent_config.get("url", "http://localhost:8001"))
+    host = _parsed.hostname or "localhost"
+    port = _parsed.port or 8001
 
     # Create agent card
     agent_card = AgentCard(
@@ -86,8 +88,8 @@ def main():
         description="Manages employee profiles and onboarding",
         url=f"http://{host}:{port}/",
         version="1.0.0",
-        defaultInputModes=["text"],
-        defaultOutputModes=["text"],
+        default_input_modes=["text"],
+        default_output_modes=["text"],
         capabilities=AgentCapabilities(streaming=True),
         skills=[
             AgentSkill(
@@ -116,11 +118,7 @@ def main():
         push_config_store=InMemoryPushNotificationConfigStore()
     )
 
-    a2a_server = A2AStarletteApplication(
-        agent_card=agent_card,
-        http_handler=request_handler
-    )
-
+    a2a_server = A2AStarletteApplication(agent_card=agent_card, http_handler=request_handler)
     app = a2a_server.build()
 
     # Mount the HR REST API as a FastAPI sub-application

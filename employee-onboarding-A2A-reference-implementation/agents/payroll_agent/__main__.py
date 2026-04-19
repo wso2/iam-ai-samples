@@ -49,15 +49,19 @@ def main():
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    host, port = 'localhost', 8004
+    from urllib.parse import urlparse
+    from src.config_loader import load_yaml_config
+    _parsed = urlparse(load_yaml_config().get("agents", {}).get("payroll_agent", {}).get("url", "http://localhost:8004"))
+    host = _parsed.hostname or "localhost"
+    port = _parsed.port or 8004
 
     agent_card = AgentCard(
         name="Finance & Payroll Agent",
         description="Registers employees in payroll and sets up expense accounts",
         url=f"http://{host}:{port}/",
         version="1.0.0",
-        defaultInputModes=["text"],
-        defaultOutputModes=["text"],
+        default_input_modes=["text"],
+        default_output_modes=["text"],
         capabilities=AgentCapabilities(streaming=True),
         skills=[
             AgentSkill(

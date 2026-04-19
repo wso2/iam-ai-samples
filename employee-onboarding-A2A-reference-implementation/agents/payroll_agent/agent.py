@@ -29,10 +29,11 @@ load_dotenv(os.path.join(project_root, '.env'))
 
 from src.config import get_settings
 from src.config_loader import load_yaml_config
+from src.log_broadcaster import log_and_broadcast
 
 logger = logging.getLogger(__name__)
 
-PAYROLL_API_BASE = "http://localhost:8004/api/payroll"
+PAYROLL_API_BASE = load_yaml_config().get("agents", {}).get("payroll_agent", {}).get("url", "http://localhost:8004") + "/api/payroll"
 
 
 class PayrollAgent:
@@ -50,6 +51,7 @@ class PayrollAgent:
         app_config    = load_yaml_config()
         agent_cfg     = app_config.get("agents", {}).get("payroll_agent", {})
         self.required_scopes = agent_cfg.get("required_scopes", self.REQUIRED_SCOPES)
+        self.agent_id        = agent_cfg.get("agent_id")
         self.openai_api_key  = self.settings.openai_api_key
         self.llm = ChatOpenAI(
             model="gpt-4o-mini",
@@ -84,6 +86,33 @@ class PayrollAgent:
         """Process a payroll/finance request using CrewAI."""
         if not token:
             return "❌ No token provided. Authentication required."
+
+        # Get actor token: 3-step flow using TEApp credentials (OAuth app) + agent credentials (authn)
+        # Then RFC 8693 exchange: OBO token as subject, agent actor token as actor
+        try:
+            from src.auth.asgardeo import get_asgardeo_client
+            asgardeo = get_asgardeo_client()
+            actor = await asgardeo._fetch_agent_actor_token(
+                client_id=self.settings.token_exchanger_client_id,
+                client_secret=self.settings.token_exchanger_client_secret,
+                agent_id=self.agent_id,
+            )
+            log_and_broadcast(f"\n[PAYROLL_AGENT_ACTOR_TOKEN]:")
+            log_and_broadcast(actor.token)
+            token = await asgardeo.perform_token_exchange(
+                subject_token=token,
+                client_id=self.settings.token_exchanger_client_id,
+                client_secret=self.settings.token_exchanger_client_secret,
+                actor_token=actor.token,
+                target_audience=None,
+                target_scopes=self.required_scopes
+            )
+            log_and_broadcast(f"\n[PAYROLL_AGENT_EXCHANGED_TOKEN]:")
+            log_and_broadcast(token)
+            logger.info("[PAYROLL_AGENT] Token exchange successful")
+        except Exception as e:
+            logger.error(f"[PAYROLL_AGENT] Token exchange failed: {e}", exc_info=True)
+            return f"❌ Token exchange failed: {str(e)}"
 
         # ── Define CrewAI tools (closures capture `self` and `token`) ────────
 
@@ -193,10 +222,17 @@ class PayrollAgent:
             allow_delegation=False,
         )
 
+        # Pre-extract employee ID from query/context to help the LLM
+        import re as _re
+        _emp_match = _re.search(r'EMP-\w+', query, _re.IGNORECASE)
+        _emp_id_hint = ""
+        if _emp_match:
+            _emp_id_hint = f"\nNOTE: The employee ID found in context is: {_emp_match.group(0).upper()}. Use this exact ID."
+
         payroll_task = Task(
             description=(
                 f"Process the following payroll onboarding request:\n\n'{query}'\n\n"
-                f"IMPORTANT: Extract the Employee ID (EMP-XXX format) from the context above. "
+                f"IMPORTANT: Extract the Employee ID (EMP-XXX format) from the context above.{_emp_id_hint} "
                 f"Register payroll AND set up an expense account for the employee. "
                 f"If a monthly expense limit is mentioned, use it; otherwise default to $1000. "
                 f"Provide a clear summary of both actions."

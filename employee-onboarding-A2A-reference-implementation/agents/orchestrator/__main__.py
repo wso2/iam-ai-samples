@@ -20,7 +20,6 @@ env_path = os.path.join(project_root, '.env')
 load_dotenv(env_path)
 
 import uvicorn
-from starlette.applications import Starlette
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -80,12 +79,12 @@ async def start_login(request: Request):
     broker = get_token_broker()
     session = broker.create_session()
 
-    scopes = [
-        "hr:read", "hr:write",
-        "it:read", "it:write",
-        "approval:read", "approval:write",
-        "booking:read", "booking:write"
-    ]
+    # Collect required scopes from all agents defined in config.yaml
+    _, global_config = load_config()
+    scopes = []
+    for agent_cfg in global_config.get("agents", {}).values():
+        scopes.extend(agent_cfg.get("required_scopes", []))
+    scopes = list(dict.fromkeys(scopes))  # deduplicate, preserve order
 
     auth_url = broker.get_authorization_url(
         session_id=session.session_id,
@@ -280,8 +279,8 @@ def create_app():
         description="AI-powered employee onboarding coordinator",
         url=f"http://{host}:{port}/",
         version="1.0.0",
-        defaultInputModes=["text"],
-        defaultOutputModes=["text"],
+        default_input_modes=["text"],
+        default_output_modes=["text"],
         capabilities=AgentCapabilities(streaming=True),
         skills=[
             AgentSkill(
@@ -316,10 +315,9 @@ def create_app():
         agent_card=agent_card,
         http_handler=request_handler
     )
-
     app = a2a_server.build()
 
-    # Add custom routes using Starlette's route_class
+    # Add custom routes
     custom_routes = [
         Route("/auth/login", start_login, methods=["GET"]),
         Route("/callback", oauth_callback, methods=["GET"]),
@@ -327,8 +325,6 @@ def create_app():
         Route("/api/demo", api_demo, methods=["GET", "POST"]),
         Route("/api/chat", api_chat, methods=["GET"]),
     ]
-    
-    # Add routes to the app
     app.routes.extend(custom_routes)
 
     # Add token extraction middleware

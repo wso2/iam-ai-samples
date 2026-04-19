@@ -48,7 +48,11 @@ class TokenExtractMiddleware(BaseHTTPMiddleware):
 def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
-    host, port = 'localhost', 8002
+    from urllib.parse import urlparse
+    from src.config_loader import load_yaml_config
+    _parsed = urlparse(load_yaml_config().get("agents", {}).get("it_agent", {}).get("url", "http://localhost:8002"))
+    host = _parsed.hostname or "localhost"
+    port = _parsed.port or 8002
 
     # ── Approval endpoints (mounted at /it/approve/* and /it/pending/*) ──────
     from agents.it_agent import approval_store
@@ -57,8 +61,9 @@ def main():
     async def approve_endpoint(request: Request) -> HTMLResponse:
         """Admin clicks this link from their email to approve IT access."""
         token = request.path_params["token"]
-        ok = await approval_store.approve(token)
+        # Fetch entry BEFORE approving (get_pending only returns pending entries)
         entry = await approval_store.get_pending(token)
+        ok = await approval_store.approve(token)
         if ok and entry:
             name = entry.get("employee_name", "the employee")
             emp  = entry.get("employee_id", "")
@@ -75,7 +80,6 @@ def main():
              <p>IT provisioning will proceed automatically.</p>
             </body></html>"""
             return HTMLResponse(html)
-        entry = await approval_store.get_pending(token)
         status = entry["status"] if entry else "not found"
         html = f"""<!DOCTYPE html><html><body style='font-family:sans-serif;text-align:center;margin-top:80px'>
             <h2 style='color:#f59e0b'>Token status: {status}</h2>
@@ -106,8 +110,8 @@ def main():
         description="Provisions IT accounts and services",
         url=f"http://{host}:{port}/",
         version="1.0.0",
-        defaultInputModes=["text"],
-        defaultOutputModes=["text"],
+        default_input_modes=["text"],
+        default_output_modes=["text"],
         capabilities=AgentCapabilities(streaming=True),
         skills=[
             AgentSkill(id="provision_vpn", name="Provision VPN", description="Set up VPN access", tags=["it", "vpn"]),

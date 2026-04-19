@@ -6,7 +6,7 @@ Identical pattern to ApprovalExecutor.
 import logging
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
-from a2a.types import UnsupportedOperationError, TextPart, Message, Part
+from a2a.types import UnsupportedOperationError, Message, Part, Role
 
 from .agent import PayrollAgent
 
@@ -42,8 +42,8 @@ class PayrollExecutor(AgentExecutor):
 
         msg_id  = context.message.message_id if context.message else 'default'
         message = Message(
-            role="agent",
-            parts=[Part(root=TextPart(text=response))],
+            role=Role.agent,
+            parts=[Part(root={'type': 'text', 'text': response})] ,
             message_id=f"response-{msg_id}"
         )
         await event_queue.enqueue_event(message)

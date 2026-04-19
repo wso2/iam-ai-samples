@@ -5,7 +5,7 @@ Orchestrator Agent Executor - A2A standard pattern with EventQueue.
 import logging
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
-from a2a.types import UnsupportedOperationError, TextPart, Message, Part
+from a2a.types import UnsupportedOperationError, Message, Part, Role
 
 from .agent import OrchestratorAgent
 
@@ -59,8 +59,8 @@ class OrchestratorExecutor(AgentExecutor):
         # Create response message
         msg_id = context.message.message_id if context.message else 'default'
         message = Message(
-            role="agent",
-            parts=[Part(root=TextPart(text=full_response or "Processing request..."))],
+            role=Role.agent,
+            parts=[Part(root={'type': 'text', 'text': full_response or "Processing request..."})] ,
             message_id=f"response-{msg_id}"
         )
         await event_queue.enqueue_event(message)

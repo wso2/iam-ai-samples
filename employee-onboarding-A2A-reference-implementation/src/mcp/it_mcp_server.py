@@ -83,7 +83,7 @@ async def vlog(message: str):
 # ─────────────────────────────────────────────────────────────────
 
 settings = get_settings()
-IT_API_BASE = "http://localhost:8002/api/it"
+IT_API_BASE = load_yaml_config().get("agents", {}).get("it_agent", {}).get("url", "http://localhost:8002") + "/api/it"
 
 # Token Exchanger — performs the actual token exchange
 # (no actor token needed, just client credentials + subject token)
@@ -197,6 +197,8 @@ async def exchange_token_for_scope(
         narrowed_token = result["access_token"]
         
         await vlog(f"\n[MCP_IT_EXCHANGED_TOKEN]:")
+        await vlog(f"{narrowed_token}")
+        await vlog(f"\n[IT_AGENT_EXCHANGED_TOKEN]:")
         await vlog(f"{narrowed_token}")
         
         # Decode exchanged token for debug
