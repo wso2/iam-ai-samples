@@ -24,7 +24,47 @@ let expectingToken = null;
 document.addEventListener('DOMContentLoaded', () => {
     console.log('[Visualizer] Initializing...');
     connect();
+    updateAuthStatus();
+
+    window.addEventListener('message', (event) => {
+        if (event.origin !== 'http://localhost:8000') return;
+        if (event.data && event.data.type === 'AUTH_SUCCESS') {
+            localStorage.setItem('orch_token', event.data.token);
+            updateAuthStatus();
+            showToast('Login successful!');
+        }
+    });
 });
+
+function getToken() {
+    return localStorage.getItem('orch_token');
+}
+
+function updateAuthStatus() {
+    const token = getToken();
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const authStatus = document.getElementById('auth-status');
+    if (token) {
+        if (loginBtn) loginBtn.style.display = 'none';
+        if (logoutBtn) logoutBtn.style.display = 'inline-block';
+        if (authStatus) { authStatus.textContent = 'Logged in'; authStatus.style.color = '#4CAF50'; }
+    } else {
+        if (loginBtn) loginBtn.style.display = 'inline-block';
+        if (logoutBtn) logoutBtn.style.display = 'none';
+        if (authStatus) { authStatus.textContent = 'Not logged in'; authStatus.style.color = '#ef4444'; }
+    }
+}
+
+function login() {
+    window.open('http://localhost:8000/auth/login', 'login', 'width=600,height=700');
+}
+
+function logout() {
+    localStorage.removeItem('orch_token');
+    updateAuthStatus();
+    showToast('Logged out');
+}
 
 function connect() {
     updateStatus('Connecting...', 'pending');
@@ -307,10 +347,34 @@ async function sendInstruction() {
     const sendBtn = document.querySelector('.send-btn');
     sendBtn.disabled = true;
 
+    const token = getToken();
+    if (!token) {
+        hideLoading();
+        sendBtn.disabled = false;
+        addResponseMessage('Error', 'Please login first. Click the Login button.', 'error');
+        showToast('Please login first');
+        return;
+    }
+
     try {
-        // Send to orchestrator API
-        const response = await fetch(`http://localhost:8000/api/chat?message=${encodeURIComponent(message)}`);
+        const response = await fetch('http://localhost:8000/api/request', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify({ message })
+        });
         const data = await response.json();
+        if (response.status === 401) {
+            localStorage.removeItem('orch_token');
+            updateAuthStatus();
+            hideLoading();
+            sendBtn.disabled = false;
+            addResponseMessage('Error', 'Session expired. Please login again.', 'error');
+            showToast('Session expired');
+            return;
+        }
 
         hideLoading();
 
@@ -338,45 +402,6 @@ async function sendInstruction() {
     sendBtn.disabled = false;
 }
 
-async function runDefaultDemo() {
-    // Clear previous responses
-    clearResponses();
-
-    // Show loading
-    showLoading();
-    addResponseMessage('You', 'Running full onboarding demo for John Doe as Software Engineer...', 'user');
-
-    const sendBtn = document.querySelector('.send-btn');
-    sendBtn.disabled = true;
-
-    try {
-        const response = await fetch('http://localhost:8000/api/demo');
-        const data = await response.json();
-
-        hideLoading();
-
-        if (data.status === 'success') {
-            // Display responses from each agent
-            if (data.responses) {
-                let stepNum = 1;
-                for (const [agentName, agentResponse] of Object.entries(data.responses)) {
-                    addResponseMessage(agentName, agentResponse, 'agent', stepNum++);
-                }
-                addResponseMessage('Summary', `✅ Onboarding complete for ${data.employee} as ${data.role}`, 'agent');
-            }
-            showToast('Demo completed!');
-        } else {
-            addResponseMessage('Error', data.error || 'Demo failed', 'error');
-            showToast('Demo failed - Please login first');
-        }
-    } catch (error) {
-        hideLoading();
-        addResponseMessage('Error', `Connection failed: ${error.message}`, 'error');
-        showToast('Connection error');
-    }
-
-    sendBtn.disabled = false;
-}
 
 function addResponseMessage(label, text, type, stepNum = null) {
     const content = document.getElementById('response-content');

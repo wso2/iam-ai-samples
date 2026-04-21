@@ -202,9 +202,9 @@
                 </button>
             </div>
             <div class="chat-actions">
-                <a href="http://localhost:8000/auth/login" target="_blank" class="action-btn login">
-                    🔑 Login First
-                </a>
+                <span id="auth-status" style="font-size:13px;margin-right:8px;">Not logged in</span>
+                <button id="login-btn" class="action-btn login" onclick="login()" style="display:none;background:#24df5f;">🔑 Login</button>
+                <button id="logout-btn" class="action-btn" onclick="logout()" style="display:none;background:#e23535;">🚪 Logout</button>
             </div>
             <div class="response-panel" id="response-panel">
                 <div class="response-header">

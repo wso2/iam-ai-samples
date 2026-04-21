@@ -7,7 +7,6 @@ import sys
 import os
 import yaml
 import logging
-import json
 from dotenv import load_dotenv
 
 # Add project root to path
@@ -23,7 +22,7 @@ import uvicorn
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import RedirectResponse, JSONResponse
+from starlette.responses import RedirectResponse, JSONResponse, HTMLResponse
 from starlette.routing import Route
 
 from a2a.server.apps import A2AStarletteApplication
@@ -34,6 +33,7 @@ from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 from .agent import OrchestratorAgent
 from .executor import OrchestratorExecutor
 from src.auth.token_broker import get_token_broker
+from src.auth.jwt_validator import get_jwt_validator
 from src.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -51,22 +51,38 @@ def load_config():
     return {}, {}
 
 
+UNPROTECTED_PATHS = {"/auth/login", "/callback", "/health", "/.well-known/agent-card.json"}
+
+
 class TokenExtractMiddleware(BaseHTTPMiddleware):
-    """Extract Bearer token from Authorization header."""
+    """Validate Bearer token on every protected request."""
 
     def __init__(self, app, executor: OrchestratorExecutor):
         super().__init__(app)
         self.executor = executor
 
     async def dispatch(self, request: Request, call_next):
+        if request.url.path in UNPROTECTED_PATHS:
+            return await call_next(request)
+
         auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return JSONResponse(
+                {"status": "error", "error": "Authentication required. Please login at /auth/login"},
+                status_code=401
+            )
 
-        if auth_header.startswith('Bearer '):
-            token = auth_header[7:]
-            self.executor.set_auth_token(token)
-        else:
-            self.executor.set_auth_token(None)
+        token = auth_header[7:]
+        try:
+            validator = get_jwt_validator()
+            await validator.validate(token)
+        except Exception:
+            return JSONResponse(
+                {"status": "error", "error": "Invalid or expired token. Please login again."},
+                status_code=401
+            )
 
+        self.executor.set_auth_token(token)
         return await call_next(request)
 
 
@@ -79,12 +95,11 @@ async def start_login(request: Request):
     broker = get_token_broker()
     session = broker.create_session()
 
-    # Collect required scopes from all agents defined in config.yaml
     _, global_config = load_config()
     scopes = []
     for agent_cfg in global_config.get("agents", {}).values():
         scopes.extend(agent_cfg.get("required_scopes", []))
-    scopes = list(dict.fromkeys(scopes))  # deduplicate, preserve order
+    scopes = list(dict.fromkeys(scopes))
 
     auth_url = broker.get_authorization_url(
         session_id=session.session_id,
@@ -97,7 +112,6 @@ async def start_login(request: Request):
 
 async def oauth_callback(request: Request):
     """OAuth2 callback - exchange code for delegated token."""
-    global _executor
     broker = get_token_broker()
 
     code = request.query_params.get('code')
@@ -108,19 +122,23 @@ async def oauth_callback(request: Request):
 
     try:
         session = await broker.handle_callback(code=code, state=state)
-
-        # Store token in executor for future requests
-        if session.delegated_token and _executor:
-            _executor.set_auth_token(session.delegated_token)
-            _executor.set_context_id(session.session_id)
-
         logger.info(f"OAuth callback success, session: {session.session_id}")
 
-        return JSONResponse({
-            "status": "success",
-            "session_id": session.session_id,
-            "message": "Authentication successful! You can now use the orchestrator."
-        })
+        token = session.delegated_token
+        html = f"""<!DOCTYPE html>
+<html><head><title>Login Successful</title></head>
+<body>
+<script>
+  localStorage.setItem('orch_token', {repr(token)});
+  if (window.opener) {{
+    window.opener.postMessage({{ type: 'AUTH_SUCCESS', token: {repr(token)} }}, 'http://localhost:8200');
+    window.close();
+  }} else {{
+    document.body.innerHTML = '<h2>Login successful!</h2><p>You may close this tab and return to the visualizer.</p>';
+  }}
+</script>
+</body></html>"""
+        return HTMLResponse(content=html)
 
     except Exception as e:
         logger.error(f"OAuth callback failed: {e}")
@@ -132,148 +150,62 @@ async def health_check(request: Request):
     return JSONResponse({"status": "healthy", "version": "1.0.0"})
 
 
-async def api_demo(request: Request):
-    """Process any user request — LLM decomposes it into agent tasks and executes them."""
+async def api_request(request: Request):
+    """Process user request — requires valid Bearer token."""
     global _executor
-    broker = get_token_broker()
-    
+
     from src.log_broadcaster import log_and_broadcast
-    
-    # Try to get token from Authorization header first
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.split(" ")[1]
-    else:
-        # Fallback to demo token (from most recent session)
-        token = broker.get_demo_token()
-    
-    if not token:
-        return JSONResponse({
-            "status": "error", 
-            "error": "No authenticated session found. Please login first at /auth/login"
-        }, status_code=401)
-    
-    # Set token in executor
-    if _executor:
-        _executor.set_auth_token(token)
-    
-    # Get user input from query params or POST body
+
+    token = _executor._current_token  # set and validated by middleware
+
     if request.method == "POST":
         body = await request.json()
         message = body.get("message", "")
     else:
         message = request.query_params.get('message', '')
-    
+
     if not message:
-        return JSONResponse({
-            "status": "error",
-            "error": "No message provided. Use ?message=<your request>",
-            "examples": [
-                "?message=Onboard John Doe as Software Engineer",
-                "?message=Create HR profile and provision VPN for Jane Smith",
-                "?message=Schedule orientation for the new marketing intern",
-            ]
-        }, status_code=400)
-    
+        return JSONResponse(
+            {"status": "error", "error": "No message provided. Use ?message=<your request>"},
+            status_code=400
+        )
+
     log_and_broadcast(f"\n[REQUEST] {message}")
-    log_and_broadcast(f"[TOKEN] Using delegated token: {token[:50]}...")
-    
+
     try:
-        # Ensure agents are discovered
         if not _executor.agent._discovered_agents:
             await _executor.agent.discover_agents()
-        
-        # LLM decomposes and executes the workflow
+
         result = await _executor.agent.process_workflow(
             user_input=message,
             access_token=token
         )
-        
+
         return JSONResponse(result)
-        
+
     except Exception as e:
         import traceback
-        err_msg = traceback.format_exc()
-        logger.error(f"Request failed: {e}\n{err_msg}")
-        with open("orchestrator_crash.log", "w", encoding="utf-8") as f:
-            f.write(err_msg)
-        
-        from src.log_broadcaster import log_and_broadcast
+        logger.error(f"Request failed: {e}\n{traceback.format_exc()}")
         log_and_broadcast(f"\n[ERROR] {str(e)}")
-        return JSONResponse({
-            "status": "error",
-            "error": str(e)
-        }, status_code=500)
-
-
-async def api_chat(request: Request):
-    """Dynamic chat endpoint - routes user instructions using LLM and returns structured step results."""
-    global _executor
-    broker = get_token_broker()
-
-    from src.log_broadcaster import log_and_broadcast
-
-    # Get the demo token (from most recent session)
-    token = broker.get_demo_token()
-
-    if not token:
-        return JSONResponse({
-            "status": "error",
-            "error": "No authenticated session found. Please login first at /auth/login"
-        }, status_code=401)
-
-    if _executor:
-        _executor.set_auth_token(token)
-
-    # Message from query param or POST body
-    if request.method == "POST":
-        body = await request.json()
-        message = body.get("message", "")
-    else:
-        message = request.query_params.get('message', '')
-
-    if not message:
-        return JSONResponse({"status": "error", "error": "No message provided"}, status_code=400)
-
-    log_and_broadcast(f"\n[CHAT REQUEST] {message[:80]}...")
-
-    try:
-        if not _executor.agent._discovered_agents:
-            await _executor.agent.discover_agents()
-
-        result = await _executor.agent.process_workflow(
-            user_input=message,
-            access_token=token
-        )
-
-        return JSONResponse(result)
-
-    except Exception as e:
-        logger.error(f"Chat request failed: {e}")
-        log_and_broadcast(f"\n[ERROR] Chat failed: {str(e)}")
         return JSONResponse({"status": "error", "error": str(e)}, status_code=500)
-
 
 
 def create_app():
     """Create the Starlette application with A2A support."""
     global _executor
-    
+
     agent_config, global_config = load_config()
     settings = get_settings()
 
-    # Setup logging
     log_level = agent_config.get('logging', {}).get('level', 'INFO')
     logging.basicConfig(
         level=getattr(logging, log_level),
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
 
-    # Server configuration
     host = agent_config.get('host', 'localhost')
     port = agent_config.get('port', 8000)
 
-    # Create agent card
     agent_card = AgentCard(
         name="Onboarding Orchestrator",
         description="AI-powered employee onboarding coordinator",
@@ -300,9 +232,8 @@ def create_app():
         ]
     )
 
-    # Setup executor and request handler
     executor = OrchestratorExecutor(agent_config)
-    _executor = executor  # Store for route handlers
+    _executor = executor
 
     request_handler = DefaultRequestHandler(
         agent_executor=executor,
@@ -310,36 +241,31 @@ def create_app():
         push_config_store=InMemoryPushNotificationConfigStore()
     )
 
-    # Create A2A application
     a2a_server = A2AStarletteApplication(
         agent_card=agent_card,
         http_handler=request_handler
     )
     app = a2a_server.build()
 
-    # Add custom routes
     custom_routes = [
         Route("/auth/login", start_login, methods=["GET"]),
         Route("/callback", oauth_callback, methods=["GET"]),
         Route("/health", health_check, methods=["GET"]),
-        Route("/api/demo", api_demo, methods=["GET", "POST"]),
-        Route("/api/chat", api_chat, methods=["GET"]),
+        Route("/api/request", api_request, methods=["GET", "POST"]),
     ]
     app.routes.extend(custom_routes)
 
-    # Add token extraction middleware
     app.add_middleware(TokenExtractMiddleware, executor=executor)
 
-    # Add CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=["http://localhost:8200", "http://127.0.0.1:8200"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"]
     )
 
-    logger.info(f"📄 Agent Card: http://{host}:{port}/.well-known/agent-card.json")
+    logger.info(f"Agent Card: http://{host}:{port}/.well-known/agent-card.json")
 
     return app, host, port, log_level
 
@@ -348,14 +274,13 @@ def main():
     """Start the Orchestrator Agent server."""
     try:
         app, host, port, log_level = create_app()
-        print(f"\n🚀 Starting Orchestrator Agent")
+        print(f"\nStarting Orchestrator Agent")
         print(f"   Server: http://{host}:{port}")
-        print(f"   Agent Card: http://{host}:{port}/.well-known/agent-card.json")
         print(f"   OAuth Login: http://{host}:{port}/auth/login")
         uvicorn.run(app, host=host, port=port, log_level=log_level.lower())
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"Error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
