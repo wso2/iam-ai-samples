@@ -10,3 +10,5 @@ This repo includes the samples that demonstrate securing AI applications using t
 4) [MCP Auth/Python](mcp-auth/python/README.md) - Example implementation of a protected Python MCP server secured with the WSO2 IAM platform
 5) [MCP Auth/TypeScript](mcp-auth/typescript/README.md) - Example implementation of a protected TypeScript MCP server secured with the WSO2 IAM platform
 6) [Agent Identity/Python](agent-identity/python/README.md) - Demonstrates how AI agents authenticate with Asgardeo using either direct Agent Credentials or user-delegated OBO tokens. These samples show how agents securely obtain and use access tokens to call backend services or MCP tool servers.
+7) [Agent Identity/Python — CIBA OBO Flow](agent-identity/python/ciba-on-behalf-of-flow/README.md) - AI agent uses CIBA to request user consent out-of-band (email) and step up to an OBO token with higher scopes, without a browser redirect.
+8) [MCP Auth/Python Tasks Server](mcp-auth/python-tasks/README.md) - A secured MCP server with per-tool scope enforcement, designed to demonstrate the CIBA-based OBO step-up flow.
