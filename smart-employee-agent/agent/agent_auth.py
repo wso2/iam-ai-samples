@@ -21,18 +21,26 @@ logger = logging.getLogger(__name__)
 REFRESH_BUFFER_SECONDS = 30
 
 
+def _required_env(key: str) -> str:
+    """Read an environment variable or raise if missing/empty."""
+    value = os.getenv(key)
+    if not value:
+        raise ValueError(f"Missing required environment variable: {key}")
+    return value
+
+
 class AgentAuth:
     """Manages the agent's own token via Asgardeo App Native Auth."""
 
     def __init__(self):
         self._asgardeo_config = AsgardeoConfig(
-            base_url=os.getenv("ASGARDEO_BASE_URL"),
-            client_id=os.getenv("ASGARDEO_CLIENT_ID"),
-            redirect_uri=os.getenv("OBO_REDIRECT_URI"),
+            base_url=_required_env("ASGARDEO_BASE_URL"),
+            client_id=_required_env("ASGARDEO_CLIENT_ID"),
+            redirect_uri=_required_env("OBO_REDIRECT_URI"),
         )
         self._agent_config = AgentConfig(
-            agent_id=os.getenv("AGENT_ID"),
-            agent_secret=os.getenv("AGENT_SECRET"),
+            agent_id=_required_env("AGENT_ID"),
+            agent_secret=_required_env("AGENT_SECRET"),
         )
         self._token = None
         self._expires_at: float = 0.0

@@ -62,6 +62,9 @@ MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.5-flash")
 # Base URL for HR MCP server reset endpoint
 HR_MCP_BASE_URL = HR_MCP_SERVER_URL.replace("/mcp", "")
 
+# Cap on chat-history turns replayed to the model per request (user+assistant = 1 turn).
+MAX_CHAT_HISTORY_TURNS = int(os.getenv("MAX_CHAT_HISTORY_TURNS", "20"))
+
 # JWT validation config
 JWKS_URL = os.getenv("JWKS_URL")
 AUTH_ISSUER = os.getenv("AUTH_ISSUER")
@@ -368,7 +371,10 @@ async def chat(request: Request, session: UserSession = Depends(get_session)):
 
         system_prompt = build_system_prompt(session)
         messages = [{"role": "system", "content": system_prompt}]
-        messages.extend(session.chat_history)
+        # Replay only the most recent N turns to bound latency/cost and avoid
+        # blowing past the model's context window.
+        history_window = session.chat_history[-(MAX_CHAT_HISTORY_TURNS * 2):]
+        messages.extend(history_window)
         messages.append({"role": "user", "content": user_message})
 
         response = await agent.ainvoke({"messages": messages})
@@ -406,9 +412,12 @@ async def chat(request: Request, session: UserSession = Depends(get_session)):
             })
         # OBO exists but scope is missing → role limitation, return normally
 
-    # Successful response
+    # Successful response — append and trim to the configured window.
     session.chat_history.append({"role": "user", "content": user_message})
     session.chat_history.append({"role": "assistant", "content": agent_reply})
+    max_msgs = MAX_CHAT_HISTORY_TURNS * 2
+    if len(session.chat_history) > max_msgs:
+        del session.chat_history[:-max_msgs]
 
     return JSONResponse({
         "type": "response",
@@ -445,6 +454,11 @@ async def obo_callback(code: str = None, state: str = None, error: str = None):
     if not code:
         return HTMLResponse(
             content=obo_flow.callback_html(success=False, error="Missing authorization code")
+        )
+
+    if not state:
+        return HTMLResponse(
+            content=obo_flow.callback_html(success=False, error="Missing state parameter")
         )
 
     session = sessions.find_by_obo_state(state)
@@ -490,11 +504,24 @@ async def get_pending(session: UserSession = Depends(get_session)):
 
 
 @app.post("/api/reset")
-async def reset_data():
-    """Reset all in-memory data and clear all sessions."""
+async def reset_data(
+    request: Request, session: UserSession = Depends(get_session)
+):
+    """Reset all in-memory data and clear all sessions. HR Admin only."""
+    if session.user_role != "HR Admin":
+        raise HTTPException(
+            status_code=403, detail="Reset is restricted to HR Admins"
+        )
+
+    auth_header = request.headers.get("Authorization", "")
+
     try:
-        async with httpx.AsyncClient() as client:
-            await client.post(f"{HR_MCP_BASE_URL}/reset")
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            reset_resp = await client.post(
+                f"{HR_MCP_BASE_URL}/reset",
+                headers={"Authorization": auth_header} if auth_header else {},
+            )
+            reset_resp.raise_for_status()
 
         sessions.clear_all()
 
@@ -505,7 +532,7 @@ async def reset_data():
         })
 
     except Exception as e:
-        logger.error(f"Reset failed: {e}")
+        logger.error(f"Reset failed (downstream HR reset did not succeed): {e}")
         return JSONResponse(
             {"error": f"Reset failed: {str(e)}"},
             status_code=500,

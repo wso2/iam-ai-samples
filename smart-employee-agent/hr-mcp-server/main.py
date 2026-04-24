@@ -170,19 +170,24 @@ class JWTTokenVerifier(TokenVerifier):
             current_user_first_name.set(first_name)
             current_user_last_name.set(last_name)
 
-            # Log token claims for debugging
-            logger.info("=" * 60)
-            logger.info("[JWT TOKEN CLAIMS]")
-            logger.info(f"  sub (subject)   : {subject}")
-            logger.info(f"  name            : {full_name}")
-            logger.info(f"  aud (audience)  : {audience}")
-            logger.info(f"  aut (auth type) : {aut}")
-            if act:
-                logger.info(f"  act (actor)     : {act}")
-            logger.info(f"  scope           : {payload.get('scope', 'N/A')}")
-            logger.info(f"  scopes (parsed) : {scopes}")
-            logger.info(f"  exp (expires)   : {expires_at}")
-            logger.info("=" * 60)
+            # INFO: high-level, non-identifying summary only.
+            masked_sub = (subject[:4] + "***") if subject else "***"
+            logger.info(
+                "JWT validated (sub=%s, aut=%s, scopes=%d, exp=%s)",
+                masked_sub, aut, len(scopes), expires_at,
+            )
+            # DEBUG: full claim detail for development/troubleshooting only.
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("[JWT TOKEN CLAIMS]")
+                logger.debug("  sub (subject)   : %s", subject)
+                logger.debug("  name            : %s", full_name)
+                logger.debug("  aud (audience)  : %s", audience)
+                logger.debug("  aut (auth type) : %s", aut)
+                if act:
+                    logger.debug("  act (actor)     : %s", act)
+                logger.debug("  scope           : %s", payload.get("scope", "N/A"))
+                logger.debug("  scopes (parsed) : %s", scopes)
+                logger.debug("  exp (expires)   : %s", expires_at)
 
             return AccessToken(
                 token=token,
@@ -413,8 +418,12 @@ async def reject_leave_request(request_id: str, reason: str) -> dict:
     result = await hr_data.reject_leave_request(request_id, reason, reviewer_sub, reviewer_name)
 
     if result.get("success"):
-        actor = get_actor_description()
-        logger.info(f"[AUDIT] Leave {request_id} rejected by {actor} — Reason: {reason}")
+        # Audit log: identify the action and request, but do not echo free-form reason text.
+        logger.info("[AUDIT] Leave %s rejected (reviewer_sub=%s)", request_id, reviewer_sub)
+        if logger.isEnabledFor(logging.DEBUG):
+            actor = get_actor_description()
+            logger.debug("[AUDIT-DETAIL] Leave %s rejected by %s — reason: %s",
+                         request_id, actor, reason)
     return result
 
 
@@ -469,9 +478,10 @@ class DashboardMiddleware:
         path = scope["path"]
         headers = scope.get("headers", [])
         origin = self._get_origin(headers)
+        method = scope["method"].upper()
 
         # Handle CORS preflight
-        if path in ("/api/leaves", "/reset") and scope["method"].upper() == "OPTIONS":
+        if path in ("/api/leaves", "/reset") and method == "OPTIONS":
             cors = self._cors_headers(origin)
             response = StarletteResponse(status_code=204, headers=cors)
             await response(scope, receive, send)
@@ -481,7 +491,56 @@ class DashboardMiddleware:
             await self._handle_leaves(scope, receive, send, headers, origin)
             return
 
+        if path == "/reset" and method == "POST":
+            await self._handle_reset(scope, receive, send, headers, origin)
+            return
+
         await self.app(scope, receive, send)
+
+    async def _handle_reset(self, scope, receive, send, headers, origin):
+        """Authenticated reset handler. Requires hr_approve_mcp or hr_read_rest scope."""
+        cors = self._cors_headers(origin)
+
+        auth_header = ""
+        for h_name, h_value in headers:
+            if h_name == b"authorization":
+                auth_header = h_value.decode("utf-8")
+                break
+
+        if not auth_header.startswith("Bearer "):
+            response = StarletteJSONResponse(
+                {"error": "missing_token", "message": "Missing or invalid Authorization header"},
+                status_code=401, headers=cors,
+            )
+            await response(scope, receive, send)
+            return
+
+        token = auth_header[7:]
+        try:
+            payload = await self.jwt_validator.validate_token(token)
+        except TokenError as e:
+            response = StarletteJSONResponse(
+                {"error": e.error_type, "message": e.message},
+                status_code=401, headers=cors,
+            )
+            await response(scope, receive, send)
+            return
+
+        scopes = payload.get("scope", "").split() if payload.get("scope") else []
+        if "hr_approve_mcp" not in scopes and "hr_read_rest" not in scopes:
+            response = StarletteJSONResponse(
+                {"error": "insufficient_scope", "message": "Reset requires HR Admin privileges."},
+                status_code=403, headers=cors,
+            )
+            await response(scope, receive, send)
+            return
+
+        hr_data.reset_data()
+        response = StarletteJSONResponse(
+            {"success": True, "message": "HR data reset to default state."},
+            headers=cors,
+        )
+        await response(scope, receive, send)
 
     async def _handle_leaves(self, scope, receive, send, headers, origin):
         cors = self._cors_headers(origin)
@@ -554,18 +613,6 @@ class DashboardMiddleware:
             await response(scope, receive, send)
 
 
-# ─── Reset Endpoint ──────────────────────────────────────────────────────────
-
-from starlette.routing import Route
-from starlette.requests import Request as StarletteRequest
-
-
-async def reset_handler(request: StarletteRequest):
-    """Reset all HR in-memory data. Global data re-seeded, user data cleared."""
-    hr_data.reset_data()
-    return StarletteJSONResponse({"success": True, "message": "HR data reset to default state."})
-
-
 # ─── Run ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -580,8 +627,8 @@ if __name__ == "__main__":
         async with mcp_starlette.router.lifespan_context(app):
             yield
 
-    reset_route = Route("/reset", reset_handler, methods=["POST"])
+    # /reset is fully handled (auth + CORS) by DashboardMiddleware below.
     app = DashboardMiddleware(
-        Starlette(routes=[reset_route, Mount("/", app=mcp_starlette)], lifespan=lifespan)
+        Starlette(routes=[Mount("/", app=mcp_starlette)], lifespan=lifespan)
     )
     uvicorn.run(app, host="0.0.0.0", port=8000)

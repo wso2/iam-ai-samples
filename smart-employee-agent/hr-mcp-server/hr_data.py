@@ -197,6 +197,17 @@ async def apply_leave(
             "message": "End date must be on or after start date.",
         }
 
+    min_notice_days = leave_policy[leave_type].get("min_notice_days", 0)
+    notice_days = (start - dt_date.today()).days
+    if notice_days < min_notice_days:
+        return {
+            "error": "insufficient_notice",
+            "message": (
+                f"{leave_type} requires at least {min_notice_days} days notice; "
+                f"start date is {notice_days} day(s) away."
+            ),
+        }
+
     # Check balance
     balance = leave_balances[sub]
     balance_key = leave_type.split()[0].lower()  # "Annual Leave" -> "annual"
@@ -290,12 +301,22 @@ async def approve_leave_request(
             "message": f"Leave request {request_id} is already {req['status']}.",
         }
 
-    # Deduct leave balance
+    # Deduct leave balance — reject if it would overdraw.
     balance = leave_balances.get(req["user_sub"])
     if balance:
         balance_key = req["leave_type"].split()[0].lower()
         if balance_key in balance:
-            balance[balance_key] = max(0, balance[balance_key] - req["days_requested"])
+            remaining = balance[balance_key]
+            if remaining < req["days_requested"]:
+                return {
+                    "error": "insufficient_balance",
+                    "message": (
+                        f"Cannot approve {request_id}: {req['user_name']} only has "
+                        f"{remaining} {balance_key} day(s) remaining, but the request "
+                        f"is for {req['days_requested']} day(s)."
+                    ),
+                }
+            balance[balance_key] = remaining - req["days_requested"]
 
     req["status"] = "Approved"
     req["reviewed_by_sub"] = reviewer_sub

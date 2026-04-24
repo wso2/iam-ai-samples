@@ -308,7 +308,7 @@ const app = (function () {
   function addAgentMessage(text) {
     const div = document.createElement("div");
     div.className = "message agent";
-    div.innerHTML = marked.parse(text);
+    div.innerHTML = DOMPurify.sanitize(marked.parse(text));
     $("chat-messages").appendChild(div);
     scrollChat();
   }
@@ -506,6 +506,9 @@ const app = (function () {
     try {
       const resp = await fetch(`${config.agentServerUrl}/api/reset`, {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
       const data = await resp.json();
 

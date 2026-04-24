@@ -47,24 +47,41 @@ class JWTValidator:
             async with httpx.AsyncClient(verify=self.ssl_verify) as client:
                 response = await client.get(self.jwks_url)
                 response.raise_for_status()
-                return response.json()
+                self._jwks_cache = response.json()
+                return self._jwks_cache
         except Exception as e:
             logger.error(f"Failed to fetch JWKS from {self.jwks_url}: {e}")
             raise
 
     async def _get_jwks(self) -> Dict[str, Any]:
         if self._jwks_cache is None:
-            self._jwks_cache = await self._fetch_jwks()
+            await self._fetch_jwks()
         return self._jwks_cache
 
-    def _get_signing_key(self, token_header: Dict[str, Any], jwks: Dict[str, Any]):
+    def _find_key_for_kid(self, kid: str, jwks: Dict[str, Any]):
+        for key in jwks.get('keys', []):
+            if key.get('kid') == kid:
+                return RSAAlgorithm.from_jwk(key)
+        return None
+
+    async def _get_signing_key(self, token_header: Dict[str, Any]):
+        """Resolve the signing key for the token, refreshing JWKS once on a kid miss
+        so we tolerate IdP key rotation without requiring a service restart."""
         kid = token_header.get('kid')
         if not kid:
             raise TokenError("invalid_token", "Token header missing 'kid' field")
 
-        for key in jwks.get('keys', []):
-            if key.get('kid') == kid:
-                return RSAAlgorithm.from_jwk(key)
+        jwks = await self._get_jwks()
+        key = self._find_key_for_kid(kid, jwks)
+        if key is not None:
+            return key
+
+        # kid not in cached JWKS — IdP may have rotated keys. Refetch once.
+        logger.info(f"Unknown kid '{kid}' in cached JWKS; refetching from IdP")
+        jwks = await self._fetch_jwks()
+        key = self._find_key_for_kid(kid, jwks)
+        if key is not None:
+            return key
 
         raise TokenError("invalid_token", f"Unable to find matching key for kid: {kid}")
 
@@ -76,8 +93,7 @@ class JWTValidator:
         """
         try:
             unverified_header = jwt.get_unverified_header(token)
-            jwks = await self._get_jwks()
-            signing_key = self._get_signing_key(unverified_header, jwks)
+            signing_key = await self._get_signing_key(unverified_header)
 
             payload = jwt.decode(
                 token,

@@ -7,8 +7,10 @@
   authorization codes for OBO tokens. Uses the Asgardeo SDK.
 """
 
+import json
 import time
 import logging
+from html import escape
 
 from asgardeo_ai import AgentAuthManager
 from agent_auth import AgentAuth
@@ -96,6 +98,9 @@ def callback_html(success: bool, error: str = None) -> str:
 </body>
 </html>"""
     else:
+        message = error or "Unknown error"
+        safe_error_html = escape(message)
+        safe_error_js = json.dumps(message)
         return f"""<!DOCTYPE html>
 <html>
 <head><title>Authorization Failed</title>
@@ -113,12 +118,12 @@ def callback_html(success: bool, error: str = None) -> str:
   <div class="card">
     <div class="icon">&#10007;</div>
     <h2>Authorization Failed</h2>
-    <p>{error or 'Unknown error'}</p>
+    <p>{safe_error_html}</p>
     <p>You can close this window and try again.</p>
   </div>
   <script>
     if (window.opener) {{
-      window.opener.postMessage({{ type: 'obo_failed', error: '{error or "Unknown error"}' }}, '*');
+      window.opener.postMessage({{ type: 'obo_failed', error: {safe_error_js} }}, '*');
     }}
   </script>
 </body>
