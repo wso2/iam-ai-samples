@@ -26,7 +26,7 @@ CONFIG = {
     "clientId": os.getenv("CLIENT_ID", ""),
     "redirectUri": os.getenv("REDIRECT_URI", f"http://localhost:{PORT}/callback"),
     "agentServerUrl": os.getenv("AGENT_SERVER_URL", "http://localhost:5001"),
-    "hrMcpRestUrl": os.getenv("HR_MCP_REST_URL", "http://localhost:8000"),
+    "hrServerUrl": os.getenv("HR_SERVER_URL", "http://localhost:8000"),
 }
 
 

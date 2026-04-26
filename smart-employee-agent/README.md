@@ -1,4 +1,4 @@
-# Smart Employee Agent v2
+# Smart Employee Agent
 
 A sample application demonstrating **three IAM patterns for AI agents** using [Asgardeo](https://asgardeo.io). An AI-powered Corporate Concierge handles HR leave management with fine-grained access control — from basic queries with the agent's own credentials, to elevated actions on behalf of individual users.
 
@@ -29,10 +29,10 @@ graph TB
         AGENT["AI Agent<br/><i>LangChain + Gemini</i>"]
     end
 
-    subgraph "HR MCP Server (localhost:8000)"
+    subgraph "HR Server (localhost:8000)"
         HR_REST["/api/leaves<br/><i>REST API</i>"]
         HR_MCP["/mcp<br/><i>MCP Protocol</i>"]
-        HR_DATA["hr_data.py<br/><i>In-memory store</i>"]
+        HR_DATA["service/store.py<br/><i>In-memory store</i>"]
     end
 
     %% Authentication flows
@@ -55,7 +55,13 @@ graph TB
     HR_MCP --> HR_DATA
 ```
 
-**3 components**: Client SPA, Agent Server, HR MCP Server. No database required — all business data is stored in-memory.
+**3 components**: Client SPA, Agent Server, HR Server (MCP + REST in one process). No database required — all business data is stored in-memory.
+
+**Two action paths, one business layer.** Every leave action — apply, approve, reject — can be performed in two ways:
+- **Manual UI** — the SPA calls REST endpoints on the HR server using the user's `*_rest` scopes from PKCE login.
+- **Chat** — the SPA sends messages to the agent server, which calls MCP tools using the agent's `*_mcp` scopes (or OBO-elevated for user-specific actions).
+
+Both paths execute the same `service/hr_service.py` functions, so behavior is identical regardless of which surface a user prefers.
 
 **No SCIM2 identity resolution.** Unlike v1, there is no M2M application and no `GET /scim2/Users/{sub}` lookup. User identity comes directly from JWT claims (`sub` + `name`). Users are auto-registered with default leave balances on first interaction.
 
@@ -66,10 +72,10 @@ graph TB
 ## Project Structure
 
 ```
-smart-employee-agent-v2/
+smart-employee-agent/
 ├── client/                     # Browser SPA (port 3000)
-│   ├── index.html              # Split-panel UI: login + chat + dashboard
-│   ├── app.js                  # PKCE login, chat, OBO popup, dashboard
+│   ├── index.html              # Tabbed UI: Dashboard, Apply, Manage, Chat
+│   ├── app.js                  # PKCE login, REST API client, chat, OBO popup
 │   ├── styles.css              # Layout and styling
 │   ├── serve.py                # Dev server with /config endpoint
 │   └── .env.example
@@ -80,10 +86,20 @@ smart-employee-agent-v2/
 │   ├── obo_flow.py             # OBO flow handling (PKCE + token exchange)
 │   ├── requirements.txt
 │   └── .env.example
-└── hr-mcp-server/              # HR MCP Server (port 8000)
-    ├── main.py                 # 9 MCP tools + REST /api/leaves
-    ├── hr_data.py              # In-memory HR data (no employee IDs)
-    ├── jwt_validator.py        # JWT validation via JWKS
+└── hr-server/                  # HR Server: MCP + REST in one process (port 8000)
+    ├── main.py                 # Composes MCP + REST and starts uvicorn
+    ├── config.py               # Centralized env loading + ALLOWED_ORIGINS
+    ├── mcp_server/
+    │   └── server.py           # FastMCP app + 9 @mcp.tool definitions
+    ├── rest_api/
+    │   └── server.py           # REST routes: holidays, policy, balance, leaves CRUD, reset
+    ├── service/
+    │   ├── store.py            # In-memory state, seed data, ensure_user
+    │   └── hr_service.py       # Business logic shared by MCP + REST
+    ├── auth/
+    │   ├── jwt_validator.py    # JWT validation via JWKS
+    │   ├── context.py          # Per-request context vars (sub, scopes, ...)
+    │   └── scopes.py           # require_scope / require_user / audit helpers
     ├── requirements.txt
     └── .env.example
 ```
@@ -164,7 +180,7 @@ The SPA handles browser PKCE login and dashboard REST access.
 8. Note the **SPA Client ID** → used in:
    - `client/.env` as `CLIENT_ID`
    - `agent/.env` as `TOKEN_AUDIENCE` (for validating user JWTs)
-   - `hr-mcp-server/.env` as `SPA_CLIENT_ID`
+   - `hr-server/.env` as `SPA_CLIENT_ID`
 
 ### Step 4: Create an MCP Client Application (for Agent)
 
@@ -185,7 +201,7 @@ The MCP Client handles agent authentication (App Native Auth) and OBO flow.
    - Under the **Access Token Attributes** dropdown, select `given_name` and `family_name`
 8. Note the **MCP Client ID** → used in:
    - `agent/.env` as `ASGARDEO_CLIENT_ID`
-   - `hr-mcp-server/.env` as `CLIENT_ID`
+   - `hr-server/.env` as `CLIENT_ID`
 
 ### Step 5: Create Roles
 
@@ -209,10 +225,10 @@ Create any number of users in your Asgardeo organization and assign them the app
 
 ## Setup & Run
 
-### 1. HR MCP Server (Terminal 1)
+### 1. HR Server (Terminal 1)
 
 ```bash
-cd hr-mcp-server
+cd hr-server
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
@@ -270,6 +286,17 @@ Go to **http://localhost:3000**. Click "Sign In" and log in with any Asgardeo us
 
 ## Usage
 
+The app has **four tabs**:
+
+| Tab | Visible to | Purpose |
+|---|---|---|
+| **Dashboard** | Everyone | Stat cards (balance for employees, status counts for admins), upcoming holidays, leaves table with filters. Row click opens a details drawer. |
+| **Apply for Leave** | `hr_self_rest` | Form with leave-type dropdown, date pickers, reason. Live summary shows requested days plus warnings if notice period or balance would be violated. |
+| **Manage Requests** | `hr_approve_rest` | Pending queue with inline ✓ Approve / ✗ Reject buttons. Reject opens a reason modal. Tab badge shows the pending count. |
+| **Chat** | Everyone | Conversational AI Assistant. Backed by the agent server + MCP tools, with the OBO popup for elevated actions. |
+
+Manual actions (tabs 1–3) call the **REST API** with the SPA's `*_rest` scopes. Chat (tab 4) calls the **agent server**, which uses the MCP tools with `*_mcp` scopes via OBO. Both paths invoke the same `service/hr_service.py` business logic.
+
 ### Basic Queries (Agent Token — No OBO Needed)
 
 These work immediately with the agent's own `hr_basic_mcp` credentials:
@@ -320,6 +347,26 @@ If a user tries an action beyond their role, the agent explains politely:
 | `get_leave_request_details` | `hr_read_mcp` | No | OBO |
 | `approve_leave_request` | `hr_approve_mcp` | Yes | OBO |
 | `reject_leave_request` | `hr_approve_mcp` | Yes | OBO |
+
+---
+
+## REST API (used by the manual UI)
+
+These are the REST endpoints exposed by `hr-server` for the SPA. The browser calls them directly with its PKCE-issued SPA token; no OBO required.
+
+| Method | Path | Required scope | Purpose |
+|---|---|---|---|
+| `GET`  | `/api/holidays`                    | `hr_basic_rest` | Company holidays |
+| `GET`  | `/api/leave-policy`                | `hr_basic_rest` | Leave types and rules |
+| `GET`  | `/api/leave-balance`               | `hr_self_rest` | Caller's own balance |
+| `GET`  | `/api/leaves`                      | `hr_self_rest` \| `hr_read_rest` | Caller's leaves (employee) or all leaves with filters (admin) |
+| `GET`  | `/api/leaves/{id}`                 | `hr_self_rest` (own) \| `hr_read_rest` (any) | Leave details |
+| `POST` | `/api/leaves`                      | `hr_self_rest` | Apply for leave |
+| `POST` | `/api/leaves/{id}/approve`         | `hr_approve_rest` | Approve a pending request |
+| `POST` | `/api/leaves/{id}/reject`          | `hr_approve_rest` | Reject a pending request |
+| `POST` | `/reset`                           | `hr_approve_rest` \| `hr_approve_mcp` | Reset all in-memory data (demo only) |
+
+The `hr_approve_rest` scope is granted to the `hr_admin` role per the Asgardeo configuration above. Employee tokens never receive it, so approve/reject actions return HTTP 403 from the REST surface.
 
 ---
 
@@ -388,7 +435,7 @@ If a user tries an action beyond their role, the agent explains politely:
 ## Troubleshooting
 
 ### "Agent error" on startup
-- Ensure the HR MCP server is running before starting the agent
+- Ensure the HR server is running before starting the agent
 - Verify `AGENT_ID` and `AGENT_SECRET` in `agent/.env` match the values from Console > Agents
 - Verify `ASGARDEO_CLIENT_ID` in `agent/.env` matches the MCP Client Application's Client ID
 
@@ -405,8 +452,8 @@ If a user tries an action beyond their role, the agent explains politely:
 - Ensure `AUTH_ISSUER` and `JWKS_URL` match across all `.env` files
 - `TOKEN_AUDIENCE` in `agent/.env` must be the **SPA** app's Client ID (not the MCP Client's)
 - `ASGARDEO_CLIENT_ID` in `agent/.env` must be the **MCP Client** app's Client ID
-- `CLIENT_ID` in `hr-mcp-server/.env` must be the **MCP Client** app's Client ID
-- `SPA_CLIENT_ID` in `hr-mcp-server/.env` must be the **SPA** app's Client ID
+- `CLIENT_ID` in `hr-server/.env` must be the **MCP Client** app's Client ID
+- `SPA_CLIENT_ID` in `hr-server/.env` must be the **SPA** app's Client ID
 
 ### Token missing scopes
 - Check that API Resources are authorized for the application in Asgardeo
