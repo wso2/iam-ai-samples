@@ -24,9 +24,10 @@ if not all([AUTH_ISSUER, CLIENT_ID, JWKS_URL]):
     )
 
 ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    o.strip()
+    for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+    if o.strip()
 ]
 
-PORT = int(os.getenv("HR_SERVER_PORT", "8000"))
+PORT = int(os.getenv("HR_SERVER_PORT", os.getenv("PORT", "8000")))
 HOST = os.getenv("HR_SERVER_HOST", "0.0.0.0")

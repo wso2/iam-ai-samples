@@ -605,6 +605,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
   justify-content: space-between;
   gap: 0.75rem;
 }
+#authorize-section[hidden] { display: none; }
 
 #chat-form {
   display: flex;

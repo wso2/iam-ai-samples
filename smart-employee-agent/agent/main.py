@@ -282,9 +282,15 @@ def _check_tool_errors(response) -> tuple:
 
 app = FastAPI(title="Smart Employee Agent")
 
+ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+    if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -542,4 +548,6 @@ async def reset_data(
 # ─── Run ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=5001)
+    host = os.getenv("AGENT_SERVER_HOST", "0.0.0.0")
+    port = int(os.getenv("AGENT_SERVER_PORT", os.getenv("PORT", "5001")))
+    uvicorn.run(app, host=host, port=port)

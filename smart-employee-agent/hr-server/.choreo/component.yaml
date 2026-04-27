@@ -1,0 +1,11 @@
+schemaVersion: 1.2
+
+endpoints:
+  - name: hr-server
+    displayName: HR Server (REST + MCP)
+    service:
+      basePath: /
+      port: 8000
+    type: REST
+    networkVisibilities:
+      - Public
