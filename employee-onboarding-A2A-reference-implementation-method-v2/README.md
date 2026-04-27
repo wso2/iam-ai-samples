@@ -1,13 +1,15 @@
-# A2A + MCP Reference Implementation with WSO2 Identity Server
+# A2A + MCP Reference Implementation with WSO2 Identity Server (Method V2)
 
 A reference implementation demonstrating the **Agent-to-Agent (A2A) protocol** with **Model Context Protocol (MCP)**, secured by **WSO2 Identity Server** using OAuth 2.0 token exchange (RFC 8693).
 
-Each agent uses a **modern AI framework** for autonomous request handling instead of hardcoded keyword matching:
-- **Orchestrator** — OpenAI GPT-4o for LLM task decomposition
-- **HR Agent** — Standard A2A + **SQLite** (`aiosqlite`) for persistent employee records
-- **IT Agent** — OpenAI GPT-4o-mini for LLM-routing via MCP + **Human-in-the-Loop Approval Gate**
+Each agent uses a **modern AI framework** for autonomous request handling and its **own WSO2 IS application identity** (Method V2 — decentralized agent identity):
+- **Orchestrator** — OpenAI GPT-4o + LangGraph for LLM task decomposition and DAG execution
+- **HR Agent** — **Vercel AI SDK** + **SQLite** (`aiosqlite`) for persistent employee records
+- **IT Agent** — **LangGraph** + **MCP SSE** for LLM-routed provisioning + Human-in-the-Loop Approval Gate
 - **Finance & Payroll Agent** — **CrewAI** autonomous payroll and expense registration
 - **Booking Agent** — [Google ADK](https://google.github.io/adk-docs/) + **Google Calendar** integration
+
+> **Deep dive:** See [docs/ORCHESTRATOR_FLOW.md](docs/ORCHESTRATOR_FLOW.md) for a complete code-level walkthrough of every function and file involved in the orchestrator's flow — from browser login to scoped tokens arriving at each worker agent.
 
 ---
 
@@ -147,46 +149,51 @@ The Booking Agent interacts with the Google Calendar API.
 
 ---
 
-## Token Flow
+## Token Flow (Method V2 — Decentralized Agent Identity)
+
+Method V2 removes the shared Token Exchanger. Each worker agent has its own WSO2 IS application and agent identity. The orchestrator self-delegates (downscopes) using its own credentials, and the worker agent performs a second exchange using its own credentials before calling its downstream API.
 
 ```
-User ──login──► WSO2 IS ──delegated token──► Orchestrator
-                                                  │
-                                    Token Broker performs
-                                    RFC 8693 Token Exchange
-                                    per agent (with actor token)
-                                                  │
-                              ┌───────────────────┼───────────────────┐
-                              ▼                   ▼                   ▼
-                      HR Token              IT Token            Booking Token
-                    (hr:read,             (it:read,           (booking:read,
-                     hr:write)             it:write)           booking:write)
-                              │                   │
-                              ▼                   ▼
-                         HR API          MCP Server narrows scope:
-                                         it:read+it:write → it:write only
-                                         (Token Exchange, no actor token)
-                                                  │
-                                                  ▼
-                                              IT API
+User ──PKCE login──► WSO2 IS ──USER_DELEGATED_TOKEN──► Orchestrator
+                                  (act.sub = orchestrator-agent)
+                                  (scope = all scopes)
+                                         │
+                          ┌──────────────┼──────────────┐──────────────┐
+                          │              │              │              │
+          Self-delegation (RFC 8693) per agent — orchestrator client_id only, no actor token
+                          │              │              │              │
+                          ▼              ▼              ▼              ▼
+                    HR_DOWNSCOPED  IT_DOWNSCOPED  PAYROLL_DOWN   BOOKING_DOWN
+                    (hr:read,      (it:read,      (payroll:write) (booking:write)
+                     hr:write)      it:write)
+                          │              │
+                          │              ▼
+                          │        IT MCP Server (port 8020)
+                          │        LLM classifies operation
+                          │        Second RFC 8693 exchange
+                          │        (IT agent's own credentials)
+                          │              │
+                          ▼              ▼
+                       HR API         IT API
+                    (hr:read,      (it:write only,
+                     hr:write)      per operation)
 ```
 
-### Token Exchange Flow (Orchestrator → Agent)
+### Step-by-Step Token Exchange Flow
 
-1. User authenticates via OAuth 2.0 Authorization Code + PKCE (`response_mode=direct`)
-2. Orchestrator obtains a **delegated token** (all scopes)
-3. For each agent, Token Broker performs **RFC 8693 Token Exchange**:
-   - Gets **agent actor token** (3-step flow: authorize → authn → token)
-   - Exchanges: subject_token (user) + actor_token (agent) → scoped token
-   - Uses **Token Exchanger App** credentials for authentication
-4. Agent receives a **scoped token** (only its required scopes)
+1. **User login** — OAuth 2.0 Authorization Code + PKCE with `requested_actor={orchestrator-agent-id}`
+2. **3-Step Actor Token** — Orchestrator proves its identity to WSO2 IS via `response_mode=direct` authorization flow (flowId → authn → token)
+3. **Delegated Token** — Code exchanged with actor token → `USER_DELEGATED_TOKEN` with `act.sub = orchestrator-agent`
+4. **Orchestrator Self-Delegation** — For each agent, Token Broker calls RFC 8693 using orchestrator's own `client_id`/`secret` (the token issuer). No actor token required — WSO2 IS self-delegation.
+5. **Downscoped Token forwarded** to worker agent (scopes narrowed to agent's `required_scopes`)
+6. **Worker Agent Second Exchange** — Agent uses its own application credentials + its own actor token to prove its identity, then calls its downstream API
 
 ### MCP Server Token Narrowing (IT Agent → IT API)
 
 The IT MCP Server (SSE transport on port 8020) demonstrates an additional scope-narrowing layer:
-- Receives IT Agent's token (`it:read + it:write`)
-- For write operations: exchanges to **`it:write` only**
-- Uses simplified exchange (no actor token, just Token Exchanger credentials)
+- Receives IT Agent's downscoped token (`it:read + it:write`)
+- For each write operation: exchanges to **`it:write` only**, using IT Agent's own application credentials
+- Each IT operation (VPN, GitHub, AWS) gets its own independent token exchange
 
 ---
 
@@ -336,33 +343,35 @@ python3.12 -m venv .venv
 
 See [ASGARDEO_SETUP.md](ASGARDEO_SETUP.md) for detailed WSO2 IS configuration.
 
-#### Summary of Required Entities
+#### Summary of Required Entities (Method V2)
 
 **API Resources** — Create in WSO2 IS Console:
 
 | Identifier | Scopes |
 |------------|--------|
-| `onboarding-api` | `hr:read`, `hr:write`, `it:read`, `it:write`, `approval:read`, `approval:write`, `booking:read`, `booking:write` |
+| `onboarding-api` | `hr:read`, `hr:write`, `it:read`, `it:write`, `payroll:read`, `payroll:write`, `approval:read`, `approval:write`, `booking:read`, `booking:write` |
 
-**Applications:**
+**Applications** — One per agent (Method V2 — decentralized identity):
 
 | Application | Grant Types | Purpose |
-|-------------|------------|---------| 
-| `onboarding-orchestrator` | Authorization Code, Client Credentials, Refresh Token | Main application for the orchestrator |
-| `token-exchanger` | Token Exchange, Client Credentials | Performs all token exchanges on behalf of agents |
-| `mcp-it-server` (optional) | Token Exchange | Registered for MCP server scope narrowing |
+|-------------|------------|---------|
+| `onboarding-orchestrator` | Authorization Code, Token Exchange, Client Credentials | Orchestrator app — issues delegated tokens and self-delegates |
+| `hr-app` | Token Exchange, Client Credentials | HR Agent's own application identity |
+| `it-app` | Token Exchange, Client Credentials | IT Agent's own application identity |
+| `payroll-app` | Token Exchange, Client Credentials | Payroll Agent's own application identity |
+| `booking-app` | Token Exchange, Client Credentials | Booking Agent's own application identity |
 
-**AI Agents** (User Management → Agents):
+**AI Agents** (User Management → Agents) — one per application:
 
 | Agent Name | Linked Application | Purpose |
-|------------|-------------------|---------| 
-| `orchestrator-agent` | `onboarding-orchestrator` | Orchestrator identity |
-| `hr-agent` | `onboarding-orchestrator` | HR worker identity |
-| `it-agent` | `onboarding-orchestrator` | IT worker identity |
-| `payroll-agent` | `onboarding-orchestrator` | Finance & Payroll worker identity |
-| `booking-agent` | `onboarding-orchestrator` | Booking worker identity |
+|------------|-------------------|---------|
+| `orchestrator-agent` | `onboarding-orchestrator` | Orchestrator identity (actor token for delegated token exchange) |
+| `hr-agent` | `hr-app` | HR Agent identity (second exchange before calling HR API) |
+| `it-agent` | `it-app` | IT Agent identity (second exchange before calling IT API via MCP) |
+| `payroll-agent` | `payroll-app` | Payroll Agent identity |
+| `booking-agent` | `booking-app` | Booking Agent identity |
 
-> **Note:** Worker agents don't need their own applications. They are registered as AI Agents linked to the orchestrator's application. The Token Exchanger app performs exchanges using agent actor tokens.
+> **Method V2 vs V1:** In V1 a shared Token Exchanger app performed all RFC 8693 exchanges. In V2 each agent has its own WSO2 IS application. The orchestrator self-delegates (uses its own credentials to downscope), and each worker agent performs a second exchange using its own credentials. This eliminates the shared broker bottleneck and gives each agent an independent audit trail.
 
 ### 3. Configure Environment Variables
 

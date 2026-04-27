@@ -15,6 +15,7 @@ eggs/
 lib/
 lib64/
 parts/
+docs/
 sdist/
 var/
 wheels/
