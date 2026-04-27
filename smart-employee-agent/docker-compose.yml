@@ -1,0 +1,41 @@
+services:
+  hr-server:
+    build:
+      context: ./hr-server
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./hr-server/.env
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - HR_SERVER_HOST=0.0.0.0
+      - MCP_ALLOWED_HOSTS="127.0.0.1,localhost,hr-server"
+
+  agent:
+    build:
+      context: ./agent
+    ports:
+      - "5001:5001"
+    env_file:
+      - ./agent/.env
+    environment:
+      # Override localhost URL to use Docker service name
+      - HR_MCP_SERVER_URL=http://hr-server:8000/mcp
+      - AGENT_SERVER_HOST=0.0.0.0
+    depends_on:
+      - hr-server
+
+  client:
+    build:
+      context: ./client
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./client/.env
+    environment:
+      # These are served to the browser via /config, so they must be
+      # localhost URLs (the browser runs on the host, not inside Docker)
+      - AGENT_SERVER_URL=http://localhost:5001
+      - HR_SERVER_URL=http://localhost:8000
+    depends_on:
+      - agent

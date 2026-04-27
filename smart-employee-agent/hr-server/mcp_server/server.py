@@ -22,6 +22,7 @@ from pydantic import AnyHttpUrl
 from mcp.server.auth.provider import AccessToken, TokenVerifier
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 import config
 from auth.jwt_validator import JWTValidator, TokenError
@@ -106,24 +107,19 @@ class JWTTokenVerifier(TokenVerifier):
             current_user_first_name.set(first_name)
             current_user_last_name.set(last_name)
 
-            # INFO: high-level, non-identifying summary only.
-            masked_sub = (subject[:4] + "***") if subject else "***"
-            logger.info(
-                "JWT validated (sub=%s, aut=%s, scopes=%d, exp=%s)",
-                masked_sub, aut, len(scopes), expires_at,
-            )
-            # DEBUG: full claim detail for development/troubleshooting only.
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug("[JWT TOKEN CLAIMS]")
-                logger.debug("  sub (subject)   : %s", subject)
-                logger.debug("  name            : %s", full_name)
-                logger.debug("  aud (audience)  : %s", audience)
-                logger.debug("  aut (auth type) : %s", aut)
-                if act:
-                    logger.debug("  act (actor)     : %s", act)
-                logger.debug("  scope           : %s", payload.get("scope", "N/A"))
-                logger.debug("  scopes (parsed) : %s", scopes)
-                logger.debug("  exp (expires)   : %s", expires_at)
+            # ── Token access log (visible at INFO for demo clarity) ──
+            logger.info("┌─── MCP Request Authenticated ───────────────────────")
+            logger.info("│ Subject (sub) : %s", subject)
+            logger.info("│ Name          : %s", full_name)
+            logger.info("│ Scopes        : %s", ", ".join(scopes) if scopes else "(none)")
+            if act:
+                actor_sub = act.get("sub") if isinstance(act, dict) else str(act)
+                logger.info("│ ⚡ OBO Flow — Agent acting on behalf of user")
+                logger.info("│   User (sub)    : %s", subject)
+                logger.info("│   Agent (act.sub): %s", actor_sub)
+            else:
+                logger.info("│ Token type    : Direct (agent or user token)")
+            logger.info("└────────────────────────────────────────────────────")
 
             return AccessToken(
                 token=token,
@@ -147,6 +143,12 @@ mcp = FastMCP(
     auth=AuthSettings(
         issuer_url=AnyHttpUrl(config.AUTH_ISSUER),
         resource_server_url=AnyHttpUrl(f"http://localhost:{config.PORT}"),
+    ),
+    # DNS-rebinding protection off: this server is always behind a trusted
+    # caller (the agent) and validates a JWT on every request, so the
+    # browser-localhost threat the protection targets does not apply here.
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False,
     ),
 )
 

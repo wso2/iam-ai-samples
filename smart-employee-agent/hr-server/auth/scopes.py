@@ -68,5 +68,6 @@ def get_actor_description() -> str:
     act = info.get("act")
     name = current_full_name()
     if act:
-        return f"AI Agent (on behalf of {name})"
+        actor_sub = act.get("sub") if isinstance(act, dict) else str(act)
+        return f"Agent {actor_sub} (on behalf of {name})"
     return f"AI Agent ({name})"
