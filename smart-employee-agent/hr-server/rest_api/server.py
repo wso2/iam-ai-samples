@@ -94,18 +94,18 @@ async def _authenticate(request: Request) -> _AuthContext | JSONResponse:
 
     act = payload.get("act")
     endpoint = request.url.path
-    logger.info("┌─── REST Request Authenticated (%s) ──────────────", endpoint)
-    logger.info("│ Subject (sub) : %s", ctx.sub)
-    logger.info("│ Name          : %s", ctx.full_name)
-    logger.info("│ Scopes        : %s", ", ".join(ctx.scopes) if ctx.scopes else "(none)")
+    scope_str = ", ".join(ctx.scopes) if ctx.scopes else "(none)"
     if act:
         actor_sub = act.get("sub") if isinstance(act, dict) else str(act)
-        logger.info("│ ⚡ OBO Flow — Agent acting on behalf of user")
-        logger.info("│   User (sub)    : %s", ctx.sub)
-        logger.info("│   Agent (act.sub): %s", actor_sub)
+        logger.info(
+            "[REST %s >> OBO Token] user(sub)=%s | name=%s | agent(act.sub)=%s | scopes=%s",
+            endpoint, ctx.sub, ctx.full_name, actor_sub, scope_str,
+        )
     else:
-        logger.info("│ Token type    : Direct (user token via SPA)")
-    logger.info("└────────────────────────────────────────────────────")
+        logger.info(
+            "[REST %s >> User Token] sub=%s | name=%s | scopes=%s",
+            endpoint, ctx.sub, ctx.full_name, scope_str,
+        )
 
     return ctx
 

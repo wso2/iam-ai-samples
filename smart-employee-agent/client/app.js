@@ -11,7 +11,7 @@
  *    Dashboard view (stat cards, holidays, leaves table, details drawer)
  *    Apply-leave form view
  *    Manage-requests view (pending queue, approve/reject)
- *    Chat view (talks to agent server, OBO popup flow)
+ *    Assistant side panel (talks to agent server, OBO popup flow)
  *    Toast + modal + drawer utilities
  *    Sign-out + reset
  */
@@ -42,6 +42,7 @@ const app = (function () {
 
   // UI state
   let activeTab = "dashboard";
+  let assistantOpen = false;
   let pendingRejectId = null;
 
   // ─── DOM helpers ────────────────────────────────────────────────────────────
@@ -231,7 +232,7 @@ const app = (function () {
     // Initial tab
     switchTab("dashboard");
 
-    // Greet in chat (chat tab content stays mounted; just doesn't show until selected)
+    // Enable assistant input and greet
     $("message-input").disabled = false;
     $("send-btn").disabled = false;
     appendChatGreeting();
@@ -259,7 +260,6 @@ const app = (function () {
     if (name === "dashboard") refreshDashboard();
     else if (name === "apply") loadApplyTab();
     else if (name === "manage") refreshManageQueue();
-    else if (name === "chat") setTimeout(() => $("message-input").focus(), 50);
   }
 
   // ─── REST API client ────────────────────────────────────────────────────────
@@ -334,6 +334,29 @@ const app = (function () {
       renderLeavesTable([]);
       console.error("Leaves load failed:", e);
     }
+  }
+
+  async function silentRefreshDashboard() {
+    const isAdmin = userScopes.includes("hr_read_rest");
+
+    if (!isAdmin && userScopes.includes("hr_self_rest")) {
+      try { balanceCache = await api("/api/leave-balance"); } catch {}
+    }
+
+    try {
+      const data = await api("/api/holidays");
+      holidaysCache = data.holidays || [];
+    } catch {}
+
+    try {
+      const data = await api("/api/leaves");
+      leavesCache = data.leaves || [];
+    } catch {}
+
+    renderBalanceCards(isAdmin ? "admin-stats" : balanceCache);
+    renderHolidays(holidaysCache);
+    renderLeavesTable(leavesCache);
+    updatePendingBadge();
   }
 
   function renderBalanceCards(state) {
@@ -622,6 +645,45 @@ const app = (function () {
     }
   }
 
+  async function silentRefreshManageQueue() {
+    try {
+      const data = await api("/api/leaves?status=Pending");
+      const pending = (data.leaves || []).filter((l) => l.status === "Pending");
+      const container = $("manage-queue-container");
+
+      if (pending.length === 0) {
+        container.innerHTML = `<p class="muted">No pending requests. 🎉</p>`;
+      } else {
+        container.innerHTML = pending.map((l) => `
+          <div class="queue-item" data-request-id="${esc(l.request_id || "")}">
+            <div>
+              <div class="who">${esc(l.employee)}</div>
+              <div class="meta">${esc(l.type || l.leave_type)} ·
+                ${esc(formatDate(l.start_date))} → ${esc(formatDate(l.end_date))} ·
+                ${esc(l.days_requested)} day(s)</div>
+              ${l.reason ? `<div class="reason">${esc(l.reason)}</div>` : ""}
+            </div>
+            <div class="actions">
+              <button class="btn-success btn-small" data-action="approve">✓ Approve</button>
+              <button class="btn-danger btn-small" data-action="reject">✗ Reject</button>
+              <button class="btn-ghost btn-small" data-action="details">Details</button>
+            </div>
+          </div>
+        `).join("");
+
+        container.querySelectorAll(".queue-item").forEach((row) => {
+          const id = row.dataset.requestId;
+          row.querySelector('[data-action="approve"]').addEventListener("click", () => onApprove(id, row));
+          row.querySelector('[data-action="reject"]').addEventListener("click", () => openRejectModal(id, row));
+          row.querySelector('[data-action="details"]').addEventListener("click", () => openDetails(id));
+        });
+      }
+
+      leavesCache = data.leaves || leavesCache;
+      updatePendingBadge();
+    } catch {}
+  }
+
   async function onApprove(requestId, row) {
     const btn = row.querySelector('[data-action="approve"]');
     btn.disabled = true;
@@ -727,6 +789,23 @@ const app = (function () {
     return `<div class="detail-row"><div class="label">${esc(label)}</div><div>${value ?? ""}</div></div>`;
   }
 
+  // ─── Assistant panel ────────────────────────────────────────────────────
+
+  function toggleAssistant() {
+    assistantOpen = !assistantOpen;
+    const panel = $("assistant-panel");
+    const toggle = $("assistant-toggle");
+    const shell = $("app-shell");
+
+    panel.hidden = !assistantOpen;
+    toggle.classList.toggle("active", assistantOpen);
+    shell.classList.toggle("panel-open", assistantOpen);
+
+    if (assistantOpen) {
+      setTimeout(() => $("message-input").focus(), 50);
+    }
+  }
+
   // ─── Chat view ──────────────────────────────────────────────────────────────
 
   function appendChatGreeting() {
@@ -743,9 +822,9 @@ const app = (function () {
         "- **Apply** for leave (Annual, Sick, or Personal)";
 
     addAgentMessage(
-      `Hello ${userName}! I'm your Corporate Concierge. ` +
+      `Hello ${userName}! I'm your HR Assistant. ` +
       `You're signed in as **${userRole}**.\n\n${capabilities}\n\n` +
-      `_You can also use the tabs above to do these actions manually._`
+      `_Any actions I take will be reflected live in the main view._`
     );
   }
 
@@ -790,10 +869,9 @@ const app = (function () {
         addAgentMessage(data.message);
         hideAuthorizeButton();
         if (data.refresh_dashboard) {
-          // Invalidate caches; refresh whichever tab is active.
           balanceCache = null;
-          if (activeTab === "dashboard") refreshDashboard();
-          else if (activeTab === "manage") refreshManageQueue();
+          silentRefreshDashboard();
+          if (activeTab === "manage") silentRefreshManageQueue();
         }
       }
     } catch (e) {
@@ -993,7 +1071,8 @@ const app = (function () {
     confirmReject,
     // details
     closeDetails,
-    // chat
+    // assistant panel
+    toggleAssistant,
     handleChatSubmit,
     initiateOBOFlow,
     // user menu

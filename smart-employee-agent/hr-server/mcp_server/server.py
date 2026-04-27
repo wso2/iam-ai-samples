@@ -107,19 +107,18 @@ class JWTTokenVerifier(TokenVerifier):
             current_user_first_name.set(first_name)
             current_user_last_name.set(last_name)
 
-            # ── Token access log (visible at INFO for demo clarity) ──
-            logger.info("┌─── MCP Request Authenticated ───────────────────────")
-            logger.info("│ Subject (sub) : %s", subject)
-            logger.info("│ Name          : %s", full_name)
-            logger.info("│ Scopes        : %s", ", ".join(scopes) if scopes else "(none)")
+            scope_str = ", ".join(scopes) if scopes else "(none)"
             if act:
                 actor_sub = act.get("sub") if isinstance(act, dict) else str(act)
-                logger.info("│ ⚡ OBO Flow — Agent acting on behalf of user")
-                logger.info("│   User (sub)    : %s", subject)
-                logger.info("│   Agent (act.sub): %s", actor_sub)
+                logger.info(
+                    "[MCP >> OBO Token] user(sub)=%s | name=%s | agent(act.sub)=%s | scopes=%s",
+                    subject, full_name, actor_sub, scope_str,
+                )
             else:
-                logger.info("│ Token type    : Direct (agent or user token)")
-            logger.info("└────────────────────────────────────────────────────")
+                logger.info(
+                    "[MCP >> Agent Token] sub=%s | name=%s | scopes=%s",
+                    subject, full_name, scope_str,
+                )
 
             return AccessToken(
                 token=token,

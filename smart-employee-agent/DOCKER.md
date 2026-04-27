@@ -61,36 +61,19 @@ docker compose logs --tail=50 -f hr-server
 
 The HR server logs token details at INFO level on every authenticated request. These logs demonstrate the three IAM patterns:
 
-**Pattern 2 — Agent token (direct):**
+**Pattern 2 — Agent token (direct access, no user context):**
 ```
-hr-server  | ┌─── MCP Request Authenticated ───────────────────────
-hr-server  | │ Subject (sub) : 5f3a8b2c-1234-...
-hr-server  | │ Name          : Smart Employee Agent
-hr-server  | │ Scopes        : hr_basic_mcp
-hr-server  | │ Token type    : Direct (agent or user token)
-hr-server  | └────────────────────────────────────────────────────
+[MCP >> Agent Token] sub=5f3a8b2c-1234-... | name=Smart Employee Agent | scopes=hr_basic_mcp, openid
 ```
 
 **Pattern 3 — OBO token (agent acting on behalf of user):**
 ```
-hr-server  | ┌─── MCP Request Authenticated ───────────────────────
-hr-server  | │ Subject (sub) : a1b2c3d4-5678-...
-hr-server  | │ Name          : John Doe
-hr-server  | │ Scopes        : hr_self_mcp, hr_read_mcp, hr_approve_mcp
-hr-server  | │ ⚡ OBO Flow — Agent acting on behalf of user
-hr-server  | │   User (sub)    : a1b2c3d4-5678-...
-hr-server  | │   Agent (act.sub): 5f3a8b2c-1234-...
-hr-server  | └────────────────────────────────────────────────────
+[MCP >> OBO Token] user(sub)=a1b2c3d4-5678-... | name=John Doe | agent(act.sub)=5f3a8b2c-1234-... | scopes=hr_basic_mcp, hr_self_mcp, openid, profile
 ```
 
-**REST requests (browser SPA with user token):**
+**Pattern 1 — REST requests (browser SPA with user token):**
 ```
-hr-server  | ┌─── REST Request Authenticated (/api/holidays) ──────
-hr-server  | │ Subject (sub) : a1b2c3d4-5678-...
-hr-server  | │ Name          : John Doe
-hr-server  | │ Scopes        : hr_basic_rest, hr_self_rest
-hr-server  | │ Token type    : Direct (user token via SPA)
-hr-server  | └────────────────────────────────────────────────────
+[REST /api/holidays >> User Token] sub=a1b2c3d4-5678-... | name=John Doe | scopes=hr_basic_rest, hr_self_rest
 ```
 
 ## Common Operations

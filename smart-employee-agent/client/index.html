@@ -4,9 +4,10 @@
 
   Smart Employee Agent — Client Application
 
-  Tabbed UI: Dashboard, Apply for Leave, Manage Requests (HR Admin), Chat.
+  Tabbed UI: Dashboard, Apply for Leave, Manage Requests (HR Admin).
+  Persistent Assistant side panel for AI agent interaction.
   Manual actions go through the REST API (with *_rest scopes).
-  Chat goes through the agent server, which uses MCP tools (with *_mcp
+  Assistant goes through the agent server, which uses MCP tools (with *_mcp
   scopes via OBO when elevated actions are needed).
 -->
 <html lang="en">
@@ -51,10 +52,16 @@
           Manage Requests
           <span id="pending-badge" class="pending-badge" hidden>0</span>
         </button>
-        <button class="tab" data-tab="chat" role="tab" aria-selected="false">
-          Chat
-        </button>
       </nav>
+
+      <button class="assistant-toggle" id="assistant-toggle" onclick="app.toggleAssistant()" title="Toggle Assistant">
+        <svg class="assistant-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1.27A7 7 0 0 1 14 23h-4a7 7 0 0 1-6.73-4H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+          <circle cx="9.5" cy="15.5" r="1"/>
+          <circle cx="14.5" cy="15.5" r="1"/>
+        </svg>
+        <span class="assistant-label">Assistant</span>
+      </button>
 
       <div id="user-menu">
         <button class="user-btn" id="user-btn" onclick="app.toggleUserMenu()">
@@ -170,33 +177,39 @@
         </div>
       </section>
 
-      <!-- ── Chat Tab ──────────────────────────────────────────────── -->
-      <section id="tab-chat" class="tab-panel chat-panel" role="tabpanel" hidden>
-        <div class="page-header">
-          <h2>AI Assistant</h2>
-          <span class="muted">Ask the agent to apply, approve or look up leave on your behalf.</span>
-        </div>
-
-        <div class="card chat-card">
-          <div id="chat-messages"></div>
-
-          <div id="authorize-section" hidden>
-            <p class="muted">The agent needs your authorization to perform this action.</p>
-            <button id="authorize-btn" class="btn-primary" onclick="app.initiateOBOFlow()">
-              Authorize
-            </button>
-          </div>
-
-          <form id="chat-form" onsubmit="return app.handleChatSubmit(event)">
-            <input type="text" id="message-input"
-                   placeholder="Ask me anything about leave…"
-                   autocomplete="off" disabled />
-            <button type="submit" id="send-btn" class="btn-primary" disabled>Send</button>
-          </form>
-        </div>
-      </section>
-
     </main>
+
+    <!-- ─── Assistant Side Panel ──────────────────────────────────────── -->
+    <aside id="assistant-panel" class="assistant-panel" hidden>
+      <div class="assistant-header">
+        <div class="assistant-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1.27A7 7 0 0 1 14 23h-4a7 7 0 0 1-6.73-4H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+            <circle cx="9.5" cy="15.5" r="1"/>
+            <circle cx="14.5" cy="15.5" r="1"/>
+          </svg>
+          <h3>Assistant</h3>
+        </div>
+        <button class="btn-ghost btn-small" onclick="app.toggleAssistant()" aria-label="Close assistant">✕</button>
+      </div>
+
+      <div id="chat-messages"></div>
+
+      <div id="authorize-section" hidden>
+        <p class="muted">The agent needs your authorization to perform this action.</p>
+        <button id="authorize-btn" class="btn-primary" onclick="app.initiateOBOFlow()">
+          Authorize
+        </button>
+      </div>
+
+      <form id="chat-form" onsubmit="return app.handleChatSubmit(event)">
+        <input type="text" id="message-input"
+               placeholder="Ask me anything about leave…"
+               autocomplete="off" disabled />
+        <button type="submit" id="send-btn" class="btn-primary" disabled>Send</button>
+      </form>
+    </aside>
+
   </div>
 
   <!-- ─── Reusable Overlays ──────────────────────────────────────────── -->

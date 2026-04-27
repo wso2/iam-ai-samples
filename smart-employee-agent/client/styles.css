@@ -2,7 +2,7 @@
  * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
  *
  * Smart Employee Agent — Client styles.
- * Tabbed shell: Dashboard / Apply / Manage / Chat.
+ * Tabbed shell: Dashboard / Apply / Manage + persistent Assistant side panel.
  */
 
 :root {
@@ -238,6 +238,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+  transition: margin-right 0.2s ease;
 }
 
 .tab-panel { display: block; }
@@ -513,18 +514,76 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
 }
 .queue-item .actions { display: inline-flex; gap: 0.4rem; }
 
-/* ── Chat (in tab) ─────────────────────────────────────────────────────── */
+/* ── Assistant toggle button (in topbar) ──────────────────────────────── */
 
-.chat-panel { display: flex; flex-direction: column; }
-.chat-panel[hidden] { display: none; }
+.assistant-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: background 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
+}
+.assistant-toggle:hover { background: var(--primary-hover); }
+.assistant-toggle.active {
+  background: var(--primary-hover);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+}
+.assistant-icon { display: block; }
 
-.chat-card {
+/* ── Assistant side panel ─────────────────────────────────────────────── */
+
+.assistant-panel {
+  position: fixed;
+  top: var(--topbar-h);
+  right: 0;
+  bottom: 0;
+  width: 400px;
+  max-width: 100vw;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -4px 0 16px rgba(15, 23, 42, 0.06);
+  z-index: 40;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - var(--topbar-h) - 8rem);
-  min-height: 360px;
-  padding: 0;
+  animation: panel-in 0.2s ease-out;
 }
+.assistant-panel[hidden] { display: none; }
+
+@keyframes panel-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+.assistant-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.assistant-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.assistant-title h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.assistant-title svg { color: var(--primary); }
+
+#app-shell.panel-open #work-area {
+  margin-right: 400px;
+}
+
+/* ── Chat messages (in assistant panel) ───────────────────────────────── */
 
 #chat-messages {
   flex: 1;
@@ -604,6 +663,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  flex-shrink: 0;
 }
 #authorize-section[hidden] { display: none; }
 
@@ -612,6 +672,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
   gap: 0.5rem;
   padding: 0.75rem 1rem;
   border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 #message-input {
   flex: 1;
@@ -769,7 +830,10 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
 @media (max-width: 720px) {
   #topbar { gap: 0.75rem; padding: 0 0.75rem; }
   .brand-name { display: none; }
+  .assistant-label { display: none; }
   #work-area { padding: 1rem 0.75rem; }
+  #app-shell.panel-open #work-area { margin-right: 0; }
+  .assistant-panel { width: 100%; }
   .form-row.split { grid-template-columns: 1fr; }
   .drawer { width: 100%; }
 }
