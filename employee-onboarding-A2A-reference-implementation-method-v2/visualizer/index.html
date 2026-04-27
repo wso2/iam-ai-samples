@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>A2A Token Flow Visualizer</title>
+    <title>A2A Token Flow Visualizer — Method V2</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -16,7 +16,7 @@
                 <img src="https://wso2.cachefly.net/wso2/sites/images/brand/downloads/wso2-logo.png" alt="WSO2 Logo"
                     class="wso2-logo">
                 <div class="divider"></div>
-                <h1>A2A Token Flow</h1>
+                <h1>A2A Token Flow <span style="font-size:14px;color:#FF7300;font-weight:600;">Method V2</span></h1>
             </div>
             <div class="header-actions">
                 <button class="reset-btn" onclick="resetAll()">
@@ -68,7 +68,9 @@
                             <span>IS</span>
                         </div>
                         <span class="node-label">Identity Server</span>
-                        <div class="tooltip">Asgardeo/WSO2 IS<br>Issues Tokens & Validates</div>
+                        <div class="tooltip"><strong>Asgardeo / WSO2 IS</strong><br>Issues &amp; Validates Tokens<br><br>
+                            <em>Method V2:</em> Each agent has its own registered Application. IS validates agent identity during the 3-step actor token flow for each agent independently.
+                        </div>
                     </div>
 
                     <div class="connector vertical" id="conn-wso2-orch">
@@ -84,26 +86,32 @@
                             </svg>
                         </div>
                         <span class="node-label">Orchestrator Agent</span>
-                        <div class="tooltip">Manages workflow logic, aggregates results, sends final response</div>
+                        <div class="tooltip"><strong>Orchestrator Agent</strong><br>Manages workflow &amp; aggregates results<br><br>
+                            <em>Method V2:</em> Downscopes the user delegated token for each agent using that agent's own WSO2 IS application credentials. No actor token needed — the orchestrator is the issuer and performs self-delegation.
+                        </div>
                     </div>
                 </div>
 
-                <!-- Exchanger Section -->
+                <!-- Downscope Section (Method V2) -->
                 <div class="flow-section center">
                     <div class="connector" id="conn-orch-exchanger">
                         <div class="connector-line"></div>
                         <div class="packet forward"></div>
                         <div class="packet reverse"></div>
+                        <div class="connector-label" style="font-size:10px;color:#FF7300;">Downscoped Token</div>
                     </div>
 
                     <div class="flow-node exchanger" id="node-exchanger">
                         <div class="node-icon">
                             <svg viewBox="0 0 24 24">
-                                <path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z" />
+                                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
                             </svg>
                         </div>
-                        <span class="node-label">Token Exchanger</span>
-                        <div class="tooltip">Exchanges user/orch tokens for Agent-specific tokens (RFC 8693)</div>
+                        <span class="node-label">Orch. Downscopes</span>
+                        <div class="tooltip"><strong>Method V2 — Orchestrator Downscoping</strong><br>
+                            Orchestrator uses each agent's own WSO2 IS Application credentials to downscope the user token via RFC 8693 (no actor token — self-delegation).<br><br>
+                            Each agent then uses its own credentials + actor token for the second exchange when calling its API.
+                        </div>
                     </div>
 
                     <div class="connector" id="conn-exchanger-agents">
@@ -119,7 +127,9 @@
                         <div class="agent-path">
                             <div class="flow-node agent" id="node-hr">
                                 <div class="node-icon hr">HR Agent</div>
-                                <div class="tooltip">HR Agent<br>Creates Employee Profiles</div>
+                                <div class="tooltip"><strong>HR Agent</strong><br>Creates Employee Profiles<br><br>
+                                    <em>Method V2:</em> Gets its own actor token (3-step flow, own app credentials), then exchanges the pre-scoped token → hr:read hr:write scoped token for the HR API.
+                                </div>
                             </div>
                             <div class="connector small" id="conn-hr-api">
                                 <div class="connector-line"></div>
@@ -133,7 +143,9 @@
                         <div class="agent-path">
                             <div class="flow-node agent" id="node-booking">
                                 <div class="node-icon booking">Booking Agent</div>
-                                <div class="tooltip">Booking Agent<br>Schedules Orientation</div>
+                                <div class="tooltip"><strong>Booking Agent</strong><br>Schedules Orientation<br><br>
+                                    <em>Method V2:</em> Gets its own actor token, exchanges pre-scoped token → booking:read booking:write for the Booking API.
+                                </div>
                             </div>
                             <div class="connector small" id="conn-booking-api">
                                 <div class="connector-line"></div>
@@ -147,7 +159,9 @@
                         <div class="agent-path">
                             <div class="flow-node agent" id="node-it">
                                 <div class="node-icon it">IT Agent</div>
-                                <div class="tooltip">IT Agent<br>Provisions VPN, Email, etc.</div>
+                                <div class="tooltip"><strong>IT Agent</strong><br>Provisions VPN, Email, etc.<br><br>
+                                    <em>Method V2:</em> Gets its own actor token, exchanges pre-scoped token → it:read it:write. MCP Server also has its own actor token for the final API call.
+                                </div>
                             </div>
                             <div class="connector small" id="conn-it-mcp">
                                 <div class="connector-line"></div>
@@ -170,7 +184,8 @@
                                 <div class="tooltip">
                                     <strong>Finance &amp; Payroll Agent</strong><br>
                                     Registers salary grade &amp; pay schedule.<br>
-                                    Sets up expense accounts.
+                                    Sets up expense accounts.<br><br>
+                                    <em>Method V2:</em> Gets its own actor token, exchanges pre-scoped token → payroll:read payroll:write for the Payroll API.
                                 </div>
                             </div>
                             <div class="connector small" id="conn-payroll-api">
@@ -224,6 +239,12 @@
                     <h2>Live Tokens</h2>
                     <span class="badge">Autoupdating</span>
                 </div>
+                <div style="background:#fff8f0;border:1px solid #FF7300;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;line-height:1.6;">
+                    <strong>Method V2 Token Flow:</strong><br>
+                    1. Orchestrator gets <em>User Delegated</em> token (actor token proves orchestrator identity)<br>
+                    2. Orchestrator downscopes token per-agent using <strong>each agent's own app</strong> credentials (no actor token needed)<br>
+                    3. Each agent gets its own <strong>Actor Token</strong> (3-step, own app) then does RFC 8693 → <strong>Exchanged Token</strong> for its API
+                </div>
 
                 <div class="tokens-grid">
                     <!-- Orchestrator -->
@@ -250,15 +271,18 @@
                         </div>
                     </div>
 
-                    <!-- Agents -->
+                    <!-- Agents — Method V2: each shows Downscoped (from orch) + Actor + Exchanged -->
                     <div class="agents-tokens">
                         <div class="agent-group hr">
                             <h4>HR Agent</h4>
                             <div class="token-pair">
-                                <div class="token-badge" id="token-hr_actor" onclick="copyToken('hr_actor')">
+                                <div class="token-badge" id="token-hr_downscoped" onclick="copyToken('hr_downscoped')" title="Pre-scoped token from Orchestrator">
+                                    Downscoped <span class="icon">⬇️</span>
+                                </div>
+                                <div class="token-badge" id="token-hr_actor" onclick="copyToken('hr_actor')" title="HR Agent's own actor token (3-step flow)">
                                     Actor <span class="icon">📋</span>
                                 </div>
-                                <div class="token-badge" id="token-hr_exchanged" onclick="copyToken('hr_exchanged')">
+                                <div class="token-badge" id="token-hr_exchanged" onclick="copyToken('hr_exchanged')" title="Final API-scoped token">
                                     Exchanged <span class="icon">🔄</span>
                                 </div>
                             </div>
@@ -267,11 +291,13 @@
                         <div class="agent-group booking">
                             <h4>Booking</h4>
                             <div class="token-pair">
-                                <div class="token-badge" id="token-booking_actor" onclick="copyToken('booking_actor')">
+                                <div class="token-badge" id="token-booking_downscoped" onclick="copyToken('booking_downscoped')" title="Pre-scoped token from Orchestrator">
+                                    Downscoped <span class="icon">⬇️</span>
+                                </div>
+                                <div class="token-badge" id="token-booking_actor" onclick="copyToken('booking_actor')" title="Booking Agent's own actor token">
                                     Actor <span class="icon">📋</span>
                                 </div>
-                                <div class="token-badge" id="token-booking_exchanged"
-                                    onclick="copyToken('booking_exchanged')">
+                                <div class="token-badge" id="token-booking_exchanged" onclick="copyToken('booking_exchanged')" title="Final API-scoped token">
                                     Exchanged <span class="icon">🔄</span>
                                 </div>
                             </div>
@@ -280,10 +306,13 @@
                         <div class="agent-group it">
                             <h4>IT Agent</h4>
                             <div class="token-pair">
-                                <div class="token-badge" id="token-it_actor" onclick="copyToken('it_actor')">
+                                <div class="token-badge" id="token-it_downscoped" onclick="copyToken('it_downscoped')" title="Pre-scoped token from Orchestrator">
+                                    Downscoped <span class="icon">⬇️</span>
+                                </div>
+                                <div class="token-badge" id="token-it_actor" onclick="copyToken('it_actor')" title="IT Agent's own actor token">
                                     Actor <span class="icon">📋</span>
                                 </div>
-                                <div class="token-badge" id="token-it_exchanged" onclick="copyToken('it_exchanged')">
+                                <div class="token-badge" id="token-it_exchanged" onclick="copyToken('it_exchanged')" title="Final API-scoped token">
                                     Exchanged <span class="icon">🔄</span>
                                 </div>
                             </div>
@@ -292,16 +321,18 @@
                         <div class="agent-group payroll">
                             <h4>Payroll</h4>
                             <div class="token-pair">
-                                <div class="token-badge" id="token-payroll_actor"
-                                    onclick="copyToken('payroll_actor')">
+                                <div class="token-badge" id="token-payroll_downscoped" onclick="copyToken('payroll_downscoped')" title="Pre-scoped token from Orchestrator">
+                                    Downscoped <span class="icon">⬇️</span>
+                                </div>
+                                <div class="token-badge" id="token-payroll_actor" onclick="copyToken('payroll_actor')" title="Payroll Agent's own actor token">
                                     Actor <span class="icon">📋</span>
                                 </div>
-                                <div class="token-badge" id="token-payroll_exchanged"
-                                    onclick="copyToken('payroll_exchanged')">
+                                <div class="token-badge" id="token-payroll_exchanged" onclick="copyToken('payroll_exchanged')" title="Final API-scoped token">
                                     Exchanged <span class="icon">🔄</span>
                                 </div>
                             </div>
                         </div>
+
                     </div>
                 </div>
             </div>

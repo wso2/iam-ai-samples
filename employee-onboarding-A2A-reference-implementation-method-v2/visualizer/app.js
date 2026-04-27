@@ -2,18 +2,15 @@
  * A2A Token Flow Visualizer - JavaScript
  */
 
-// Token storage
+// Token storage — Method V2 adds per-agent downscoped tokens
 const tokens = {
     orchestrator_actor: null,
     user_delegated: null,
-    hr_actor: null,
-    hr_exchanged: null,
-    it_actor: null,
-    it_exchanged: null,
-    approval_actor: null,
-    approval_exchanged: null,
-    booking_actor: null,
-    booking_exchanged: null
+    // Per-agent: downscoped (from orchestrator) + actor (agent's own) + exchanged (final API token)
+    hr_downscoped: null, hr_actor: null, hr_exchanged: null,
+    it_downscoped: null, it_actor: null, it_exchanged: null,
+    booking_downscoped: null, booking_actor: null, booking_exchanged: null,
+    payroll_downscoped: null, payroll_actor: null, payroll_exchanged: null
 };
 
 let ws = null;
@@ -117,18 +114,33 @@ function handleLogMessage(message) {
     if (message.includes('[SOURCE_TOKEN')) expectingToken = 'user_delegated';
 
     const agentMap = {
-        'HR': 'hr', 'IT': 'it', 'PAYROLL': 'payroll', 'BOOKING': 'booking', 'APPROVAL': 'approval'
+        'HR': 'hr', 'IT': 'it', 'PAYROLL': 'payroll', 'BOOKING': 'booking'
     };
 
     for (const [key, val] of Object.entries(agentMap)) {
-        if (message.includes(`[${key}_AGENT_ACTOR_TOKEN]:`)) expectingToken = `${val}_actor`;
-        if (message.includes(`[${key}_AGENT_EXCHANGED_TOKEN`)) expectingToken = `${val}_exchanged`;
+        // Method V2: orchestrator logs downscoped token before forwarding to each agent
+        // Payroll agent card name is "Finance & Payroll Agent" → type becomes FINANCE_PAYROLL_AGENT
+        if (message.includes(`[${key}_AGENT_DOWNSCOPED_TOKEN]`) ||
+            message.includes(`[${val.toUpperCase()}_AGENT_DOWNSCOPED_TOKEN]`) ||
+            (val === 'payroll' && message.includes('[FINANCE_PAYROLL_AGENT_DOWNSCOPED_TOKEN]'))) {
+            expectingToken = `${val}_downscoped`;
+        }
+        if (message.includes(`[${key}_AGENT_ACTOR_TOKEN]:`) ||
+            (val === 'payroll' && message.includes('[FINANCE_PAYROLL_AGENT_ACTOR_TOKEN]:'))) {
+            expectingToken = `${val}_actor`;
+        }
+        if (message.includes(`[${key}_AGENT_EXCHANGED_TOKEN`) ||
+            (val === 'payroll' && message.includes('[FINANCE_PAYROLL_AGENT_EXCHANGED_TOKEN'))) {
+            expectingToken = `${val}_exchanged`;
+        }
     }
 
     // Forward Flow
     if (message.includes('auth/login')) animatePathForward('conn-user-wso2');
     if (message.includes('Actor token obtained')) animatePathForward('conn-wso2-orch');
-    if (message.includes('TOKEN EXCHANGE FOR')) animatePathForward('conn-orch-exchanger');
+    // Method V2: orchestrator downscopes animate on the orch→agents connector
+    if (message.includes('ORCHESTRATOR DOWNSCOPING TOKEN FOR') ||
+        message.includes('TOKEN EXCHANGE FOR')) animatePathForward('conn-orch-exchanger');
 
     // Agent Flows
     if (message.includes('HR_AGENT')) triggerAgentFlow('hr');
@@ -269,7 +281,16 @@ function setToken(type, token) {
         const card = document.getElementById(`token-${type}`);
         if (card) {
             card.classList.add('active');
-            card.closest('.agent-group').style.borderColor = '#4CAF50';
+            // Downscoped = orange (orchestrator forwarded), actor = blue, exchanged = green
+            if (type.endsWith('_downscoped')) {
+                card.style.borderColor = '#FF7300';
+                card.style.background = '#fff8f0';
+            } else if (type.endsWith('_actor')) {
+                card.style.borderColor = '#2196F3';
+                card.style.background = '#f0f7ff';
+            } else if (type.endsWith('_exchanged')) {
+                card.closest('.agent-group').style.borderColor = '#4CAF50';
+            }
         }
     }
 }
@@ -319,6 +340,7 @@ function resetAll() {
     document.querySelectorAll('.response-active').forEach(el => el.classList.remove('response-active'));
     document.querySelectorAll('.token-value').forEach(el => el.textContent = 'Waiting...');
     document.querySelectorAll('.agent-group').forEach(el => el.style.borderColor = '');
+    document.querySelectorAll('.token-badge').forEach(el => { el.style.borderColor = ''; el.style.background = ''; });
     document.getElementById('logs').innerHTML = '';
     clearResponses();
 }

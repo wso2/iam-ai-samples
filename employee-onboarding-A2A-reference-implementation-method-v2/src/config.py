@@ -31,15 +31,10 @@ class Settings(BaseSettings):
     # Agents (Optional, as they are primarily in config.yaml but useful here for validation)
     # Orchestrator is mandatory
     
-    # Token Exchanger Application (for RFC 8693 exchange calls)
-    token_exchanger_client_id: Optional[str] = None
-    token_exchanger_client_secret: Optional[str] = None
-    
     # MCP IT Server (intermediary between IT Agent and IT API)
+    # Uses its own WSO2 IS application for token exchange (Method V2)
     mcp_it_client_id: Optional[str] = None
     mcp_it_client_secret: Optional[str] = None
-    mcp_it_agent_id: Optional[str] = None
-    mcp_it_agent_secret: Optional[str] = None
     
     # Optional Agent Credentials (loaded via env if needed, but primarily used by TokenBroker via config.yaml)
     # However, if .env contains them, Pydantic might complain if not defined here 
@@ -69,13 +64,13 @@ class Settings(BaseSettings):
             with open(env_path, "r") as f:
                 content = f.read()
                 for line in content.splitlines():
-                    if "TOKEN_EXCHANGER_CLIENT_ID" in line:
+                    if "ORCHESTRATOR_CLIENT_ID" in line:
                         print(f"[CONFIG DEBUG] Found in file: {line}", file=_sys.stderr)
         else:
             print(f"[CONFIG DEBUG] .env file NOT FOUND at {env_path}", file=_sys.stderr)
 
         super().__init__(**kwargs)
-        print(f"[CONFIG DEBUG] TOKEN_EXCHANGER_CLIENT_ID: {self.token_exchanger_client_id}", file=_sys.stderr)
+        print(f"[CONFIG DEBUG] ORCHESTRATOR_CLIENT_ID: {self.orchestrator_client_id}", file=_sys.stderr)
         base = f"https://api.asgardeo.io/t/{self.asgardeo_org_name}"
         if not self.asgardeo_base_url:
             self.asgardeo_base_url = base

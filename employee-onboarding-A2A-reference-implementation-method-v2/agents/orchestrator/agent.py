@@ -231,17 +231,40 @@ class OrchestratorAgent:
 
         # Derive log label from the agent card name (discovered dynamically)
         agent_name = agent_info.get("name", "Agent")
-        agent_type = agent_name.upper().replace(" ", "_")
+        agent_type = agent_name.upper().replace(" & ", "_").replace(" ", "_")
 
         try:
-            # Forward the user-delegated token directly.
-            # Each worker agent performs its own RFC 8693 token exchange
-            # (using Token Exchanger App credentials + its own actor token).
-            exchanged_token = pre_exchanged_token if pre_exchanged_token else access_token
-            vlog(f"\n[FORWARDING USER DELEGATED TOKEN TO {agent_type}]")
+            # Method V2: Orchestrator downscopes the user token using each agent's
+            # own WSO2 IS application credentials before forwarding.
+            # The agent receives a pre-scoped token and uses its own credentials
+            # again for the second exchange when calling its downstream API.
+            if pre_exchanged_token:
+                exchanged_token = pre_exchanged_token
+            else:
+                # Find config key for this agent URL
+                agent_cfg_key = next(
+                    (k for k, v in self.agents_config.items() if v.get("url") == agent_url),
+                    None
+                )
+                if agent_cfg_key:
+                    agent_cfg = self.agents_config[agent_cfg_key]
+                    target_scopes = agent_cfg.get("required_scopes", [])
+                    target_audience = agent_cfg.get("target_audience", "onboarding-api")
+                    async with self._token_exchange_lock:
+                        exchanged_token = await self.token_broker.exchange_token_for_agent(
+                            source_token=access_token,
+                            agent_key=agent_cfg_key,
+                            target_audience=target_audience,
+                            target_scopes=target_scopes
+                        )
+                else:
+                    vlog(f"\n[WARNING] No config found for {agent_url}, forwarding raw token")
+                    exchanged_token = access_token
+
+            vlog(f"\n[FORWARDING DOWNSCOPED TOKEN TO {agent_type}]")
             vlog(f"  Agent: {agent_name}")
             vlog(f"  URL: {agent_url}")
-            vlog(f"\n[USER_DELEGATED_TOKEN]:")
+            vlog(f"\n[{agent_type}_DOWNSCOPED_TOKEN]:")
             vlog(f"  {exchanged_token}")
 
             async with httpx.AsyncClient() as httpx_client:

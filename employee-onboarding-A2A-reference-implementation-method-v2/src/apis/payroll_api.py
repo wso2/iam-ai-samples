@@ -1,7 +1,7 @@
 """
 Payroll API - Employee payroll and expense management endpoints.
-Required scope: approval:write, approval:read
-Required audience: payroll-api
+Required scope: payroll:write (write ops), payroll:read (read ops)
+Required audience: onboarding-api
 """
 
 from datetime import date, datetime
@@ -102,7 +102,7 @@ async def register_payroll(
     - Requires scope: payroll:write
     - Requires audience: payroll-api (validated as onboarding-api in this demo)
     """
-    require_scope(token, "approval:write")
+    require_scope(token, "payroll:write")
     require_audience(token, "onboarding-api")
 
     if data.employee_id in _payroll_records:
@@ -141,7 +141,7 @@ async def create_expense_account(
     Create an expense account with monthly spending limits.
     - Requires scope: payroll:write
     """
-    require_scope(token, "approval:write")
+    require_scope(token, "payroll:write")
     require_audience(token, "onboarding-api")
 
     if data.employee_id in _expense_accounts:
@@ -170,7 +170,7 @@ async def get_payroll(
     employee_id: str,
     token: TokenClaims = Depends(validate_token)
 ):
-    require_scope(token, "approval:read")
+    require_scope(token, "payroll:read")
     require_audience(token, "onboarding-api")
     record = _payroll_records.get(employee_id)
     if not record:
@@ -183,7 +183,7 @@ async def get_expense_account(
     employee_id: str,
     token: TokenClaims = Depends(validate_token)
 ):
-    require_scope(token, "approval:read")
+    require_scope(token, "payroll:read")
     require_audience(token, "onboarding-api")
     account = _expense_accounts.get(employee_id)
     if not account:

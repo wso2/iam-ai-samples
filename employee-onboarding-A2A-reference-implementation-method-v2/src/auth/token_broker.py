@@ -145,23 +145,8 @@ class TokenBroker:
             return None
         return session.delegated_token
         
-    def get_demo_token(self) -> str:
-        """
-        Get a delegated token for demo purposes.
-        Uses the most recent session's delegated token if available.
-        """
-        # Try to get token from most recent session
-        for session in reversed(list(self._sessions.values())):
-            if session.delegated_token:
-                vlog(f"\n[DEMO] Using delegated token from session: {session.session_id}")
-                return session.delegated_token
-        
-        # If no session, log warning
-        vlog(f"\n[DEMO WARNING] No user session found! Please login first at /auth/login")
-        raise ValueError("No user session found. Please login at /auth/login first to get a delegated token.")
-
     # ─────────────────────────────────────────────────────────────────
-    # Token Exchange (Single App, Per-Agent Identity)
+    # Token Exchange (Method V2 — Per-Agent App, No Actor Token)
     # ─────────────────────────────────────────────────────────────────
 
     async def exchange_token_for_agent(
@@ -172,89 +157,60 @@ class TokenBroker:
         target_scopes: list[str]
     ) -> str:
         """
-        Exchange source token for a downstream agent.
-        Uses Token Exchanger App credentials + Agent's actor token.
+        Downscope the user delegated token for a specific agent.
+
+        Method V2 flow:
+        - Orchestrator uses its OWN WSO2 IS application credentials to downscope.
+          WSO2 IS only allows the issuing application to exchange its own tokens —
+          the subject_token was issued by the orchestrator app, so only the
+          orchestrator's client_id/secret can exchange it (self-delegation).
+        - No actor_token parameter is sent — WSO2 IS self-delegation does not
+          require an actor token.
+        - The resulting token is scoped to the agent's required scopes and
+          forwarded to the agent, which then does a second exchange with its own
+          application credentials + its own actor token.
         """
         agent_config = self.agents_config.get(agent_key)
         if not agent_config:
             raise ValueError(f"Unknown agent: {agent_key}")
-            
-        agent_id = agent_config.get("agent_id")
-        agent_secret = agent_config.get("agent_secret")
-        
-        if not agent_id:
-            raise ValueError(f"Missing agent_id for agent {agent_key}")
+
+        # Use orchestrator's own credentials — it is the token issuer
+        client_id = self.settings.orchestrator_client_id
+        client_secret = self.settings.orchestrator_client_secret
 
         vlog(f"\n{'#'*80}")
-        vlog(f"# TOKEN EXCHANGE FOR: {agent_key.upper()}")
+        vlog(f"# ORCHESTRATOR DOWNSCOPING TOKEN FOR: {agent_key.upper()}")
         vlog(f"{'#'*80}")
-        vlog(f"Agent ID: {agent_id}")
-        vlog(f"Target Audience: {target_audience}")
+        vlog(f"Orchestrator App Client ID: {client_id}")
         vlog(f"Target Scopes: {target_scopes}")
-        
+
         vlog(f"\n[SOURCE_TOKEN (User Delegated)]:")
         vlog(f"{source_token}")
 
-        vlog(f"\n[STEP 1a: GET ORCHESTRATOR ACTOR TOKEN] (Verified in initialization)")
-        
-        if not self.settings.token_exchanger_client_id or not self.settings.token_exchanger_client_secret:
-            raise ValueError("TOKEN_EXCHANGER_CLIENT_ID and TOKEN_EXCHANGER_CLIENT_SECRET are required")
-        
-        # STEP 1b: Get Agent's Actor Token
-        vlog(f"\n[STEP 1b: GET {agent_key.upper()} ACTOR TOKEN]")
-        vlog(f"  Agent ID: {agent_id}")
-        
-        agent_actor_token = await self.asgardeo._fetch_agent_actor_token(
-            client_id=self.settings.token_exchanger_client_id,
-            client_secret=self.settings.token_exchanger_client_secret,
-            agent_id=agent_id
-        )
-        
-        vlog(f"\n[{agent_key.upper()}_ACTOR_TOKEN]:")
-        vlog(f"{agent_actor_token.token}")
-        
-        # Debug: Check who this token belongs to
-        try:
-             import json
-             import base64
-             # Pad base64 string
-             payload = agent_actor_token.token.split(".")[1]
-             payload += "=" * (4 - len(payload) % 4)
-             claims = json.loads(base64.urlsafe_b64decode(payload))
-             vlog(f"  [DEBUG] Actor Token Sub: {claims.get('sub')}")
-             vlog(f"  [DEBUG] Actor Token Iss: {claims.get('iss')}")
-             vlog(f"  [DEBUG] Actor Token Aud: {claims.get('aud')}")
-        except Exception as e:
-             vlog(f"  [DEBUG] Failed to decode actor token: {e}")
-        
-        # STEP 2: Exchange Source Token + Agent Actor Token
-        # Direct exchange: User Delegated Token (Subject) + Agent Actor Token (Actor) -> Final Token
-        vlog(f"\n[STEP 2: AGENT TOKEN EXCHANGE]")
-        vlog(f"  Subject: Source Token (User Delegated)")
-        vlog(f"  Actor: {agent_key.upper()} Actor Token")
-        vlog(f"  Token Exchanger App: {self.settings.token_exchanger_client_id}")
-        vlog(f"  Target Scopes: {target_scopes}")
-        
+        vlog(f"\n[ORCHESTRATOR DOWNSCOPE — RFC 8693, Self-Delegation, No Actor Token]")
+        vlog(f"  Using orchestrator's own credentials (token issuer): {client_id}")
+        vlog(f"  Scopes: {target_scopes}")
+
         new_token = await self.asgardeo.perform_token_exchange(
             subject_token=source_token,
-            client_id=self.settings.token_exchanger_client_id,
-            client_secret=self.settings.token_exchanger_client_secret,
-            actor_token=agent_actor_token.token,  # Agent actor for nested act
-            target_audience=None,                 # User requested NO audience parameter
+            client_id=client_id,
+            client_secret=client_secret,
+            # No actor_token — WSO2 IS self-delegation does not require one
+            target_audience=None,
             target_scopes=target_scopes
         )
-        
-        vlog(f"\n[{agent_key.upper()}_EXCHANGED_TOKEN]:")
+
+        vlog(f"\n[{agent_key.upper()}_DOWNSCOPED_TOKEN (forwarded to agent)]:")
         vlog(f"{new_token}")
         vlog(f"{'#'*80}\n")
-        
+
         self._log_audit(
-            operation="token_exchange",
+            operation="orchestrator_downscope",
             user_sub="unknown",
             target_service=agent_key,
             scopes=target_scopes
         )
-        
+
         return new_token
 
 

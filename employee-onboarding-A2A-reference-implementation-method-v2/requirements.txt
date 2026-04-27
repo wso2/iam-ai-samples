@@ -4,7 +4,8 @@
 # ==============================================================================
 
 # --- A2A Protocol ---
-a2a-sdk>=0.3.24
+# Pinned to 0.3.x: google-adk 1.31.x requires TextPart which was removed in a2a-sdk 1.0.0
+a2a-sdk>=0.3.24,<1.0.0
 
 # --- Agent Frameworks ---
 # Orchestrator & IT Agent (LangGraph)

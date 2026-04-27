@@ -54,12 +54,12 @@ def load_yaml_config(path: str = "config.yaml") -> dict[str, Any]:
     from dotenv import load_dotenv
     load_dotenv(override=True)
     
-    # Debug: Check if HR_AGENT_ID is loaded correctly
-    hr_id = os.getenv("HR_AGENT_ID")
-    if hr_id:
-        logger.info(f"Loaded HR_AGENT_ID from env: {hr_id}")
+    # Debug: Check if HR agent client_id is loaded correctly
+    hr_client_id = os.getenv("HR_CLIENT_ID")
+    if hr_client_id:
+        logger.info(f"Loaded HR_CLIENT_ID from env: {hr_client_id}")
     else:
-        logger.warning("HR_AGENT_ID not found in env")
+        logger.warning("HR_CLIENT_ID not found in env")
     
     try:
         with open(path, "r") as f:

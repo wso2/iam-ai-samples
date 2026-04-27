@@ -228,7 +228,7 @@ class HRAgent:
     Required scopes: hr:read, hr:write
     """
 
-    REQUIRED_SCOPES = ["hr:read", "hr:write"]
+    REQUIRED_SCOPES = ["hr:write", "hr:read"]
     SUPPORTED_CONTENT_TYPES = ["text", "text/plain"]
 
     def __init__(self, config: dict = None):
@@ -238,7 +238,6 @@ class HRAgent:
         app_config = load_yaml_config()
         agent_config = app_config.get("agents", {}).get("hr_agent", {})
         self.required_scopes = agent_config.get("required_scopes", self.REQUIRED_SCOPES)
-        self.agent_id = agent_config.get("agent_id")
 
         self.client = AsyncOpenAI(api_key=self.settings.openai_api_key)
         self.model = "gpt-4o-mini"
@@ -250,22 +249,30 @@ class HRAgent:
         if not token:
             return "No token provided. Authentication required."
 
-        # Get actor token: 3-step flow using TEApp credentials (OAuth app) + agent credentials (authn)
-        # Then RFC 8693 exchange: OBO token as subject, agent actor token as actor
+        # Method V2: Each agent has its OWN WSO2 IS Application + Agent identity.
+        # Step 1: Get actor token via 3-step flow using THIS agent's own client_id/secret
+        #         (not a shared TOKEN_EXCHANGER app — each agent authenticates as itself).
+        # Step 2: Exchange the pre-scoped token (from orchestrator) using own credentials
+        #         + actor token to prove agent identity.
+        app_config = load_yaml_config()
+        agent_cfg = app_config.get("agents", {}).get("hr_agent", {})
+        client_id = agent_cfg.get("client_id")
+        client_secret = agent_cfg.get("client_secret")
+        agent_id = agent_cfg.get("agent_id")
         try:
             from src.auth.asgardeo import get_asgardeo_client
             asgardeo = get_asgardeo_client()
             actor = await asgardeo._fetch_agent_actor_token(
-                client_id=self.settings.token_exchanger_client_id,
-                client_secret=self.settings.token_exchanger_client_secret,
-                agent_id=self.agent_id,
+                client_id=client_id,
+                client_secret=client_secret,
+                agent_id=agent_id,
             )
             log_and_broadcast(f"\n[HR_AGENT_ACTOR_TOKEN]:")
             log_and_broadcast(actor.token)
             token = await asgardeo.perform_token_exchange(
                 subject_token=token,
-                client_id=self.settings.token_exchanger_client_id,
-                client_secret=self.settings.token_exchanger_client_secret,
+                client_id=client_id,
+                client_secret=client_secret,
                 actor_token=actor.token,
                 target_audience=None,
                 target_scopes=self.required_scopes,

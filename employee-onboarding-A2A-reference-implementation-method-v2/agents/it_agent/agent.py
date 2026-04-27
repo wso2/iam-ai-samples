@@ -49,7 +49,7 @@ class ITAgent:
     Required scopes: it:read, it:write
     """
 
-    REQUIRED_SCOPES = ["it:read", "it:write"]
+    REQUIRED_SCOPES = ["it:write", "it:read"]
     SUPPORTED_CONTENT_TYPES = ["text", "text/plain"]
 
     def __init__(self, config: dict = None):
@@ -101,27 +101,29 @@ class ITAgent:
         if not token:
             return "[X] No token provided. Authentication required."
 
-        # ── Token exchange: get actor token + RFC 8693 exchange ─────────────
-        from src.config import get_settings
+        # Method V2: Each agent has its OWN WSO2 IS Application + Agent identity.
+        # Step 1: Get actor token via 3-step flow using THIS agent's own client_id/secret.
+        # Step 2: Exchange the pre-scoped token using own credentials + actor token.
         from src.config_loader import load_yaml_config
         from src.log_broadcaster import log_and_broadcast as _lbc
-        _settings = get_settings()
         _agent_cfg = load_yaml_config().get("agents", {}).get("it_agent", {})
-        _agent_id  = _agent_cfg.get("agent_id")
+        _client_id = _agent_cfg.get("client_id")
+        _client_secret = _agent_cfg.get("client_secret")
+        _agent_id = _agent_cfg.get("agent_id")
         try:
             from src.auth.asgardeo import get_asgardeo_client
             asgardeo = get_asgardeo_client()
             actor = await asgardeo._fetch_agent_actor_token(
-                client_id=_settings.token_exchanger_client_id,
-                client_secret=_settings.token_exchanger_client_secret,
+                client_id=_client_id,
+                client_secret=_client_secret,
                 agent_id=_agent_id,
             )
             _lbc(f"\n[IT_AGENT_ACTOR_TOKEN]:")
             _lbc(actor.token)
             token = await asgardeo.perform_token_exchange(
                 subject_token=token,
-                client_id=_settings.token_exchanger_client_id,
-                client_secret=_settings.token_exchanger_client_secret,
+                client_id=_client_id,
+                client_secret=_client_secret,
                 actor_token=actor.token,
                 target_audience=None,
                 target_scopes=self.required_scopes,

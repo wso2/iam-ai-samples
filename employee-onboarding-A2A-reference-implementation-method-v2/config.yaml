@@ -19,16 +19,22 @@ asgardeo:
 # ─────────────────────────────────────────────────────────────────
 # A2A Agents (Worker Agents)
 # ─────────────────────────────────────────────────────────────────
-# NOTE: These agents do NOT have separate Applications.
-# They use the Orchestrator's App credentials but have their own Agent IDs.
-# All agents use onboarding-api as the audience (scopes are global in WSO2 IS)
+# Method V2: Each agent has its own WSO2 IS Application (client_id/secret).
+# The Orchestrator downscopes the user token using its own credentials and
+# forwards the pre-scoped token to each agent. Each agent then performs a
+# second exchange using its own app credentials when calling its downstream API.
+# No shared Token Exchanger app; no actor token required for exchange.
 agents:
   hr_agent:
     name: "HR Agent"
     description: "Manages employee profiles"
     url: "http://localhost:8001"
-    required_scopes: ["hr:read", "hr:write"]
+    # hr:write — create_employee, grant_privileges (POST endpoints)
+    # hr:read  — get_employee, list_employees (GET endpoints, LLM may verify after create)
+    required_scopes: ["hr:write", "hr:read"]
     target_audience: "onboarding-api"
+    client_id: "${HR_CLIENT_ID}"
+    client_secret: "${HR_CLIENT_SECRET}"
     agent_id: "${HR_AGENT_ID}"
     agent_secret: "${HR_AGENT_SECRET}"
     skills:
@@ -39,18 +45,18 @@ agents:
     name: "IT Agent"
     description: "Provisions IT accounts"
     url: "http://localhost:8002"
-    required_scopes: ["it:read", "it:write"]
+    # it:write — provision VPN, GitHub, AWS (POST endpoints via MCP)
+    # it:read  — list provisions (GET endpoint via MCP)
+    required_scopes: ["it:write", "it:read"]
     target_audience: "onboarding-api"
+    client_id: "${IT_CLIENT_ID}"
+    client_secret: "${IT_CLIENT_SECRET}"
     agent_id: "${IT_AGENT_ID}"
     agent_secret: "${IT_AGENT_SECRET}"
     # IT Agent routes through MCP Server instead of calling API directly
-    # MCP Server is also registered as AI Agent in WSO2 IS
+    # MCP Server reuses IT Agent's credentials for token exchange (not a separate identity)
     mcp_server:
       url: "http://localhost:8020"
-      client_id: "${MCP_IT_CLIENT_ID}"
-      client_secret: "${MCP_IT_CLIENT_SECRET}"
-      agent_id: "${MCP_IT_AGENT_ID}"
-      agent_secret: "${MCP_IT_AGENT_SECRET}"
     skills:
       - id: "provision_vpn"
         name: "Provision VPN"
@@ -59,8 +65,12 @@ agents:
     name: "Finance & Payroll Agent"
     description: "Registers employees in payroll and sets up expense accounts"
     url: "http://localhost:8004"
-    required_scopes: ["approval:read", "approval:write"]
+    # payroll:write only — onboarding creates payroll records and expense accounts (POST endpoints)
+    # payroll:read not forwarded — agent does not need to read back after writing
+    required_scopes: ["payroll:write"]
     target_audience: "onboarding-api"
+    client_id: "${PAYROLL_CLIENT_ID}"
+    client_secret: "${PAYROLL_CLIENT_SECRET}"
     agent_id: "${PAYROLL_AGENT_ID}"
     agent_secret: "${PAYROLL_AGENT_SECRET}"
     skills:
@@ -73,8 +83,12 @@ agents:
     name: "Booking Agent"
     description: "Schedules tasks and deliveries"
     url: "http://localhost:8005"
-    required_scopes: ["booking:read", "booking:write"]
+    # booking:write only — onboarding creates tasks and deliveries (POST endpoints)
+    # booking:read not forwarded — agent does not need to list after scheduling
+    required_scopes: ["booking:write"]
     target_audience: "onboarding-api"
+    client_id: "${BOOKING_CLIENT_ID}"
+    client_secret: "${BOOKING_CLIENT_SECRET}"
     agent_id: "${BOOKING_AGENT_ID}"
     agent_secret: "${BOOKING_AGENT_SECRET}"
     skills:

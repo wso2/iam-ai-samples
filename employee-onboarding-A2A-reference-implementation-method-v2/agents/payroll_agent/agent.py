@@ -40,10 +40,10 @@ class PayrollAgent:
     """
     Finance & Payroll Agent.
     Uses CrewAI with two tools that call the Payroll REST API.
-    Required scopes: approval:read, approval:write
+    Required scopes: payroll:write (onboarding writes only)
     """
 
-    REQUIRED_SCOPES = ["approval:read", "approval:write"]
+    REQUIRED_SCOPES = ["payroll:write"]
 
     def __init__(self, config: dict = None):
         self.config   = config or {}
@@ -51,7 +51,6 @@ class PayrollAgent:
         app_config    = load_yaml_config()
         agent_cfg     = app_config.get("agents", {}).get("payroll_agent", {})
         self.required_scopes = agent_cfg.get("required_scopes", self.REQUIRED_SCOPES)
-        self.agent_id        = agent_cfg.get("agent_id")
         self.openai_api_key  = self.settings.openai_api_key
         self.llm = ChatOpenAI(
             model="gpt-4o-mini",
@@ -87,22 +86,27 @@ class PayrollAgent:
         if not token:
             return "❌ No token provided. Authentication required."
 
-        # Get actor token: 3-step flow using TEApp credentials (OAuth app) + agent credentials (authn)
-        # Then RFC 8693 exchange: OBO token as subject, agent actor token as actor
+        # Method V2: Each agent has its OWN WSO2 IS Application + Agent identity.
+        # Step 1: Get actor token via 3-step flow using THIS agent's own client_id/secret.
+        # Step 2: Exchange the pre-scoped token using own credentials + actor token.
+        agent_cfg = load_yaml_config().get("agents", {}).get("payroll_agent", {})
+        client_id = agent_cfg.get("client_id")
+        client_secret = agent_cfg.get("client_secret")
+        agent_id = agent_cfg.get("agent_id")
         try:
             from src.auth.asgardeo import get_asgardeo_client
             asgardeo = get_asgardeo_client()
             actor = await asgardeo._fetch_agent_actor_token(
-                client_id=self.settings.token_exchanger_client_id,
-                client_secret=self.settings.token_exchanger_client_secret,
-                agent_id=self.agent_id,
+                client_id=client_id,
+                client_secret=client_secret,
+                agent_id=agent_id,
             )
             log_and_broadcast(f"\n[PAYROLL_AGENT_ACTOR_TOKEN]:")
             log_and_broadcast(actor.token)
             token = await asgardeo.perform_token_exchange(
                 subject_token=token,
-                client_id=self.settings.token_exchanger_client_id,
-                client_secret=self.settings.token_exchanger_client_secret,
+                client_id=client_id,
+                client_secret=client_secret,
                 actor_token=actor.token,
                 target_audience=None,
                 target_scopes=self.required_scopes

@@ -48,14 +48,14 @@ class CustomA2aAgentExecutor(A2aAgentExecutor):
     Subclass of A2A Executor that bridges the Starlette token middleware
     into the ADK event loop context, with token exchange.
     """
-    def __init__(self, runner: Runner, agent_id: str, required_scopes: list,
-                 token_exchanger_client_id: str, token_exchanger_client_secret: str):
+    def __init__(self, runner: Runner, required_scopes: list,
+                 client_id: str, client_secret: str, agent_id: str):
         super().__init__(runner=runner)
         self._current_request_token = None
-        self._agent_id = agent_id
         self._required_scopes = required_scopes
-        self._token_exchanger_client_id = token_exchanger_client_id
-        self._token_exchanger_client_secret = token_exchanger_client_secret
+        self._client_id = client_id
+        self._client_secret = client_secret
+        self._agent_id = agent_id
 
     def set_auth_token(self, token: str):
         self._current_request_token = token
@@ -63,21 +63,24 @@ class CustomA2aAgentExecutor(A2aAgentExecutor):
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         token = self._current_request_token
         if token and self._agent_id:
+            # Method V2: Each agent has its OWN WSO2 IS Application + Agent identity.
+            # Step 1: Get actor token via 3-step flow using THIS agent's own client_id/secret.
+            # Step 2: Exchange the pre-scoped token using own credentials + actor token.
             try:
                 from src.auth.asgardeo import get_asgardeo_client
                 from src.log_broadcaster import log_and_broadcast
                 asgardeo = get_asgardeo_client()
                 actor = await asgardeo._fetch_agent_actor_token(
-                    client_id=self._token_exchanger_client_id,
-                    client_secret=self._token_exchanger_client_secret,
+                    client_id=self._client_id,
+                    client_secret=self._client_secret,
                     agent_id=self._agent_id,
                 )
                 log_and_broadcast(f"\n[BOOKING_AGENT_ACTOR_TOKEN]:")
                 log_and_broadcast(actor.token)
                 token = await asgardeo.perform_token_exchange(
                     subject_token=token,
-                    client_id=self._token_exchanger_client_id,
-                    client_secret=self._token_exchanger_client_secret,
+                    client_id=self._client_id,
+                    client_secret=self._client_secret,
                     actor_token=actor.token,
                     target_audience=None,
                     target_scopes=self._required_scopes,
@@ -114,15 +117,15 @@ def main():
 
     from urllib.parse import urlparse
     from src.config_loader import load_yaml_config
-    from src.config import get_settings
     _cfg = load_yaml_config()
     _parsed = urlparse(_cfg.get("agents", {}).get("booking_agent", {}).get("url", "http://localhost:8005"))
     host = _parsed.hostname or "localhost"
     port = _parsed.port or 8005
     _agent_cfg = _cfg.get("agents", {}).get("booking_agent", {})
-    _settings = get_settings()
+    _client_id = _agent_cfg.get("client_id")
+    _client_secret = _agent_cfg.get("client_secret")
     _agent_id = _agent_cfg.get("agent_id")
-    _required_scopes = _agent_cfg.get("required_scopes", ["booking:read", "booking:write"])
+    _required_scopes = _agent_cfg.get("required_scopes", ["booking:write"])
 
     # Agent Card — describes this agent to other agents (A2A protocol)
     agent_card = AgentCard(
@@ -176,10 +179,10 @@ def main():
     # Custom Executor bridges ADK Runner to A2A protocol, injects token after exchange
     agent_executor = CustomA2aAgentExecutor(
         runner=runner,
-        agent_id=_agent_id,
         required_scopes=_required_scopes,
-        token_exchanger_client_id=_settings.token_exchanger_client_id,
-        token_exchanger_client_secret=_settings.token_exchanger_client_secret,
+        client_id=_client_id,
+        client_secret=_client_secret,
+        agent_id=_agent_id,
     )
 
     # DefaultRequestHandler manages A2A task lifecycle

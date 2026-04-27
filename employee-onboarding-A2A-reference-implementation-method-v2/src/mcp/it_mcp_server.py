@@ -15,8 +15,9 @@ The MCP server:
 3. Calls the IT API with the narrowed token
 
 Token Exchange (with actor token):
-  Uses Token Exchanger app credentials + subject_token + actor_token → narrowed token
-  WSO2 IS maintains the delegation chain through scope narrowing exchanges.
+  Uses the IT Agent's application credentials + actor token (obtained via IT Agent's
+  own 3-step flow) to narrow the scope. The MCP server acts on behalf of the IT Agent,
+  so it reuses the IT Agent's WSO2 IS Application identity for all token exchanges.
 """
 
 import os
@@ -85,10 +86,13 @@ async def vlog(message: str):
 settings = get_settings()
 IT_API_BASE = load_yaml_config().get("agents", {}).get("it_agent", {}).get("url", "http://localhost:8002") + "/api/it"
 
-# Token Exchanger — performs the actual token exchange
-# (no actor token needed, just client credentials + subject token)
-TOKEN_EXCHANGER_CLIENT_ID = settings.token_exchanger_client_id
-TOKEN_EXCHANGER_CLIENT_SECRET = settings.token_exchanger_client_secret
+# MCP IT Server acts on behalf of the IT Agent — reuses the IT Agent's WSO2 IS Application
+# credentials and Agent identity for token exchange. The MCP server is a pipeline component
+# of the IT Agent, not a separate application identity.
+_it_agent_cfg = load_yaml_config().get("agents", {}).get("it_agent", {})
+IT_CLIENT_ID = _it_agent_cfg.get("client_id") or getattr(settings, "it_client_id", None)
+IT_CLIENT_SECRET = _it_agent_cfg.get("client_secret") or getattr(settings, "it_client_secret", None)
+IT_AGENT_ID = _it_agent_cfg.get("agent_id") or getattr(settings, "it_agent_id", None)
 TOKEN_URL = settings.asgardeo_token_url
 
 # OpenAI for LLM routing
@@ -96,7 +100,7 @@ OPENAI_API_KEY = settings.openai_api_key
 
 
 # ─────────────────────────────────────────────────────────────────
-# Token Exchange (simplified — no actor token)
+# Token Exchange (Method V2 — MCP IT Server own app + agent credentials)
 # ─────────────────────────────────────────────────────────────────
 
 
@@ -106,72 +110,68 @@ async def exchange_token_for_scope(
     target_audience: str = None
 ) -> str:
     """
-    Exchange the incoming IT token for a narrowed-scope token with optional audience binding.
-    
-    Uses RFC 8693 Token Exchange WITH actor token:
-      - subject_token: The IT Agent's token (it:read + it:write)
-      - actor_token: Same as subject for scope narrowing
-      - client credentials: Token Exchanger app (TOKEN_EXCHANGER_CLIENT_ID)
-      - requested scope: narrowed (e.g., just "it:write")
-      - audience: API-specific audience (e.g., "vpn-api", "github-api")
-    
-    This ensures each API gets a token specifically bound to it.
-    
+    Exchange the incoming IT token for a narrowed-scope token.
+
+    Method V2: MCP IT Server acts on behalf of the IT Agent — uses IT Agent's
+    WSO2 IS Application credentials and IT Agent's actor token.
+    Step 1: Get IT Agent's actor token via 3-step flow using IT Agent's client_id/secret.
+    Step 2: Exchange the incoming token using IT Agent's credentials + actor token.
+
     Args:
-        subject_token: IT Agent's broad token
-        target_scope: Narrowed scope (e.g., "it:write")
+        subject_token: IT Agent's downscoped token (it:read + it:write)
+        target_scope: Further narrowed scope (e.g., "it:write")
         target_audience: Optional API-specific audience for token binding
-    
-    Returns: A new access token with narrowed scope and optional audience binding.
+
+    Returns: A new access token scoped for the specific IT API call.
     """
-    if not TOKEN_EXCHANGER_CLIENT_ID or not TOKEN_EXCHANGER_CLIENT_SECRET:
-        raise ValueError("Token Exchanger credentials not configured")
+    if not IT_CLIENT_ID or not IT_CLIENT_SECRET:
+        raise ValueError("IT Agent credentials not configured")
 
     await vlog(f"\n{'#'*80}")
-    await vlog(f"# TOKEN EXCHANGE FOR: MCP_IT_SERVER")
+    await vlog(f"# TOKEN EXCHANGE FOR: IT_MCP_SERVER (using IT Agent credentials)")
     await vlog(f"{'#'*80}")
-    await vlog(f"Token Exchanger App: {TOKEN_EXCHANGER_CLIENT_ID}")
+    await vlog(f"IT Agent App Client ID: {IT_CLIENT_ID}")
     await vlog(f"Target Scope: {target_scope}")
     if target_audience:
         await vlog(f"Target Audience: {target_audience}")
-    
+
     await vlog(f"\n[SOURCE_TOKEN (from IT Agent)]:")
     await vlog(f"{subject_token}")
-    
-    # Decode source token for debug
-    try:
-        payload = subject_token.split(".")[1]
-        payload += "=" * (4 - len(payload) % 4)
-        claims = json.loads(base64.urlsafe_b64decode(payload))
-        await vlog(f"  [DEBUG] Source Token Sub: {claims.get('sub')}")
-        await vlog(f"  [DEBUG] Source Token Iss: {claims.get('iss')}")
-        await vlog(f"  [DEBUG] Source Token Scope: {claims.get('scope')}")
-    except Exception as e:
-        await vlog(f"  [DEBUG] Failed to decode source token: {e}")
 
-    await vlog(f"\n[STEP 1: SCOPE-NARROWING TOKEN EXCHANGE (With Actor Token)]")
-    await vlog(f"  Subject: IT Agent Token")
-    await vlog(f"  Token Exchanger App: {TOKEN_EXCHANGER_CLIENT_ID}")
+    # Step 1: Get IT Agent's actor token (3-step flow, IT Agent's own credentials)
+    await vlog(f"\n[STEP 1: GET IT_AGENT ACTOR TOKEN (via MCP server)]")
+    from src.auth.asgardeo import get_asgardeo_client
+    asgardeo = get_asgardeo_client()
+    actor = await asgardeo._fetch_agent_actor_token(
+        client_id=IT_CLIENT_ID,
+        client_secret=IT_CLIENT_SECRET,
+        agent_id=IT_AGENT_ID,
+    )
+    await vlog(f"\n[IT_AGENT_ACTOR_TOKEN (MCP)]:")
+    await vlog(f"{actor.token}")
+
+    await vlog(f"\n[STEP 2: SCOPE-NARROWING TOKEN EXCHANGE]")
+    await vlog(f"  Subject: IT Agent Downscoped Token")
+    await vlog(f"  Actor: IT Agent Actor Token")
+    await vlog(f"  IT Agent App Client ID: {IT_CLIENT_ID}")
     await vlog(f"  Target Scope: {target_scope}")
     if target_audience:
         await vlog(f"  Target Audience: {target_audience}")
     await vlog(f"  Token URL: {TOKEN_URL}")
-    
+
     basic_auth = base64.b64encode(
-        f"{TOKEN_EXCHANGER_CLIENT_ID}:{TOKEN_EXCHANGER_CLIENT_SECRET}".encode()
+        f"{IT_CLIENT_ID}:{IT_CLIENT_SECRET}".encode()
     ).decode()
 
-    # RFC 8693 Token Exchange WITH actor token to maintain delegation chain
     data = {
         "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
         "subject_token": subject_token,
         "subject_token_type": "urn:ietf:params:oauth:token-type:access_token",
-        "actor_token": subject_token,  # Same token acts as actor for scope narrowing
+        "actor_token": actor.token,
         "actor_token_type": "urn:ietf:params:oauth:token-type:access_token",
         "scope": target_scope,
     }
-    
-    # Add audience if specified for API-specific token binding
+
     if target_audience:
         data["audience"] = target_audience
 
@@ -710,7 +710,7 @@ if __name__ == "__main__":
     print(f"\n🔧 Starting IT MCP Server (LLM-routed)", file=sys.stderr)
     print(f"   Transport: {args.transport}", file=sys.stderr)
     print(f"   IT API Target: {IT_API_BASE}", file=sys.stderr)
-    print(f"   Token Exchanger: {TOKEN_EXCHANGER_CLIENT_ID}", file=sys.stderr)
+    print(f"   IT Agent App Client ID: {IT_CLIENT_ID}", file=sys.stderr)
     print(f"   LLM Router: gpt-4o-mini", file=sys.stderr)
     print(f"   Tools: handle_it_request (smart), provision_vpn, provision_github, provision_aws, list_provisions", file=sys.stderr)
 
