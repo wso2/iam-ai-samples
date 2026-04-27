@@ -9,3 +9,5 @@ endpoints:
     type: REST
     networkVisibilities:
       - Public
+    auth:
+      enabled: false

@@ -56,8 +56,26 @@ logger = logging.getLogger(__name__)
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
-HR_MCP_SERVER_URL = os.getenv("HR_MCP_SERVER_URL", "http://127.0.0.1:8000/mcp")
+def _resolve_hr_mcp_url() -> str:
+    """
+    Prefer an explicit HR_MCP_SERVER_URL when it's a real http(s) URL.
+    Otherwise fall back to the Choreo Connection-injected service URL.
+    Choreo doesn't expand ${VAR} placeholders in config values, so a value
+    like "${CHOREO_HR_SERVER_SERVICEURL}/mcp" reaches us literally — treat
+    that as "not set" and use the actual env var instead.
+    """
+    explicit = os.getenv("HR_MCP_SERVER_URL", "")
+    if explicit.startswith(("http://", "https://")):
+        return explicit
+    base = os.getenv("CHOREO_HR_SERVER_SERVICEURL", "").rstrip("/")
+    if base:
+        return f"{base}/mcp"
+    return "http://127.0.0.1:8000/mcp"
+
+
+HR_MCP_SERVER_URL = _resolve_hr_mcp_url()
 MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.5-flash")
+logger.info("HR MCP server URL: %s", HR_MCP_SERVER_URL)
 
 # Base URL for HR MCP server reset endpoint
 HR_MCP_BASE_URL = HR_MCP_SERVER_URL.replace("/mcp", "")
@@ -386,9 +404,16 @@ async def chat(request: Request, session: UserSession = Depends(get_session)):
         response = await agent.ainvoke({"messages": messages})
 
     except Exception as e:
-        logger.error(f"Agent invocation failed: {e}")
+        logger.exception("Agent invocation failed")
+        # ExceptionGroup (TaskGroup) hides the real cause — surface the inner exceptions too.
+        detail = str(e)
+        sub_excs = getattr(e, "exceptions", None)
+        if sub_excs:
+            for i, sub in enumerate(sub_excs):
+                logger.error("  sub-exception %d: %r", i, sub, exc_info=sub)
+            detail = "; ".join(repr(s) for s in sub_excs)
         return JSONResponse(
-            {"type": "error", "message": f"Agent error: {str(e)}"},
+            {"type": "error", "message": f"Agent error: {detail}"},
             status_code=500,
         )
 
