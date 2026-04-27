@@ -531,6 +531,22 @@ async def get_pending(session: UserSession = Depends(get_session)):
     return JSONResponse({"pending_message": session.pending_message})
 
 
+# ─── Logout Endpoint ─────────────────────────────────────────────────────────
+
+
+@app.post("/api/logout")
+async def logout(session: UserSession = Depends(get_session)):
+    """Clear the user's agent session (OBO tokens, chat history).
+
+    The SPA should call this on sign-out so that a subsequent login
+    starts with a fresh session instead of reusing a stale OBO token.
+    """
+    sub = session.user_sub
+    sessions.remove(sub)
+    logger.info("Session cleared for user %s", sub)
+    return JSONResponse({"success": True, "message": "Session cleared."})
+
+
 # ─── Reset Endpoint ──────────────────────────────────────────────────────────
 
 

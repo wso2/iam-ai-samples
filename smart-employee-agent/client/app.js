@@ -1024,6 +1024,8 @@ const app = (function () {
 
   function signOut() {
     const savedIdToken = idToken;
+    const savedAccessToken = accessToken;
+
     accessToken = null;
     idToken = null;
     userScopes = [];
@@ -1032,10 +1034,21 @@ const app = (function () {
     pendingMessage = null;
     sessionStorage.clear();
 
-    const logoutUrl = new URL(`${config.asgardeoBaseUrl}/oidc/logout`);
-    logoutUrl.searchParams.set("post_logout_redirect_uri", config.redirectUri);
-    if (savedIdToken) logoutUrl.searchParams.set("id_token_hint", savedIdToken);
-    window.location.href = logoutUrl.toString();
+    const redirectToIdp = () => {
+      const logoutUrl = new URL(`${config.asgardeoBaseUrl}/oidc/logout`);
+      logoutUrl.searchParams.set("post_logout_redirect_uri", config.redirectUri);
+      if (savedIdToken) logoutUrl.searchParams.set("id_token_hint", savedIdToken);
+      window.location.href = logoutUrl.toString();
+    };
+
+    if (savedAccessToken) {
+      fetch(`${config.agentServerUrl}/api/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${savedAccessToken}` },
+      }).finally(redirectToIdp);
+    } else {
+      redirectToIdp();
+    }
   }
 
   // ─── Utilities ──────────────────────────────────────────────────────────────
