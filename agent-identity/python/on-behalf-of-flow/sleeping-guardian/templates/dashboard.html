@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurelius - The Sleeping Guardian</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            color: #a0aec0;
+            font-size: 1.1em;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h3 {
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            color: #cbd5e0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .price {
+            font-size: 3em;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        .price.positive {
+            color: #48bb78;
+        }
+
+        .price.negative {
+            color: #f56565;
+        }
+
+        .price.neutral {
+            color: #ecc94b;
+        }
+
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: #a0aec0;
+        }
+
+        .stat-value {
+            font-weight: bold;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .status-stable {
+            background: rgba(72, 187, 120, 0.2);
+            color: #48bb78;
+        }
+
+        .status-crashing {
+            background: rgba(245, 101, 101, 0.2);
+            color: #f56565;
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-recovering {
+            background: rgba(66, 153, 225, 0.2);
+            color: #4299e1;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f56565 0%, #c53030 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(245, 101, 101, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #48bb78 0%, #2f855a 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(72, 187, 120, 0.4);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .history {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.9em;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .timestamp {
+            color: #718096;
+            margin-right: 10px;
+        }
+
+        .ciba-alert {
+            background: linear-gradient(135deg, #f6ad55 0%, #ed8936 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            animation: glow 2s infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(246, 173, 85, 0.5); }
+            50% { box-shadow: 0 0 40px rgba(246, 173, 85, 0.8); }
+        }
+
+        .auto-refresh {
+            text-align: center;
+            color: #718096;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 20px;
+            color: #718096;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 AURELIUS</h1>
+            <p class="subtitle">The Sleeping Guardian - AI-Powered Portfolio Protection</p>
+            <p style="color: #718096; margin-top: 10px;">{{ timestamp }}</p>
+        </header>
+
+        {% if ciba_status.active %}
+        <div class="ciba-alert">
+            <h2 style="margin-bottom: 10px;">🚨 Authorization Required</h2>
+            <p>Aurelius is requesting permission to execute a trade. Check your {{ 'email' if 'email' in ciba_status.details.notification_channel else 'SMS' }}!</p>
+            {% if ciba_status.pending_trade %}
+            <p style="margin-top: 10px;">
+                <strong>Pending:</strong> Buy {{ ciba_status.pending_trade.shares }} shares at ${{ "%.2f"|format(ciba_status.pending_trade.price) }}
+            </p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="dashboard">
+            <!-- Market Card -->
+            <div class="card">
+                <h3>📈 Market Status</h3>
+                <div class="stat">
+                    <span class="stat-label">Symbol</span>
+                    <span class="stat-value">{{ market.symbol }}</span>
+                </div>
+                <div class="price {% if market.change < 0 %}negative{% elif market.change > 0 %}positive{% else %}neutral{% endif %}">
+                    ${{ "%.2f"|format(market.price) }}
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Change</span>
+                    <span class="stat-value {% if market.change < 0 %}negative{% elif market.change > 0 %}positive{% else %}neutral{% endif %}">
+                        ${{ "%.2f"|format(market.change) }} ({{ "%.2f"|format(market.change_percent) }}%)
+                    </span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Status</span>
+                    <span class="status-badge status-{{ market.status.lower() }}">
+                        {{ market.status }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Portfolio Card -->
+            <div class="card">
+                <h3>💼 Your Portfolio</h3>
+                <div class="stat">
+                    <span class="stat-label">Cash Balance</span>
+                    <span class="stat-value">${{ "%.2f"|format(portfolio.balance) }}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Shares Owned</span>
+                    <span class="stat-value">{{ portfolio.shares }}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Total Value</span>
+                    <span class="stat-value">${{ "%.2f"|format(portfolio.total_value) }}</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Profit/Loss</span>
+                    <span class="stat-value {% if portfolio.profit_loss < 0 %}negative{% elif portfolio.profit_loss > 0 %}positive{% else %}neutral{% endif %}">
+                        ${{ "%.2f"|format(portfolio.profit_loss) }} ({{ "%.2f"|format(portfolio.profit_loss_percent) }}%)
+                    </span>
+                </div>
+            </div>
+
+            <!-- Agent Activity Card -->
+            <div class="card">
+                <h3>🤖 Agent Activity</h3>
+                <div class="history">
+                    {% if portfolio.history %}
+                        {% for item in portfolio.history|reverse %}
+                        <div class="history-item">
+                            <span class="timestamp">{{ item.timestamp }}</span>
+                            <span>{{ item.message }}</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p style="color: #718096;">No activity yet...</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            {% if market.status != 'CRASHING' %}
+            <a href="/crash" class="btn btn-danger">⚠️ TRIGGER MARKET CRASH</a>
+            {% else %}
+            <a href="/stabilize" class="btn btn-success">✓ STABILIZE MARKET</a>
+            {% endif %}
+            <a href="/reset" class="btn btn-secondary">🔄 RESET DEMO</a>
+        </div>
+
+        <div class="auto-refresh">
+            <p>Dashboard auto-refreshes every 2 seconds</p>
+        </div>
+
+        <footer>
+            <p>Powered by WSO2 Identity Server CIBA | Demo for Educational Purposes</p>
+        </footer>
+    </div>
+
+    <script>
+        // Auto-refresh every 2 seconds
+        setTimeout(() => {
+            location.reload();
+        }, 2000);
+    </script>
+</body>
+</html>
