@@ -522,7 +522,7 @@ The agent initiates a CIBA (Client Initiated Backchannel Authentication) request
 ### Step 7: Watch the Authorization Complete
 
 Back in the terminal, you'll see:
-no 
+
 ```
 [15:30:52] [DEBUG] CIBA polling completed!
 [15:30:52] ✓ Authorization approved!

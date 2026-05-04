@@ -180,15 +180,17 @@ if __name__ == '__main__':
     print("\n")
 
     # Start background threads
-    market_thread = threading.Thread(target=run_market_engine, daemon=True)
-    agent_thread = threading.Thread(target=run_aurelius_agent, daemon=True)
-
-    market_thread.start()
-    agent_thread.start()
+    is_reloader_child = os.getenv("WERKZEUG_RUN_MAIN") == "true"
+    debug_enabled = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+    if not debug_enabled or is_reloader_child:
+        market_thread = threading.Thread(target=run_market_engine, daemon=True)
+        agent_thread = threading.Thread(target=run_aurelius_agent, daemon=True)
+        market_thread.start()
+        agent_thread.start()
 
     # Start Flask app
     app.run(
-        host='0.0.0.0',
+        host=os.getenv("HOST", "127.0.0.1"),
         port=int(os.getenv("PORT", "5001")),
-        debug=os.getenv("FLASK_DEBUG", "False").lower() == "true"
+        debug=debug_enabled
     )

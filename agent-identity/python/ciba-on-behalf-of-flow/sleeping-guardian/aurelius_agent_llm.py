@@ -11,6 +11,7 @@ Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
 """
 
 import os
+import time
 import asyncio
 import threading
 from datetime import datetime
@@ -69,7 +70,7 @@ class AureliusAgentLLM:
         self.current_agent_token = None
         self.current_obo_token = None
         self.current_scopes = ["openid", "stock:read"]
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()  # Reentrant lock to allow nested locking in reset()
 
         # History tracking (for UI display)
         self.history = []
@@ -86,6 +87,10 @@ class AureliusAgentLLM:
         self.running = False
         self.monitoring = True
         self._event_loop = None
+
+        # CIBA cooldown tracking to prevent spam
+        self.last_ciba_denial_time = None
+        self.CIBA_COOLDOWN_SECONDS = 300  # 5 minutes cooldown after denial/timeout
 
     def _initialize_llm(self):
         """Initialize the LLM using Google Gemini."""
@@ -319,8 +324,9 @@ You MUST call the buy_stock tool now. Do NOT check scopes or permissions yoursel
             # NOTE: MCP server maintains the authoritative portfolio state
             # We update local state for UI display purposes only
             current_price = self.market_engine.get_price()
-            self.shares += shares
-            self.balance -= shares * current_price
+            with self.lock:
+                self.shares += shares
+                self.balance -= shares * current_price
 
             self._add_history(f"✓ Trade executed: Bought {shares} shares")
 
@@ -339,6 +345,15 @@ You MUST call the buy_stock tool now. Do NOT check scopes or permissions yoursel
 
     async def _handle_insufficient_scope(self, market_data: dict, error_msg: str):
         """Handle insufficient scope by requesting CIBA authorization."""
+        # Check if we're in cooldown period after previous denial/timeout
+        if self.last_ciba_denial_time:
+            time_since_denial = time.time() - self.last_ciba_denial_time
+            if time_since_denial < self.CIBA_COOLDOWN_SECONDS:
+                remaining = int(self.CIBA_COOLDOWN_SECONDS - time_since_denial)
+                print(f"[Aurelius AI] ⏳ CIBA cooldown active: {remaining}s remaining")
+                print(f"[Aurelius AI] Skipping authorization request to prevent spam")
+                return
+
         # Extract required scopes (simplified - in production, parse from error)
         required_scopes = ["openid", "stock:read", "stock:trade"]
         new_permissions = ["stock:trade"]  # The new scope we need
@@ -394,6 +409,9 @@ You MUST call the buy_stock tool now. Do NOT check scopes or permissions yoursel
             print(f"[Aurelius AI] 🔄 Reinitializing agent with OBO token...")
             print(f"{'='*80}\n")
 
+            # Clear cooldown timer since authorization succeeded
+            self.last_ciba_denial_time = None
+
             # Reinitialize agent with new token
             await self._initialize_agent(self.current_obo_token.access_token)
 
@@ -404,19 +422,24 @@ You MUST call the buy_stock tool now. Do NOT check scopes or permissions yoursel
             await self._execute_ai_trade(market_data['symbol'], shares)
 
         else:
+            # Set cooldown timer to prevent spam
+            self.last_ciba_denial_time = time.time()
+            cooldown_minutes = self.CIBA_COOLDOWN_SECONDS // 60
             print(f"[Aurelius AI] ✗ Authorization denied or failed")
-            self._add_history("✗ User denied authorization or request timed out")
+            print(f"[Aurelius AI] ⏳ Cooldown: Will not request again for {cooldown_minutes} minutes")
+            self._add_history(f"✗ User denied authorization (cooldown: {cooldown_minutes}m)")
 
     def _add_history(self, message: str):
         """Add event to history log."""
         timestamp = datetime.now().strftime('%H:%M:%S')
-        self.history.append({
-            'timestamp': timestamp,
-            'message': message
-        })
+        with self.lock:
+            self.history.append({
+                'timestamp': timestamp,
+                'message': message
+            })
 
-        if len(self.history) > 50:
-            self.history.pop(0)
+            if len(self.history) > 50:
+                self.history.pop(0)
 
     def get_portfolio(self) -> Dict:
         """
@@ -459,6 +482,7 @@ You MUST call the buy_stock tool now. Do NOT check scopes or permissions yoursel
             self.shares = 0
             self.history = []
             self.monitoring = True
+            self.last_ciba_denial_time = None  # Clear cooldown on reset
             self._add_history("Agent reset to initial state")
 
     def stop(self):

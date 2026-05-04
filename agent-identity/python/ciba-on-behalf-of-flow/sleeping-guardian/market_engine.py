@@ -37,8 +37,10 @@ class MarketEngine:
         # MCP Server integration (for syncing prices)
         self.mcp_server_url = mcp_server_url
         self.mcp_admin_token = mcp_admin_token
-        self.last_synced_price = initial_price
+        self.last_synced_price = None  # None forces initial sync
         self.sync_threshold = 0.5  # Only sync if price changed by more than $0.50
+        self.last_sync_error_time = None  # Track last error for rate-limited logging
+        self.sync_error_cooldown = 60  # Log sync errors at most once per 60 seconds
 
         # Price history for charts (last 100 data points)
         self.price_history = []
@@ -73,8 +75,11 @@ class MarketEngine:
         if not self.mcp_server_url:
             return
 
-        # Only sync if price changed significantly
-        if abs(new_price - self.last_synced_price) < self.sync_threshold:
+        # Only sync if price changed significantly (skip threshold check on first sync)
+        if (
+            self.last_synced_price is not None
+            and abs(new_price - self.last_synced_price) < self.sync_threshold
+        ):
             return
 
         try:
@@ -86,12 +91,27 @@ class MarketEngine:
             )
             if response.ok:
                 self.last_synced_price = new_price
+                self.last_sync_error_time = None  # Clear error state on success
                 print(f"[Market Engine] ✓ Synced price ${new_price:.2f} to MCP server")
             else:
-                print(f"[Market Engine] ⚠️  Failed to sync price to MCP: {response.status_code}")
+                self._log_sync_error(f"HTTP {response.status_code}: {response.text[:100]}")
         except Exception as e:
-            # Don't crash if MCP sync fails - just log it
-            pass  # Silently ignore sync errors to avoid spam
+            # Don't crash if MCP sync fails, but log it for diagnostics
+            self._log_sync_error(f"{type(e).__name__}: {str(e)}")
+
+    def _log_sync_error(self, error_message: str):
+        """Log MCP sync errors with rate limiting to avoid spam."""
+        current_time = time.time()
+
+        # Only log if enough time has passed since last error
+        if (
+            self.last_sync_error_time is None
+            or current_time - self.last_sync_error_time >= self.sync_error_cooldown
+        ):
+            print(f"[Market Engine] ❌ MCP sync failed: {error_message}")
+            print(f"[Market Engine] ⚠️  Market Engine and MCP Server prices are now OUT OF SYNC!")
+            print(f"[Market Engine] 💡 Check that MCP Server is running on: {self.mcp_server_url}")
+            self.last_sync_error_time = current_time
 
     def _update_price(self):
         """Update the stock price based on current market status."""
@@ -178,6 +198,8 @@ class MarketEngine:
             self.current_price = self.initial_price
             self.status = "STABLE"
             self.price_history = []
+            self.last_synced_price = None  # Force sync on next update
+            self.last_sync_error_time = None  # Clear error cooldown
             print(f"[Market Engine] 🔄 Market reset - {self.symbol} at ${self.initial_price:.2f}")
 
     def get_price(self) -> float:
