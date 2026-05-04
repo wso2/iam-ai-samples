@@ -345,23 +345,116 @@
             {% else %}
             <a href="/stabilize" class="btn btn-success">✓ STABILIZE MARKET</a>
             {% endif %}
-            <a href="/reset" class="btn btn-secondary">🔄 RESET DEMO</a>
         </div>
 
-        <div class="auto-refresh">
-            <p>Dashboard auto-refreshes every 2 seconds</p>
-        </div>
 
         <footer>
-            <p>Powered by WSO2 Identity Server CIBA | Demo for Educational Purposes</p>
+            <p> Powered by WSO2 Identity Server | CIBA </p>
         </footer>
     </div>
 
     <script>
-        // Auto-refresh every 2 seconds
-        setTimeout(() => {
-            location.reload();
-        }, 2000);
+        // Dynamic refresh every 2 seconds without page reload
+        async function updateDashboard() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+
+                // Update market data
+                const market = data.market;
+                document.querySelector('.price').textContent = `$${market.price.toFixed(2)}`;
+                document.querySelector('.price').className = `price ${market.change < 0 ? 'negative' : market.change > 0 ? 'positive' : 'neutral'}`;
+
+                // Update market stats
+                const marketStats = document.querySelectorAll('.card')[0].querySelectorAll('.stat-value');
+                marketStats[0].textContent = market.symbol; // Symbol
+                marketStats[1].innerHTML = `$${market.change.toFixed(2)} (${market.change_percent.toFixed(2)}%)`; // Change
+                marketStats[1].className = `stat-value ${market.change < 0 ? 'negative' : market.change > 0 ? 'positive' : 'neutral'}`;
+
+                // Update market status badge
+                const statusBadge = document.querySelector('.status-badge');
+                statusBadge.textContent = market.status;
+                statusBadge.className = `status-badge status-${market.status.toLowerCase()}`;
+
+                // Update portfolio data
+                const portfolio = data.portfolio;
+                const portfolioStats = document.querySelectorAll('.card')[1].querySelectorAll('.stat-value');
+                portfolioStats[0].textContent = `$${portfolio.balance.toFixed(2)}`;
+                portfolioStats[1].textContent = portfolio.shares;
+                portfolioStats[2].textContent = `$${portfolio.total_value.toFixed(2)}`;
+                portfolioStats[3].innerHTML = `$${portfolio.profit_loss.toFixed(2)} (${portfolio.profit_loss_percent.toFixed(2)}%)`;
+                portfolioStats[3].className = `stat-value ${portfolio.profit_loss < 0 ? 'negative' : portfolio.profit_loss > 0 ? 'positive' : 'neutral'}`;
+
+                // Update agent activity (preserve scroll position)
+                const historyDiv = document.querySelector('.history');
+                const scrollPos = historyDiv.scrollTop;
+                const isScrolledToBottom = historyDiv.scrollHeight - historyDiv.scrollTop === historyDiv.clientHeight;
+
+                if (portfolio.history && portfolio.history.length > 0) {
+                    historyDiv.innerHTML = portfolio.history.slice().reverse().map(item =>
+                        `<div class="history-item">
+                            <span class="timestamp">${item.timestamp}</span>
+                            <span>${item.message}</span>
+                        </div>`
+                    ).join('');
+
+                    // Auto-scroll to bottom only if user was already at the bottom
+                    if (isScrolledToBottom) {
+                        historyDiv.scrollTop = historyDiv.scrollHeight;
+                    } else {
+                        historyDiv.scrollTop = scrollPos;
+                    }
+                } else {
+                    historyDiv.innerHTML = '<p style="color: #718096;">No activity yet...</p>';
+                }
+
+                // Update CIBA alert (show/hide based on status)
+                const cibaAlert = document.querySelector('.ciba-alert');
+                const ciba = data.ciba;
+
+                if (ciba.active && cibaAlert) {
+                    // Alert already exists, just update content if needed
+                    if (ciba.pending_trade) {
+                        const pendingInfo = cibaAlert.querySelector('p:last-child');
+                        if (pendingInfo) {
+                            pendingInfo.innerHTML = `<strong>Pending:</strong> Buy ${ciba.pending_trade.shares} shares at $${ciba.pending_trade.price.toFixed(2)}`;
+                        }
+                    }
+                } else if (ciba.active && !cibaAlert) {
+                    // Need to add CIBA alert
+                    const alertHtml = `
+                        <div class="ciba-alert">
+                            <h2 style="margin-bottom: 10px;">🚨 Authorization Required</h2>
+                            <p>Aurelius is requesting permission to execute a trade. Check your ${ciba.details?.notification_channel === 'email' ? 'email' : 'SMS'}!</p>
+                            ${ciba.pending_trade ? `<p style="margin-top: 10px;"><strong>Pending:</strong> Buy ${ciba.pending_trade.shares} shares at $${ciba.pending_trade.price.toFixed(2)}</p>` : ''}
+                        </div>
+                    `;
+                    document.querySelector('header').insertAdjacentHTML('afterend', alertHtml);
+                } else if (!ciba.active && cibaAlert) {
+                    // Remove CIBA alert
+                    cibaAlert.remove();
+                }
+
+                // Update control buttons based on market status
+                const controlsDiv = document.querySelector('.controls');
+                if (market.status !== 'CRASHING') {
+                    controlsDiv.innerHTML = `
+                        <a href="/crash" class="btn btn-danger">⚠️ TRIGGER MARKET CRASH</a>
+                    `;
+                } else {
+                    controlsDiv.innerHTML = `
+                        <a href="/stabilize" class="btn btn-success">✓ STABILIZE MARKET</a>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('Failed to update dashboard:', error);
+            }
+        }
+
+        // Update immediately on load, then every 2 seconds
+        updateDashboard();
+        setInterval(updateDashboard, 2000);
     </script>
 </body>
 </html>

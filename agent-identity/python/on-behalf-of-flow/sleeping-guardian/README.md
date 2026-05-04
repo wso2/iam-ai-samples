@@ -4,7 +4,7 @@ A demonstration of **Client Initiated Backchannel Authentication (CIBA)** using 
 
 ## The Story
 
-**Meet Alice**, a high-net-worth investor who uses **Aurelius**, her personal AI agent. Aurelius's job is to watch the stock market 24/7 and protect Alice's portfolio from market crashes by identifying "Golden Buy" opportunities.
+**Meet Alice**, a high-net-worth investor who uses **Aurelius**, her personal AI agent that runs as a background service. Aurelius's job is to continuously watch the stock market 24/7 and protect Alice's portfolio from market crashes by identifying "Golden Buy" opportunities.
 
 **The Conflict**: It's 3:00 AM. Alice is asleep. Suddenly, NVDA stock crashes 15% due to a market event. Aurelius detects this as a golden opportunity to buy shares at a discount. However, Alice has a security policy: **Any trade over $1,000 requires manual approval**.
 
@@ -72,7 +72,7 @@ This demo consists of four main components:
 
 Before starting, ensure you have:
 
-- **Python 3.8 or higher**
+- **Python 3.12 or higher**
 - **WSO2 Asgardeo Account**: Sign up at https://console.asgardeo.io
 - **Google AI API Key**: For Gemini LLM (get from https://aistudio.google.com/app/apikey)
 - **Email Access**: For receiving CIBA approval notifications
@@ -84,7 +84,7 @@ If you want a quick overview before diving into details:
 ### Setup Checklist
 
 **Asgardeo Configuration** (Detailed in "WSO2 Asgardeo Setup" section):
-- [ ] Create "Aurelius Trading Agent" MCP Clinet application (for agent auth)
+- [ ] Create "Aurelius Trading Agent" MCP Client application (for agent auth)
 - [ ] Create MCP Resource with scopes: `stock:read`, `stock:trade`
 - [ ] Authorize MCP Resource to created MCP Client Application
 - [ ] Create agent "Aurelius Bot" identity and note AGENT_ID + AGENT_SECRET
@@ -106,160 +106,6 @@ If you want a quick overview before diving into details:
 - [ ] Check email for approval request
 - [ ] Approve the trade
 - [ ] Watch trade execute successfully
-
-## Installation
-
-### 1. Clone and Navigate
-
-```bash
-cd sleeping-guardian
-```
-
-### 2. Set Up MCP Stock Server
-
-The MCP Stock Server must be configured and running first.
-
-#### Install MCP Server Dependencies
-
-```bash
-cd mcp-stock-server
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-#### Configure MCP Server Environment
-
-```bash
-cp .env.example .env
-```
-
-Edit `mcp-stock-server/.env` with your **Stock MCP Server** application credentials from Step 11:
-
-```bash
-# Asgardeo/WSO2 Identity Server Configuration
-AUTH_ISSUER=https://api.asgardeo.io/t/YOUR_ORG/oauth2/token
-CLIENT_ID=<stock-mcp-server-client-id>
-JWKS_URL=https://api.asgardeo.io/t/YOUR_ORG/oauth2/jwks
-
-# MCP Server Configuration
-MCP_SERVER_PORT=8200
-```
-
-**Important Notes**:
-- Replace `YOUR_ORG` with your actual Asgardeo organization name
-- Use the `CLIENT_ID` from the **Stock MCP Server** application 
-- The `AUTH_ISSUER` should end with `/oauth2/token`
-- The `JWKS_URL` should end with `/oauth2/jwks`
-
-#### Start the MCP Server
-
-```bash
-python main.py
-```
-
-Keep this terminal running. You should see:
-
-```
-================================================================================
-Stock Trading MCP Server
-================================================================================
-Port: 8200
-Issuer: https://api.asgardeo.io/t/YOUR_ORG/oauth2/token
-Client ID: <your-client-id>
-================================================================================
-
-Available Scopes:
-  - stock:read   : Read market data and portfolio
-  - stock:trade  : Execute buy/sell trades
-  - stock:admin  : Update market prices (simulation)
-================================================================================
-```
-
-### 3. Set Up Main Application
-
-Open a **new terminal** and navigate back to the sleeping-guardian directory.
-
-#### Create Virtual Environment
-
-```bash
-cd ..  # Back to sleeping-guardian directory
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-#### Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Configure Main Application Environment
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and fill in your credentials from Step 11:
-
-```bash
-# ---------------------------------------
-# Asgardeo OAuth2 Configuration
-# ---------------------------------------
-ASGARDEO_BASE_URL=https://api.asgardeo.io/t/YOUR_ORG
-CLIENT_ID=<aurelius-agent-client-id>
-CLIENT_SECRET=<aurelius-agent-client-secret>
-REDIRECT_URI=http://localhost:5001/callback
-
-# ---------------------------------------
-# Asgardeo Agent Credentials
-# ---------------------------------------
-AGENT_ID=<agent-id-from-agent-identity>
-AGENT_SECRET=<agent-secret-from-agent-identity>
-
-# ---------------------------------------
-# Google Gemini API Key
-# ---------------------------------------
-GOOGLE_AI_API_KEY=<your-google-ai-api-key>
-
-# LLM model used by the agent
-MODEL_NAME=gemini-2.5-flash
-
-# ---------------------------------------
-# CIBA Configuration
-# ---------------------------------------
-CIBA_NOTIFICATION_CHANNEL=email
-
-# ---------------------------------------
-# Sleeping Guardian Configuration
-# ---------------------------------------
-# Investor email for CIBA notifications (Alice's verified email)
-INVESTOR_EMAIL=<alice-email-address>
-
-# Stock simulation settings
-STOCK_SYMBOL=NVDA
-INITIAL_STOCK_PRICE=150.00
-PRICE_THRESHOLD=140.00
-
-# Trading settings
-TRADE_AMOUNT=5000.00
-INITIAL_BALANCE=10000.00
-
-# MCP Stock Server URL
-STOCK_MCP_SERVER_URL=http://localhost:8200/mcp
-
-# Flask app port
-PORT=5001
-FLASK_DEBUG=False
-```
-
-**Important Configuration Notes**:
-- `CLIENT_ID` and `CLIENT_SECRET`: Use credentials from **Aurelius Agent** application
-- `AGENT_ID` and `AGENT_SECRET`: Use credentials from the agent identity you created
-- `INVESTOR_EMAIL`: Must be the verified email of the user (Alice)
-- `GOOGLE_AI_API_KEY`: Get from https://aistudio.google.com/app/apikey
-- `STOCK_MCP_SERVER_URL`: Must point to running MCP server (default: `http://localhost:8200/mcp`)
-- Replace `YOUR_ORG` with your Asgardeo organization name
 
 ## WSO2 Asgardeo Setup (Complete Guide)
 
@@ -380,11 +226,11 @@ Grant the user appropriate trading permissions.
 1. Go to **User Management**
 2. Navigate to **Roles** tab
 3. Go to the created Role(`stock_mcp`)
-4. Go to user section and asign the created user
-5. Go to agent section and asign the created agent
+4. Go to user section and assign the created user
+5. Go to agent section and assign the created agent
 
 
-### Step 11: Gather Configuration Values
+### Step 8: Gather Configuration Values
 
 Before moving to installation, collect all these values set in the .env file:
 
@@ -393,35 +239,174 @@ Before moving to installation, collect all these values set in the .env file:
     - Find the tenant from the asgardeo and set it.
     - Set the Agent ID and Secret
     - Set the Google API key
-    - Set INVESTOR_EMAIL which is the email address you at teh creation time of the user
+    - Set INVESTOR_EMAIL which is the email address you at the creation time of the user
 
-.env file in the sleeping-guardian/mcp-srock-server :-
+.env file in the sleeping-guardian/mcp-stock-server :-
     - Set the created MCP client ID
 
-## Running the Demo
+### Installation
 
-### Prerequisites Check
+### 1. Clone and Navigate
 
-Before running, ensure:
-1. MCP Stock Server is running on port 8200 (from Step 2)
-2. You have configured both `.env` files correctly
-3. Your Asgardeo user email is verified
+```bash
+git clone https://github.com/wso2/iam-ai-samples.git
+cd agent-identity/python/ciba-on-behalf-of-flow/sleeping-guardian
+```
 
-### 1. Start the MCP Server
+### 2. Set Up MCP Stock Server
 
-go to sleeping-guardian/mcp-stock-server 
+The MCP Stock Server must be configured and running first.
 
-1. Activate viratual environement
-2. Install the requiments library from requirements.txt
-3. run `python main.py`
+#### Install MCP Server Dependencies
+
+```bash
+cd mcp-stock-server
+python3.12 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+#### Configure MCP Server Environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `mcp-stock-server/.env` with your MCP Client Application credentials.
+
+```bash
+# Asgardeo/WSO2 Identity Server Configuration
+AUTH_ISSUER=https://api.asgardeo.io/t/YOUR_ORG/oauth2/token
+CLIENT_ID=<mcp-client-application-client-id>
+JWKS_URL=https://api.asgardeo.io/t/YOUR_ORG/oauth2/jwks
+
+# MCP Server Configuration
+MCP_SERVER_PORT=8200
+```
+
+**Important Notes**:
+- Replace `YOUR_ORG` with your actual Asgardeo organization name
+- Use the `CLIENT_ID` from the MCP Client Application
+- The `AUTH_ISSUER` should end with `/oauth2/token`
+- The `JWKS_URL` should end with `/oauth2/jwks`
+
+#### Start the MCP Server
+
+```bash
+python main.py
+```
+
+Keep this terminal running. You should see:
+
+```
+================================================================================
+Stock Trading MCP Server
+================================================================================
+Port: 8200
+Issuer: https://api.asgardeo.io/t/YOUR_ORG/oauth2/token
+Client ID: <your-client-id>
+================================================================================
+
+Available Scopes:
+  - stock:read   : Read market data and portfolio
+  - stock:trade  : Execute buy/sell trades
+  - stock:admin  : Update market prices (simulation)
+================================================================================
+```
+
+### 3. Set Up Main Application
+
+Open a **new terminal** and navigate back to the sleeping-guardian directory.
+
+#### Create Virtual Environment
+
+```bash
+cd agent-identity/python/ciba-on-behalf-of-flow/sleeping-guardian
+ # Back to sleeping-guardian directory
+python3.12 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+#### Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure Main Application Environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and fill in your credentials from Step 11:
+
+```bash
+# ---------------------------------------
+# Asgardeo OAuth2 Configuration
+# ---------------------------------------
+ASGARDEO_BASE_URL=https://api.asgardeo.io/t/YOUR_ORG
+CLIENT_ID=<mcp-client-application-client-id>
+CLIENT_SECRET=<mcp-client-application-client-secret>
+REDIRECT_URI=http://localhost:5001/callback
+
+# ---------------------------------------
+# Asgardeo Agent Credentials
+# ---------------------------------------
+AGENT_ID=<created-agent-id>
+AGENT_SECRET=<created-agent-secret>
+
+# ---------------------------------------
+# Google Gemini API Key
+# ---------------------------------------
+GOOGLE_AI_API_KEY=<your-google-ai-api-key>
+
+# LLM model used by the agent
+MODEL_NAME=gemini-2.5-flash
+
+# ---------------------------------------
+# CIBA Configuration
+# ---------------------------------------
+CIBA_NOTIFICATION_CHANNEL=email
+
+# ---------------------------------------
+# Sleeping Guardian Configuration
+# ---------------------------------------
+# Investor email for CIBA notifications (Alice's verified email)
+INVESTOR_EMAIL=<email-address>
+
+# Stock simulation settings
+STOCK_SYMBOL=NVDA
+INITIAL_STOCK_PRICE=150.00
+PRICE_THRESHOLD=140.00
+
+# Trading settings
+TRADE_AMOUNT=5000.00
+INITIAL_BALANCE=10000.00
+
+# MCP Stock Server URL
+STOCK_MCP_SERVER_URL=http://localhost:8200/mcp
+
+# Flask app port
+PORT=5001
+FLASK_DEBUG=False
+```
+
+**Important Configuration Notes**:
+- `CLIENT_ID` and `CLIENT_SECRET`: Use credentials from **Aurelius Trading Agent** application
+- `AGENT_ID` and `AGENT_SECRET`: Use credentials from the agent identity you created
+- `INVESTOR_EMAIL`: Must be the verified email of the user (Alice)
+- `GOOGLE_AI_API_KEY`: Get from https://aistudio.google.com/app/apikey
+- `STOCK_MCP_SERVER_URL`: Must point to running MCP server (default: `http://localhost:8200/mcp`)
+- Replace `YOUR_ORG` with your Asgardeo organization name
 
 
-### 2. Start the Main Application
+### Start the Main Application
 
 go to sleeping-guardian
 
-1. Activate viratual environement
-2. Install the requiments library from requirements.txt
+1. Activate virtual environment
+2. Install the requirements library from requirements.txt
 3. run `python app.py`
 
 
@@ -455,7 +440,6 @@ Navigate to `http://localhost:5001` in your browser. You'll see:
 - **Market Status**: Current stock price and market conditions
 - **Portfolio**: Your current balance and holdings
 - **Agent Activity**: Real-time log of Aurelius's decisions
-- **CIBA Status**: Current authorization state
 
 ### Verify Agent Initialization
 
@@ -469,7 +453,7 @@ In the terminal, you should see:
 
 This confirms:
 - The agent successfully authenticated with Asgardeo
-- The agent received a token with `stock:read` scope
+- The agent received a token with `stock:read` and `openid` scope
 - The agent can read market data but cannot trade yet
 
 ## Conducting the Demo
@@ -480,7 +464,7 @@ Follow these steps for a compelling demonstration of CIBA with On-Behalf-Of flow
 
 - Point out the market price hovering around $150
 - Explain that Aurelius has authenticated using **App-Native Authentication** with agent credentials
-- The agent currently has a token with **`stock:read`** scope only
+- The agent currently has a token with **`stock:read` and `openid`** scope only
 - Agent can monitor prices but **cannot execute trades** without user authorization
 
 ### Step 2: Trigger the Market Crash
@@ -497,18 +481,6 @@ When the price drops below $140 (the threshold), the LLM-powered agent will:
 2. Attempt to execute a trade using the MCP server's `buy_stock` tool
 3. Receive an "insufficient_scope" error because it only has `stock:read`
 
-The console will show:
-
-```
-[Aurelius] 🚨 GOLDEN BUY OPPORTUNITY DETECTED!
-[Aurelius] Current price: $139.45 (below threshold $140.00)
-[Aurelius] Attempting to execute trade...
-[MCP Server] ❌ SCOPE CHECK FAILED
-  Required: ['stock:trade', 'stock:read']
-  Available: ['stock:read', 'openid']
-  Missing: ['stock:trade']
-  → CIBA authorization needed!
-```
 
 ### Step 4: CIBA Request Initiated
 
@@ -533,7 +505,7 @@ The agent initiates a CIBA (Client Initiated Backchannel Authentication) request
 
 1. **Check your email inbox** (the email you configured as `INVESTOR_EMAIL`)
 2. You'll receive an email from Asgardeo with subject like:
-   - "Authentication Request" or "Approval Required"
+   - "Authorize Sign-in Request"
 3. The email will contain:
    - A description of what's being requested
    - The binding message: "AI agent requests permission to buy X shares of NVDA at $139.45 for $5000.00"
@@ -545,16 +517,12 @@ The agent initiates a CIBA (Client Initiated Backchannel Authentication) request
 1. Click the **Approve** link in the email
 2. You'll be redirected to an Asgardeo authentication page
 3. If not already logged in, enter Alice's credentials
-4. Review the consent screen showing:
-   - Application: Aurelius Agent
-   - Requested scopes: `stock:read`, `stock:trade`
-   - Binding message with trade details
-5. Click **Allow** or **Approve**
+4. Appear successfully authenticated screen
 
 ### Step 7: Watch the Authorization Complete
 
 Back in the terminal, you'll see:
-
+no 
 ```
 [15:30:52] [DEBUG] CIBA polling completed!
 [15:30:52] ✓ Authorization approved!
@@ -565,7 +533,7 @@ Back in the terminal, you'll see:
 [CIBA] REQUESTED: ['openid', 'stock:read', 'stock:trade']
 [CIBA] RECEIVED : ['openid', 'stock:read', 'stock:trade']
 [CIBA] TOKEN SUB: <alice-user-id>
-[CIBA] TOKEN AUT: CIBA
+[CIBA] TOKEN AUT: APPLICATION_USER
 [CIBA] ✅ All requested scopes granted
 ================================================================================
 ```
@@ -573,26 +541,23 @@ Back in the terminal, you'll see:
 Key points to highlight:
 - The agent now has an **On-Behalf-Of (OBO) token**
 - The token has the user's identity (`sub` claim = Alice)
+- The token has the agent's identity (`act.sub`)
 - The token includes the elevated `stock:trade` scope
-- The authentication method (`aut` claim) is "CIBA"
+- The authentication method (`aut` claim) is "APPLICATION_USER"
+
 
 ### Step 8: Trade Execution via MCP
 
 The agent retries the trade with the new OBO token:
 
-```
-[Aurelius] Executing trade with OBO token...
-[MCP Server] ✅ SCOPE CHECK PASSED
-[BUY_STOCK] ✅ Scope check passed for user <alice-user-id>
-[TRADE] User <alice-user-id> bought 35 NVDA @ $139.45
-```
+Then Invoking: `buy_stock` with `{'symbol': 'NVDA', 'shares': #Number of shares}`
 
 ### Step 9: View the Results
 
 - Switch back to the **Dashboard** (`http://localhost:5001`)
 - You'll see:
   - **Balance**: Decreased by ~$5,000
-  - **Holdings**: Shows 35 shares of NVDA
+  - **Holdings**: Shows #number of shares of NVDA
   - **Trade History**: New entry showing the purchase
   - **Agent Activity**: Complete log of the entire flow
 
@@ -602,14 +567,21 @@ Check the MCP server terminal to see the complete flow:
 
 ```
 [JWT VALIDATION SUCCESS]
-  Subject (sub): <alice-user-id>
-  Auth Method (aut): CIBA
+  Subject (sub): <user-id>  (Alice's user ID)
+  Auth Method (aut): APPLICATION_USER
   🔍 Token Scopes: ['openid', 'stock:read', 'stock:trade']
+  Actor (act): {'sub': '<agent-id>'}  (Aurelius Bot's agent ID)
 
 [SCOPE CHECK] Required: ['stock:trade', 'stock:read']
 [SCOPE CHECK] Available: ['openid', 'stock:read', 'stock:trade']
 [SCOPE CHECK] ✅ All required scopes present
+[BUY_STOCK] ✅ Scope check passed for user <user-id>
 ```
+
+**Key Token Claims Explained:**
+- **`sub`**: Alice's user ID - trades are attributed to her
+- **`act.sub`**: Aurelius Bot's agent ID - identifies who actually executed the action
+- **`aut`**: `APPLICATION_USER` indicates this is an On-Behalf-Of (OBO) token
 
 ## Key Demo Points to Highlight
 
@@ -617,7 +589,7 @@ Check the MCP server terminal to see the complete flow:
 
 1. **No User Credentials Stored**: Agent never has access to Alice's password
 2. **App-Native Authentication**: Agent authenticates using its own identity (agent credentials)
-3. **Principle of Least Privilege**: Agent starts with minimal `stock:read` scope
+3. **Principle of Least Privilege**: Agent starts with minimal `stock:read` and `openid` scope
 4. **Just-In-Time Authorization**: Elevated permissions (`stock:trade`) granted only when needed
 5. **Scope-Based Access Control**: MCP server enforces granular permissions per tool
 6. **JWT Validation**: MCP server validates all tokens using JWKS from Asgardeo
@@ -634,11 +606,12 @@ Check the MCP server terminal to see the complete flow:
 
 ### On-Behalf-Of (OBO) Flow
 
-1. **User Identity Preserved**: OBO token contains user's identity (`sub` claim)
-2. **Elevated Privileges**: Token includes scopes that agent alone doesn't have
-3. **Audit Attribution**: All trades are attributed to the user, not the agent
-4. **Time-Limited**: OBO tokens expire, forcing re-authorization for new operations
-5. **Delegated Authorization**: Agent acts on behalf of user, not as the user
+1. **User Identity Preserved**: OBO token contains user's identity in the `sub` claim (e.g., Alice's user ID)
+2. **Agent Identity Tracked**: The token has the agent identity in the `act.sub` claim (e.g., Aurelius Bot's agent ID)
+3. **Elevated Privileges**: Token includes scopes that agent alone doesn't have
+4. **Audit Attribution**: All trades are attributed to the user (`sub`), with the agent (`act.sub`) recorded as the actor
+5. **Time-Limited**: OBO tokens expire, forcing re-authorization for new operations
+6. **Delegated Authorization**: Agent acts on behalf of user, not as the user 
 
 ### MCP (Model Context Protocol) Integration
 

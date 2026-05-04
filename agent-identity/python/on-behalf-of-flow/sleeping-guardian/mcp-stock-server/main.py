@@ -1,5 +1,5 @@
 """
-Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
+Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
 
  This software is the property of WSO2 LLC. and its suppliers, if any.
  Dissemination of any information or reproduction of any material contained
@@ -155,6 +155,7 @@ if not all([AUTH_ISSUER, CLIENT_ID, JWKS_URL]):
 
 mcp = FastMCP(
     "Stock Trading Server",
+    host="127.0.0.1",  # Bind to localhost only for security
     port=MCP_SERVER_PORT,
     token_verifier=JWTTokenVerifier(JWKS_URL, AUTH_ISSUER, CLIENT_ID),
     auth=AuthSettings(
@@ -388,12 +389,18 @@ async def update_market_price(symbol: str, new_price: float) -> dict:
 
 
 # ==================== MARKET ENGINE SYNC ENDPOINT (NO AUTH) ====================
+# SECURITY NOTE: This endpoint has no authentication to allow the market simulator
+# to update prices. The server is bound to 127.0.0.1 (localhost only) to prevent
+# external network access. For production use, implement proper authentication.
 
 @mcp.custom_route("/api/market/update", methods=["POST"])
 async def market_update_endpoint(request: Request):
     """
     Unauthenticated endpoint for market engine to push price updates.
     This bypasses MCP tools and directly updates the in-memory market data.
+
+    SECURITY: Server is bound to localhost only (127.0.0.1) to prevent
+    external access to this unauthenticated endpoint.
     """
     try:
         data = await request.json()
@@ -449,6 +456,9 @@ if __name__ == "__main__":
     print("\nMarket Sync Endpoint:")
     print(f"  POST http://localhost:{MCP_SERVER_PORT}/api/market/update")
     print("  (No authentication required - for market engine only)")
+    print("\n⚠️  SECURITY NOTE:")
+    print("  Server is bound to 127.0.0.1 (localhost only)")
+    print("  This prevents external network access to unauthenticated endpoints")
     print("=" * 80)
     print("\nStarting server...\n")
 

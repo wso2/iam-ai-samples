@@ -1,5 +1,5 @@
 """
-Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
+Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
 
  This software is the property of WSO2 LLC. and its suppliers, if any.
  Dissemination of any information or reproduction of any material contained
@@ -21,24 +21,12 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools.base import ToolException
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
-# LLM imports (support multiple providers)
+# LLM imports
 try:
     from langchain_google_genai import ChatGoogleGenerativeAI
     GOOGLE_AVAILABLE = True
 except ImportError:
     GOOGLE_AVAILABLE = False
-
-try:
-    from langchain_openai import ChatOpenAI
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
-
-try:
-    from langchain_anthropic import ChatAnthropic
-    ANTHROPIC_AVAILABLE = False
-except ImportError:
-    ANTHROPIC_AVAILABLE = False
 
 from market_engine import MarketEngine
 from ciba_client import CIBAClient
@@ -97,47 +85,26 @@ class AureliusAgentLLM:
         # Running state
         self.running = False
         self.monitoring = True
+        self._event_loop = None
 
     def _initialize_llm(self):
-        """Initialize the LLM based on available API keys and model name."""
-        if "gemini" in self.model_name.lower() or "google" in self.model_name.lower():
-            if not GOOGLE_AVAILABLE or not os.getenv("GOOGLE_AI_API_KEY"):
-                raise ValueError(
-                    "Google Gemini selected but GOOGLE_AI_API_KEY not set or langchain-google-genai not installed"
-                )
-            self.llm = ChatGoogleGenerativeAI(
-                model=self.model_name,
-                temperature=0.7,
-                google_api_key=os.getenv("GOOGLE_AI_API_KEY")
-            )
-            print(f"[Aurelius LLM] Using Google Gemini: {self.model_name}")
-
-        elif "gpt" in self.model_name.lower() or "openai" in self.model_name.lower():
-            if not OPENAI_AVAILABLE or not os.getenv("OPENAI_API_KEY"):
-                raise ValueError(
-                    "OpenAI selected but OPENAI_API_KEY not set or langchain-openai not installed"
-                )
-            self.llm = ChatOpenAI(
-                model=self.model_name,
-                temperature=0.7,
-            )
-            print(f"[Aurelius LLM] Using OpenAI: {self.model_name}")
-
-        elif "claude" in self.model_name.lower() or "anthropic" in self.model_name.lower():
-            if not ANTHROPIC_AVAILABLE or not os.getenv("ANTHROPIC_API_KEY"):
-                raise ValueError(
-                    "Anthropic Claude selected but ANTHROPIC_API_KEY not set or langchain-anthropic not installed"
-                )
-            self.llm = ChatAnthropic(
-                model=self.model_name,
-                temperature=0.7,
-            )
-            print(f"[Aurelius LLM] Using Anthropic Claude: {self.model_name}")
-
-        else:
+        """Initialize the LLM using Google Gemini."""
+        if not GOOGLE_AVAILABLE:
             raise ValueError(
-                f"Unknown model: {self.model_name}. Supported: gemini-*, gpt-*, claude-*"
+                "langchain-google-genai package not installed. Please run: pip install langchain-google-genai"
             )
+
+        if not os.getenv("GOOGLE_AI_API_KEY"):
+            raise ValueError(
+                "GOOGLE_AI_API_KEY not set in environment. Get your API key from https://aistudio.google.com/app/apikey"
+            )
+
+        self.llm = ChatGoogleGenerativeAI(
+            model=self.model_name,
+            temperature=0.7,
+            google_api_key=os.getenv("GOOGLE_AI_API_KEY")
+        )
+        print(f"[Aurelius LLM] Using Google Gemini: {self.model_name}")
 
     def _build_mcp_config(self, access_token: str) -> dict:
         """Build MCP client configuration with access token."""
@@ -224,6 +191,9 @@ Be concise and actionable in your responses."""),
         """Start the Aurelius agent."""
         self.running = True
 
+        # Store reference to the event loop for cleanup
+        self._event_loop = asyncio.get_event_loop()
+
         # Initialize CIBA client and get initial token
         await self.ciba_client.initialize()
         self.current_agent_token = self.ciba_client.current_agent_token
@@ -244,7 +214,7 @@ Be concise and actionable in your responses."""),
         # Main monitoring loop
         while self.running:
             await self._ai_monitoring_cycle()
-            await asyncio.sleep(5)  # Check every 5 seconds
+            await asyncio.sleep(2)  # Check every 1 second for faster response
 
     async def _ai_monitoring_cycle(self):
         """AI-powered monitoring cycle."""
@@ -262,16 +232,19 @@ Be concise and actionable in your responses."""),
         print(f"\n[Aurelius AI] 🚨 Market alert detected - invoking AI analysis via MCP tools")
         print(f"[Aurelius AI] 🔍 Triggering LLM with stock:read scope required for price fetch")
 
-        # Ask AI to use MCP tools to gather data and decide
+        # Ask AI to use MCP tools to gather data and decide.
+        # IMPORTANT: Tools must be called one at a time due to a bug in
+        # langchain-google-genai (<=2.0.8) where parallel tool calls produce
+        # an empty function_response.name, which the Gemini API rejects.
         analysis_prompt = f"""Market alert for {local_state['symbol']}!
 
-Please use your available tools to:
-1. Call get_market_price for {local_state['symbol']} to get the current verified price from the market server
-2. Call get_my_portfolio to check your available balance
+Please use your available tools ONE AT A TIME (do NOT call multiple tools in parallel):
+1. First, call get_market_price for {local_state['symbol']} to get the current verified price
+2. Then, call get_my_portfolio to check your available balance
 3. Analyse whether the price is below the threshold of ${self.price_threshold:.2f}
 4. If yes, recommend exactly how many shares to buy with the ${self.trade_amount:.2f} budget
 
-Use the tools first, then provide your recommendation."""
+IMPORTANT: Call each tool separately, one after another. Do not batch tool calls."""
 
         try:
             response = await self.agent_executor.ainvoke({
@@ -309,14 +282,8 @@ Use the tools first, then provide your recommendation."""
             else:
                 print(f"[Aurelius AI] ⚠️  Tool error: {e}")
         except Exception as e:
-            error_msg = str(e)
-            # Gemini API formatting error - proceed with trade anyway
-            if "GenerateContentRequest" in error_msg or "function_response.name" in error_msg:
-                print(f"[Aurelius AI] ⚠️  Gemini API error, proceeding with trade")
-                shares = int(self.trade_amount / local_state['price'])
-                await self._execute_ai_trade(local_state['symbol'], shares)
-            else:
-                print(f"[Aurelius AI] ❌ Error: {e}")
+            print(f"[Aurelius AI] ⚠️  Error during AI analysis: {e}")
+            print(f"[Aurelius AI] Will retry on next monitoring cycle")
 
     async def _execute_ai_trade(self, symbol: str, shares: int):
         """Execute trade recommended by AI."""
@@ -324,7 +291,7 @@ Use the tools first, then provide your recommendation."""
 - Stock: {symbol}
 - Shares: {shares}
 
-Use the buy_stock tool to execute this trade."""
+You MUST call the buy_stock tool now. Do NOT check scopes or permissions yourself — just call the tool and let the server decide. Call tools one at a time."""
 
         try:
             response = await self.agent_executor.ainvoke({
@@ -338,6 +305,16 @@ Use the buy_stock tool to execute this trade."""
 
             output = response.get("output", "")
             print(f"[Aurelius AI] ✓ Trade result: {output}")
+
+            # Check if the LLM refused to call the tool or reported a scope error
+            scope_refusal_keywords = ["insufficient_scope", "stock:trade", "scope", "authorization", "permission"]
+            if any(kw in output.lower() for kw in scope_refusal_keywords) and "success" not in output.lower():
+                print(f"[Aurelius AI] 🔐 Trade blocked due to insufficient scope — triggering CIBA")
+                await self._handle_insufficient_scope(
+                    self.market_engine.get_current_state(),
+                    output
+                )
+                return
 
             # NOTE: MCP server maintains the authoritative portfolio state
             # We update local state for UI display purposes only
@@ -487,4 +464,10 @@ Use the buy_stock tool to execute this trade."""
     def stop(self):
         """Stop the agent."""
         self.running = False
-        asyncio.create_task(self.ciba_client.cleanup())
+
+        # Schedule cleanup in the agent's event loop if it exists
+        if self._event_loop and not self._event_loop.is_closed():
+            asyncio.run_coroutine_threadsafe(
+                self.ciba_client.cleanup(),
+                self._event_loop
+            )
