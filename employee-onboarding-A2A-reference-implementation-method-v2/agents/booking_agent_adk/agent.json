@@ -1,0 +1,59 @@
+{
+    "name": "Booking Agent (ADK)",
+    "description": "Schedules onboarding tasks (orientation, training) and equipment deliveries (laptop, phone, monitor) for new employees. Built with Google ADK.",
+    "url": "http://localhost:8005/a2a/booking_agent_adk",
+    "version": "1.0.0",
+    "defaultInputModes": [
+        "text"
+    ],
+    "defaultOutputModes": [
+        "text"
+    ],
+    "capabilities": {
+        "streaming": false
+    },
+    "skills": [
+        {
+            "id": "create_task",
+            "name": "Schedule Onboarding Task",
+            "description": "Schedule an orientation, training, or other onboarding session for an employee",
+            "tags": [
+                "booking",
+                "task",
+                "orientation",
+                "training"
+            ]
+        },
+        {
+            "id": "schedule_delivery",
+            "name": "Schedule Equipment Delivery",
+            "description": "Schedule delivery of a laptop, phone, monitor or other equipment to an employee",
+            "tags": [
+                "booking",
+                "delivery",
+                "laptop",
+                "equipment"
+            ]
+        },
+        {
+            "id": "list_tasks",
+            "name": "List Scheduled Tasks",
+            "description": "List all scheduled onboarding tasks, optionally filtered by employee",
+            "tags": [
+                "booking",
+                "list",
+                "tasks"
+            ]
+        },
+        {
+            "id": "list_deliveries",
+            "name": "List Scheduled Deliveries",
+            "description": "List all scheduled equipment deliveries, optionally filtered by employee",
+            "tags": [
+                "booking",
+                "list",
+                "deliveries"
+            ]
+        }
+    ]
+}
