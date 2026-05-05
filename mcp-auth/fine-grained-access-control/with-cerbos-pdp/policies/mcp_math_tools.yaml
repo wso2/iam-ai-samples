@@ -1,0 +1,12 @@
+---
+apiVersion: "api.cerbos.dev/v1"
+resourcePolicy:
+  version: "default"
+  resource: "mcp::math_tools"
+  rules:
+    - actions: ["*"]
+      effect: EFFECT_ALLOW
+      roles: ["*"]
+      condition:
+        match:
+          expr: request.principal.attr.scopes.hasIntersection([request.resource.attr.required_scope])
