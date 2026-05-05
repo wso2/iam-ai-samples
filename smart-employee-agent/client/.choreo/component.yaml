@@ -1,0 +1,13 @@
+schemaVersion: 1.2
+
+endpoints:
+  - name: web-client
+    displayName: Smart Employee Web Client
+    service:
+      basePath: /
+      port: 3000
+    type: REST
+    networkVisibilities:
+      - Public
+    auth:
+      enabled: false

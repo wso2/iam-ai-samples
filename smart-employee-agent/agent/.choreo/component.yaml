@@ -1,0 +1,13 @@
+schemaVersion: 1.2
+
+endpoints:
+  - name: agent-server
+    displayName: AI Agent Server
+    service:
+      basePath: /
+      port: 5001
+    type: REST
+    networkVisibilities:
+      - Public
+    auth:
+      enabled: false

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<!--
+  Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
+
+  Smart Employee Agent — Client Application
+
+  Tabbed UI: Dashboard, Apply for Leave, Manage Requests (HR Admin).
+  Persistent Assistant side panel for AI agent interaction.
+  Manual actions go through the REST API (with *_rest scopes).
+  Assistant goes through the agent server, which uses MCP tools (with *_mcp
+  scopes via OBO when elevated actions are needed).
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Employee Agent</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+  <!-- ─── Login Overlay ───────────────────────────────────────────────── -->
+  <div id="login-overlay">
+    <div class="login-box">
+      <h1>Smart Employee Agent</h1>
+      <p class="subtitle">Your AI Concierge for Leave Management</p>
+      <button class="login-btn" id="login-btn" onclick="app.initiateLogin()">
+        Sign In
+      </button>
+      <p class="login-footer">Secure login via Asgardeo</p>
+    </div>
+  </div>
+
+  <!-- ─── Authenticated App Shell ─────────────────────────────────────── -->
+  <div id="app-shell">
+
+    <!-- Top Bar -->
+    <header id="topbar">
+      <div class="brand">
+        <span class="brand-mark">●</span>
+        <span class="brand-name">Concierge HR</span>
+      </div>
+
+      <nav id="tabs" role="tablist">
+        <button class="tab" data-tab="dashboard" role="tab" aria-selected="true">
+          Dashboard
+        </button>
+        <button class="tab" data-tab="apply" role="tab" aria-selected="false" data-requires-scope="hr_self_rest">
+          Apply for Leave
+        </button>
+        <button class="tab" data-tab="manage" role="tab" aria-selected="false" data-requires-scope="hr_approve_rest">
+          Manage Requests
+          <span id="pending-badge" class="pending-badge" hidden>0</span>
+        </button>
+      </nav>
+
+      <button class="assistant-toggle" id="assistant-toggle" onclick="app.toggleAssistant()" title="Toggle Assistant">
+        <svg class="assistant-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1.27A7 7 0 0 1 14 23h-4a7 7 0 0 1-6.73-4H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+          <circle cx="9.5" cy="15.5" r="1"/>
+          <circle cx="14.5" cy="15.5" r="1"/>
+        </svg>
+        <span class="assistant-label">Assistant</span>
+      </button>
+
+      <div id="user-menu">
+        <button class="user-btn" id="user-btn" onclick="app.toggleUserMenu()">
+          <span class="user-name" id="user-name-label">User</span>
+          <span class="role-badge" id="role-badge">Employee</span>
+          <span class="caret">▾</span>
+        </button>
+        <div class="user-menu-popover" id="user-menu-popover" hidden>
+          <button class="menu-item" onclick="app.resetDatabase()">Reset demo data</button>
+          <button class="menu-item danger" onclick="app.signOut()">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main work area: one panel per tab -->
+    <main id="work-area">
+
+      <!-- ── Dashboard Tab ─────────────────────────────────────────── -->
+      <section id="tab-dashboard" class="tab-panel" role="tabpanel">
+        <div class="page-header">
+          <h2>Dashboard</h2>
+          <button class="btn-ghost" onclick="app.refreshDashboard()" title="Refresh">
+            ↻ Refresh
+          </button>
+        </div>
+
+        <div id="balance-cards" class="stat-cards"></div>
+
+        <div id="upcoming-holidays" class="card">
+          <h3>Upcoming Holidays</h3>
+          <div id="holidays-list" class="holidays-strip">
+            <p class="muted">Loading…</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3 id="leaves-heading">Leave Requests</h3>
+            <div class="filters">
+              <input type="search" id="leaves-search"
+                     placeholder="Search employee…"
+                     oninput="app.onLeaveFilterChange()" hidden />
+              <select id="leaves-status-filter" onchange="app.onLeaveFilterChange()">
+                <option value="">All statuses</option>
+                <option value="Pending">Pending</option>
+                <option value="Approved">Approved</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
+          <div id="leaves-table-container">
+            <p class="muted">Loading…</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Apply for Leave Tab ───────────────────────────────────── -->
+      <section id="tab-apply" class="tab-panel" role="tabpanel" hidden>
+        <div class="page-header">
+          <h2>Apply for Leave</h2>
+        </div>
+
+        <div class="card">
+          <form id="apply-form" onsubmit="return app.submitApplyLeave(event)">
+            <div class="form-row">
+              <label for="leave-type">Leave type</label>
+              <select id="leave-type" required>
+                <option value="">Select…</option>
+              </select>
+              <p class="hint" id="leave-type-hint"></p>
+            </div>
+
+            <div class="form-row split">
+              <div>
+                <label for="start-date">Start date</label>
+                <input type="date" id="start-date" required />
+              </div>
+              <div>
+                <label for="end-date">End date</label>
+                <input type="date" id="end-date" required />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label for="reason">Reason</label>
+              <textarea id="reason" rows="3" required maxlength="500"
+                        placeholder="Briefly describe the reason for this leave."></textarea>
+            </div>
+
+            <div id="apply-summary" class="summary" hidden></div>
+
+            <div class="form-actions">
+              <button type="button" class="btn-ghost" onclick="app.resetApplyForm()">Reset</button>
+              <button type="submit" class="btn-primary" id="apply-submit">Submit request</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- ── Manage Requests Tab (HR Admin) ───────────────────────── -->
+      <section id="tab-manage" class="tab-panel" role="tabpanel" hidden>
+        <div class="page-header">
+          <h2>Manage Pending Requests</h2>
+          <button class="btn-ghost" onclick="app.refreshManageQueue()" title="Refresh">
+            ↻ Refresh
+          </button>
+        </div>
+
+        <div class="card">
+          <div id="manage-queue-container">
+            <p class="muted">Loading…</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ─── Assistant Side Panel ──────────────────────────────────────── -->
+    <aside id="assistant-panel" class="assistant-panel" hidden>
+      <div class="assistant-header">
+        <div class="assistant-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1.27A7 7 0 0 1 14 23h-4a7 7 0 0 1-6.73-4H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+            <circle cx="9.5" cy="15.5" r="1"/>
+            <circle cx="14.5" cy="15.5" r="1"/>
+          </svg>
+          <h3>Assistant</h3>
+        </div>
+        <button class="btn-ghost btn-small" onclick="app.toggleAssistant()" aria-label="Close assistant">✕</button>
+      </div>
+
+      <div id="chat-messages"></div>
+
+      <div id="authorize-section" hidden>
+        <p class="muted">The agent needs your authorization to perform this action.</p>
+        <button id="authorize-btn" class="btn-primary" onclick="app.initiateOBOFlow()">
+          Authorize
+        </button>
+      </div>
+
+      <form id="chat-form" onsubmit="return app.handleChatSubmit(event)">
+        <input type="text" id="message-input"
+               placeholder="Ask me anything about leave…"
+               autocomplete="off" disabled />
+        <button type="submit" id="send-btn" class="btn-primary" disabled>Send</button>
+      </form>
+    </aside>
+
+  </div>
+
+  <!-- ─── Reusable Overlays ──────────────────────────────────────────── -->
+
+  <!-- Toast container (top-right) -->
+  <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Reject reason modal -->
+  <div id="reject-modal" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-labelledby="reject-modal-title">
+      <h3 id="reject-modal-title">Reject leave request</h3>
+      <p class="muted" id="reject-modal-subject"></p>
+      <label for="reject-reason">Reason for rejection</label>
+      <textarea id="reject-reason" rows="3" maxlength="500"
+                placeholder="Explain why this request is being rejected."></textarea>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="app.closeRejectModal()">Cancel</button>
+        <button class="btn-danger" id="reject-confirm-btn" onclick="app.confirmReject()">
+          Reject request
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leave details drawer -->
+  <div id="details-drawer" class="drawer" hidden>
+    <div class="drawer-header">
+      <h3 id="details-title">Leave request</h3>
+      <button class="btn-ghost" onclick="app.closeDetails()" aria-label="Close">✕</button>
+    </div>
+    <div id="details-body" class="drawer-body"></div>
+  </div>
+
+  <!-- ─── Markdown rendering + sanitization (pinned, with SRI) ─────────── -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/marked@14.1.3/marked.min.js"
+    integrity="sha384-k8o8HikHweyzW55Wd3wl18ovJj6vHVYNQeQbeSM0fxx+0WiH4TcccOG9uz8Xd2JR"
+    crossorigin="anonymous"
+  ></script>
+  <script
+    src="https://cdn.jsdelivr.net/npm/dompurify@3.1.7/dist/purify.min.js"
+    integrity="sha384-XQqX/4yiUGu+oyr87jvWzRuqBUK/adrY0DunhL+tID9m/9dwSpV8h9Fk/Sg6ifVQ"
+    crossorigin="anonymous"
+  ></script>
+  <script src="/app.js"></script>
+</body>
+</html>

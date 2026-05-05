@@ -1,0 +1,10 @@
+fastapi~=0.115.0
+uvicorn~=0.34.0
+asgardeo==0.2.1
+asgardeo_ai==0.2.2
+langchain>=1.2.11
+langchain-google-genai==3.2.0
+langchain-mcp-adapters==0.1.14
+python-dotenv~=1.0.0
+httpx~=0.28.0
+PyJWT[crypto]>=2.12.0
