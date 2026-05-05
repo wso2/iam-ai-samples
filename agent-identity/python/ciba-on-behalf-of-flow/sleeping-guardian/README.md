@@ -10,6 +10,8 @@ A demonstration of **Client Initiated Backchannel Authentication (CIBA)** using 
 
 **The Solution**: Aurelius cannot log Alice in. Instead, it uses **CIBA (Client Initiated Backchannel Authentication)** via WSO2 Identity Server (Asgardeo). Aurelius initiates a backchannel request, and Alice receives an SMS/Email notification. She taps a link, reviews the trade details, and approves it from her phone—all without leaving her bed. Aurelius receives the authorization token and executes the trade via a protected MCP Stock Trading Server.
 
+![The Sleeping Guardian: How Aurelius Works](images/sleeping-guardian-flow.png)
+
 ## Architecture
 
 This demo consists of four main components:
