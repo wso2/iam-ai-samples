@@ -10,3 +10,5 @@ This repo includes the samples that demonstrate securing AI applications using t
 4) [MCP Auth/Python](mcp-auth/python/README.md) - Example implementation of a protected Python MCP server secured with the WSO2 IAM platform
 5) [MCP Auth/TypeScript](mcp-auth/typescript/README.md) - Example implementation of a protected TypeScript MCP server secured with the WSO2 IAM platform
 6) [Agent Identity/Python](agent-identity/python/README.md) - Demonstrates how AI agents authenticate with Asgardeo using either direct Agent Credentials or user-delegated OBO tokens. These samples show how agents securely obtain and use access tokens to call backend services or MCP tool servers.
+7) [Asgardeo + AI Gateway Integration](asgardeo-agent-identity-with-ai-gateway/README.md) - An application demonstrating secure authentication and authorization for AI agents using Asgardeo identity and access management with AI Gateways.
+8) [Secure MCP Servers and Integrate Them with n8n Agentic Flows](mcp-auth/integrations/mcp-auth-n8n-example/README.md) - A tutorial on how to use Asgardeo/WSO2 Identity Server with an n8n MCP Client to securely connect to and invoke a protected MCP Server.

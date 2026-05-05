@@ -52,8 +52,6 @@ export default function AgentSimulator() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          orgName,
-          clientId,
           callingAgent,
         })
       });
