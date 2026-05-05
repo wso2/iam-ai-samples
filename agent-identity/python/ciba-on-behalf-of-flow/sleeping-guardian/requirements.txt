@@ -1,0 +1,25 @@
+# Flask web framework
+Flask==3.0.0
+
+# Environment variables
+python-dotenv==1.0.0
+
+# WSO2 Asgardeo SDK
+asgardeo==0.2.3
+asgardeo-ai==0.2.4
+
+# LangChain for AI Agent
+langchain==0.3.13
+langchain-core>=0.3.34,<0.4.0
+langchain-mcp-adapters==0.1.2
+
+# LLM Provider - Gemini (default)
+langchain-google-genai==2.0.8
+
+# HTTP requests
+requests==2.31.0
+httpx>=0.28.0,<0.29.0
+
+# JWT handling
+PyJWT==2.9.0
+cryptography>=43.0.0
