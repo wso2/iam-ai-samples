@@ -91,7 +91,8 @@ If you want a quick overview before diving into details:
 - [ ] Authorize MCP Resource to created MCP Client Application
 - [ ] Create agent "Aurelius Bot" identity and note AGENT_ID + AGENT_SECRET
 - [ ] Create user (Alice) with verified email
-- [ ] Create and assign `stock:read`, `stock_trader` role to both agent and user
+- [ ] Create a role `stock-mcp` and select created MCP resource server and assign both `stock:read` and `stock:trade` scope and click Finish
+- [ ] Assign created `stock-mcp` role to both agent and user
 - [ ] Enable CIBA grant type and App-Native Authentication in Agent app
 - [ ] Disable "Public Client" in MCP Client applications
 
@@ -215,7 +216,7 @@ Roles will define who can perform which actions on the stock trading system.
 1. Navigate to **User Management** → **Roles**
 2. Click **New Role**
 3. Create role:
-   - **Role Name**: `stock_mcp`
+   - **Role Name**: `stock-mcp`
    - select Audience as Organization
 4. Select the MCP Resource "Stock Trading MCP"
    - select all scopes
@@ -227,7 +228,7 @@ Grant the user appropriate trading permissions.
 
 1. Go to **User Management**
 2. Navigate to **Roles** tab
-3. Go to the created Role(`stock_mcp`)
+3. Go to the created Role(`stock-mcp`)
 4. Go to user section and assign the created user
 5. Go to agent section and assign the created agent
 
@@ -252,7 +253,7 @@ Before moving to installation, collect all these values set in the .env file:
 
 ```bash
 git clone https://github.com/wso2/iam-ai-samples.git
-cd agent-identity/python/ciba-on-behalf-of-flow/sleeping-guardian
+cd iam-ai-samples/agent-identity/python/ciba-on-behalf-of-flow/sleeping-guardian
 ```
 
 ### 2. Set Up MCP Stock Server
@@ -341,7 +342,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edit `.env` and fill in your credentials from Step 11:
+Edit `.env` and fill in your credentials:
 
 ```bash
 # ---------------------------------------
