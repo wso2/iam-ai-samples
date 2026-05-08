@@ -199,7 +199,8 @@ async function getOrConnectRuntime(
   oboTokens: Record<string, string>,
   trace: WorkflowTrace | undefined
 ): Promise<MCPClientNodeRuntime> {
-  const cached = runtimeCache.get(nodeId);
+  const cacheKey = `${nodeId}:${oboTokens[nodeId] ?? ''}`;
+  const cached = runtimeCache.get(cacheKey);
   if (cached) return cached;
 
   const config = mcpConfigs.find((c) => c.nodeId === nodeId);
@@ -207,7 +208,7 @@ async function getOrConnectRuntime(
 
   // connectMCPClient throws ConsentRequiredError for OBO nodes with no token
   const runtime = await connectMCPClient(config, oboTokens, trace);
-  runtimeCache.set(nodeId, runtime);
+  runtimeCache.set(cacheKey, runtime);
   return runtime;
 }
 

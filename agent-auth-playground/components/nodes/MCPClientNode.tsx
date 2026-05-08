@@ -21,7 +21,7 @@ export default function MCPClientNode({ data }: any) {
             <Handle
               type="target"
               position={Position.Left}
-              className="!w-1.5 !h-1.5 !bg-black-500 !border-1 !border-white !shadow-md"
+              className="w-1.5! h-1.5! bg-slate-900! border-1! border-white! shadow-md!"
             />
           </div>
         </ErrorBorder>

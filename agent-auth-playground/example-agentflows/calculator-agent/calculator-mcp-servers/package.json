@@ -11,12 +11,12 @@
     "cors": "^2.8.5",
     "express": "^5.2.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
     "zod": "^4.1.13"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
-    "@types/node": "^25.0.0"
+    "@types/node": "^25.0.0",
+    "typescript": "^5.9.3"
   }
 }

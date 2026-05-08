@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { invokeLLM, ProviderName } from '@/lib/llmProviders';
+import { invokeLLM, ProviderName, PROVIDER_MODELS } from '@/lib/llmProviders';
 
 export const maxDuration = 60;
 
@@ -32,6 +32,13 @@ export async function POST(request: NextRequest) {
     if (isAzure && (!azureResourceName || !azureDeploymentName || !azureApiVersion)) {
       return NextResponse.json(
         { success: false, error: 'Azure OpenAI requires azureResourceName, azureDeploymentName, and azureApiVersion.' },
+        { status: 400 }
+      );
+    }
+
+    if (!(provider in PROVIDER_MODELS)) {
+      return NextResponse.json(
+        { success: false, error: `Unknown provider: ${provider}` },
         { status: 400 }
       );
     }

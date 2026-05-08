@@ -329,12 +329,12 @@ export default function LLMPanel({ node, onUpdate }: LLMPanelProps) {
               min="0"
               max="2"
               step="0.1"
-              value={llmData.temperature || 0.7}
+              value={llmData.temperature ?? 0.7}
               onChange={(e) => onUpdate(node.id, { data: { ...llmData, temperature: parseFloat(e.target.value) } })}
               className="flex-1"
             />
             <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
-              {(llmData.temperature || 0.7).toFixed(1)}
+              {(llmData.temperature ?? 0.7).toFixed(1)}
             </span>
           </div>
         </div>

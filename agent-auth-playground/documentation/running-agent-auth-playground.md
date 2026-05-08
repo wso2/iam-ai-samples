@@ -33,7 +33,7 @@ All configuration - LLM API keys (OpenAI, Gemini, Anthropic) and per-node Asgard
 
 ```bash
 git clone https://github.com/wso2/iam-ai-samples
-cd agent-auth-playground
+cd iam-ai-samples/agent-auth-playground
 pnpm install
 ```
 

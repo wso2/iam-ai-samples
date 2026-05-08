@@ -28,6 +28,17 @@ export interface MCPToolsEntry {
 
 type MCPToolsStore = Record<string, Record<string, MCPToolsEntry>>;
 
+function safeParse<T>(key: string, fallback: T): T {
+  const stored = localStorage.getItem(key);
+  if (!stored) return fallback;
+  try {
+    return JSON.parse(stored) as T;
+  } catch {
+    localStorage.removeItem(key);
+    return fallback;
+  }
+}
+
 // Client-side storage utilities
 export const workflowStore = {
   // Workflow management — single workflow only
@@ -38,16 +49,14 @@ export const workflowStore = {
 
   getWorkflow(): Workflow | null {
     if (typeof window === 'undefined') return null;
-    const stored = localStorage.getItem(WORKFLOW_KEY);
-    return stored ? JSON.parse(stored) : null;
+    return safeParse<Workflow | null>(WORKFLOW_KEY, null);
   },
 
   // Workflow memory by workflowId -> memoryNodeId -> chat messages
   getWorkflowMemory(workflowId: string, memoryNodeId: string): ChatMessage[] {
     if (typeof window === 'undefined') return [];
 
-    const stored = localStorage.getItem(WORKFLOW_MEMORY_KEY);
-    const allMemory: WorkflowMemoryStore = stored ? JSON.parse(stored) : {};
+    const allMemory = safeParse<WorkflowMemoryStore>(WORKFLOW_MEMORY_KEY, {});
     return allMemory[workflowId]?.[memoryNodeId] || [];
   },
 
@@ -63,8 +72,7 @@ export const workflowStore = {
     const existing = this.getWorkflowMemory(workflowId, memoryNodeId);
     const next = [...existing, ...messages].slice(-normalizedMax);
 
-    const stored = localStorage.getItem(WORKFLOW_MEMORY_KEY);
-    const allMemory: WorkflowMemoryStore = stored ? JSON.parse(stored) : {};
+    const allMemory = safeParse<WorkflowMemoryStore>(WORKFLOW_MEMORY_KEY, {});
     const workflowMemory = allMemory[workflowId] || {};
 
     allMemory[workflowId] = {
@@ -79,10 +87,7 @@ export const workflowStore = {
   clearWorkflowMemory(workflowId: string, memoryNodeId: string): void {
     if (typeof window === 'undefined') return;
 
-    const stored = localStorage.getItem(WORKFLOW_MEMORY_KEY);
-    if (!stored) return;
-
-    const allMemory: WorkflowMemoryStore = JSON.parse(stored);
+    const allMemory = safeParse<WorkflowMemoryStore>(WORKFLOW_MEMORY_KEY, {});
     if (!allMemory[workflowId]) return;
 
     delete allMemory[workflowId][memoryNodeId];
@@ -97,10 +102,7 @@ export const workflowStore = {
   clearWorkflowMemories(workflowId: string): void {
     if (typeof window === 'undefined') return;
 
-    const stored = localStorage.getItem(WORKFLOW_MEMORY_KEY);
-    if (!stored) return;
-
-    const allMemory: WorkflowMemoryStore = JSON.parse(stored);
+    const allMemory = safeParse<WorkflowMemoryStore>(WORKFLOW_MEMORY_KEY, {});
     delete allMemory[workflowId];
     localStorage.setItem(WORKFLOW_MEMORY_KEY, JSON.stringify(allMemory));
   },
@@ -108,9 +110,7 @@ export const workflowStore = {
   // OBO token management — keyed by `${workflowId}_${nodeId}`
   getOBOToken(workflowId: string, nodeId: string): string | null {
     if (typeof window === 'undefined') return null;
-    const stored = localStorage.getItem(OBO_TOKENS_KEY);
-    if (!stored) return null;
-    const store: OBOTokenStore = JSON.parse(stored);
+    const store = safeParse<OBOTokenStore>(OBO_TOKENS_KEY, {});
     const entry = store[`${workflowId}_${nodeId}`];
     if (!entry) return null;
     if (Date.now() > entry.expiresAt) return null;
@@ -119,8 +119,7 @@ export const workflowStore = {
 
   setOBOToken(workflowId: string, nodeId: string, accessToken: string, expiresIn: number): void {
     if (typeof window === 'undefined') return;
-    const stored = localStorage.getItem(OBO_TOKENS_KEY);
-    const store: OBOTokenStore = stored ? JSON.parse(stored) : {};
+    const store = safeParse<OBOTokenStore>(OBO_TOKENS_KEY, {});
     store[`${workflowId}_${nodeId}`] = {
       accessToken,
       expiresAt: Date.now() + expiresIn * 1000,
@@ -130,9 +129,7 @@ export const workflowStore = {
 
   clearOBOTokens(workflowId: string): void {
     if (typeof window === 'undefined') return;
-    const stored = localStorage.getItem(OBO_TOKENS_KEY);
-    if (!stored) return;
-    const store: OBOTokenStore = JSON.parse(stored);
+    const store = safeParse<OBOTokenStore>(OBO_TOKENS_KEY, {});
     const prefix = `${workflowId}_`;
     for (const key of Object.keys(store)) {
       if (key.startsWith(prefix)) delete store[key];
@@ -153,16 +150,13 @@ export const workflowStore = {
   // MCP discovered tools — keyed by workflowId -> mcpClientNodeId -> entry
   getMCPTools(workflowId: string, nodeId: string): MCPToolsEntry | null {
     if (typeof window === 'undefined') return null;
-    const stored = localStorage.getItem(MCP_TOOLS_KEY);
-    if (!stored) return null;
-    const store: MCPToolsStore = JSON.parse(stored);
+    const store = safeParse<MCPToolsStore>(MCP_TOOLS_KEY, {});
     return store[workflowId]?.[nodeId] || null;
   },
 
   setMCPTools(workflowId: string, nodeId: string, entry: MCPToolsEntry): void {
     if (typeof window === 'undefined') return;
-    const stored = localStorage.getItem(MCP_TOOLS_KEY);
-    const store: MCPToolsStore = stored ? JSON.parse(stored) : {};
+    const store = safeParse<MCPToolsStore>(MCP_TOOLS_KEY, {});
     const workflowEntries = store[workflowId] || {};
     workflowEntries[nodeId] = entry;
     store[workflowId] = workflowEntries;
@@ -171,9 +165,7 @@ export const workflowStore = {
 
   clearMCPTools(workflowId: string, nodeId: string): void {
     if (typeof window === 'undefined') return;
-    const stored = localStorage.getItem(MCP_TOOLS_KEY);
-    if (!stored) return;
-    const store: MCPToolsStore = JSON.parse(stored);
+    const store = safeParse<MCPToolsStore>(MCP_TOOLS_KEY, {});
     if (!store[workflowId]) return;
     delete store[workflowId][nodeId];
     if (Object.keys(store[workflowId]).length === 0) {
@@ -184,9 +176,7 @@ export const workflowStore = {
 
   clearAllMCPTools(workflowId: string): void {
     if (typeof window === 'undefined') return;
-    const stored = localStorage.getItem(MCP_TOOLS_KEY);
-    if (!stored) return;
-    const store: MCPToolsStore = JSON.parse(stored);
+    const store = safeParse<MCPToolsStore>(MCP_TOOLS_KEY, {});
     if (!store[workflowId]) return;
     delete store[workflowId];
     localStorage.setItem(MCP_TOOLS_KEY, JSON.stringify(store));
@@ -195,8 +185,7 @@ export const workflowStore = {
   // Agent credential management — stored globally, not per-workflow
   getAgentCredentials(): AgentCredential[] {
     if (typeof window === 'undefined') return [];
-    const stored = localStorage.getItem(AGENT_CREDENTIALS_KEY);
-    return stored ? JSON.parse(stored) : [];
+    return safeParse<AgentCredential[]>(AGENT_CREDENTIALS_KEY, []);
   },
 
   saveAgentCredential(cred: AgentCredential): void {
@@ -220,8 +209,7 @@ export const workflowStore = {
   // LLM credential management — stored globally, not per-workflow
   getLLMCredentials(): LLMCredential[] {
     if (typeof window === 'undefined') return [];
-    const stored = localStorage.getItem(LLM_CREDENTIALS_KEY);
-    return stored ? JSON.parse(stored) : [];
+    return safeParse<LLMCredential[]>(LLM_CREDENTIALS_KEY, []);
   },
 
   saveLLMCredential(cred: LLMCredential): void {
@@ -245,8 +233,7 @@ export const workflowStore = {
   // OAuth2 config management — stored globally, not per-workflow
   getOAuthConfigs(): OAuthConfig[] {
     if (typeof window === 'undefined') return [];
-    const stored = localStorage.getItem(OAUTH_CONFIGS_KEY);
-    return stored ? JSON.parse(stored) : [];
+    return safeParse<OAuthConfig[]>(OAUTH_CONFIGS_KEY, []);
   },
 
   saveOAuthConfig(config: OAuthConfig): void {
