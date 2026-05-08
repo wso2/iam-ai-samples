@@ -1,0 +1,88 @@
+{
+  "id": "workflow-1778049384803-30n2j9c6l",
+  "name": "calculator-agent",
+  "nodes": [
+    {
+      "id": "node-calc-chattrigger",
+      "type": "chatTrigger",
+      "position": {
+        "x": 100,
+        "y": 250
+      },
+      "data": {
+        "label": "Chat Trigger"
+      }
+    },
+    {
+      "id": "node-calc-aiagent",
+      "type": "aiAgent",
+      "position": {
+        "x": 350,
+        "y": 250
+      },
+      "data": {
+        "label": "AI Agent",
+        "systemPrompt": "You are a helpful calculator assistant. Use the available calculator tools to perform arithmetic operations. The tools are named same as the operation name.",
+        "maxToolSteps": 6,
+        "agentCredentialId": "",
+        "agentName": "calculator-agent",
+        "maxMessages": 10
+      }
+    },
+    {
+      "id": "node-calc-llm",
+      "type": "llm",
+      "position": {
+        "x": 359,
+        "y": 20
+      },
+      "data": {
+        "label": "AI Service",
+        "provider": "",
+        "model": "",
+        "temperature": 0.7,
+        "maxTokens": 1000
+      }
+    },
+    {
+      "id": "node-calc-mcpclient",
+      "type": "mcpClient",
+      "position": {
+        "x": 656.9143021801249,
+        "y": 258.99641725116413
+      },
+      "data": {
+        "label": "MCP Client",
+        "mcpServerEndpoint": "http://localhost:3010/mcp",
+        "name": "calculator-mcp",
+        "useOAuth2": true,
+        "oauth2Flow": "agent",
+        "oauth2ConfigId": ""
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-calc-trigger-agent",
+      "source": "node-calc-chattrigger",
+      "target": "node-calc-aiagent"
+    },
+    {
+      "id": "edge-calc-agent-mcp",
+      "source": "node-calc-aiagent",
+      "target": "node-calc-mcpclient",
+      "sourceHandle": "right",
+      "animated": true
+    },
+    {
+      "id": "edge-calc-agent-llm",
+      "source": "node-calc-aiagent",
+      "target": "node-calc-llm",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "animated": true
+    }
+  ],
+  "createdAt": 1746700800000,
+  "updatedAt": 1778218921100
+}
