@@ -15,6 +15,8 @@ from auth.context import (
     current_user_sub,
     current_user_first_name,
     current_user_last_name,
+    current_user_email,
+    current_user_username,
 )
 from service import store
 
@@ -47,12 +49,20 @@ def require_user() -> dict | None:
 
 
 def ensure_current_user() -> None:
-    """Auto-register the current user from JWT claims into the in-memory store."""
+    """Auto-register the current user from JWT claims into the in-memory store.
+
+    Also records email/username where the token carries them: they are what
+    make the person reachable once they leave the browser.
+    """
     sub = current_user_sub.get()
     first_name = current_user_first_name.get() or "Unknown"
     last_name = current_user_last_name.get() or ""
     if sub:
-        store.ensure_user(sub, first_name, last_name)
+        store.ensure_user(
+            sub, first_name, last_name,
+            email=current_user_email.get() or "",
+            username=current_user_username.get() or "",
+        )
 
 
 def current_full_name() -> str:

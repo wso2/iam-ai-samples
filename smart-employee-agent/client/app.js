@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
  *
- *  Smart Employee Agent — Client Application
+ *  Employee Portal — Client Application
  *
  *  Sections:
  *    State + DOM helpers + utilities
@@ -38,6 +38,7 @@ const app = (function () {
   let leavePolicyCache = null;
   let leavesCache = [];
   let holidaysCache = [];
+  let ticketsCache = [];
   let balanceCache = null;
 
   // UI state
@@ -119,10 +120,14 @@ const app = (function () {
     sessionStorage.setItem("pkce_verifier", pkceVerifier);
     sessionStorage.setItem("pkce_state", pkceState);
 
+    // Asgardeo grants the intersection of requested / app-authorized /
+    // role-permitted, so asking for everything is safe — an employee simply
+    // does not receive it_desk_access, and the desk tab stays hidden.
     const scopes = [
       "openid", "profile",
       "agent_access",
       "hr_basic_rest", "hr_self_rest", "hr_read_rest", "hr_approve_rest",
+      "it_desk_access",
     ].join(" ");
 
     const authUrl = new URL(`${config.asgardeoBaseUrl}/oauth2/authorize`);
@@ -229,6 +234,13 @@ const app = (function () {
       if (!userScopes.includes(req)) tab.hidden = true;
     });
 
+    // Reveal the IT Tickets tab if the IT Agent is wired up (Pattern 4).
+    probeItAgent();
+    // Reveal the Google Calendar menu item if configured (Pattern 6).
+    refreshGoogleStatus();
+    // Reveal the IT Service Desk tab if this user may use it (Pattern 7).
+    refreshDeskStatus();
+
     // Initial tab
     switchTab("dashboard");
 
@@ -260,6 +272,94 @@ const app = (function () {
     if (name === "dashboard") refreshDashboard();
     else if (name === "apply") loadApplyTab();
     else if (name === "manage") refreshManageQueue();
+    else if (name === "tickets") refreshTickets();
+    else if (name === "desk") refreshDeskStatus();
+  }
+
+  // ─── IT tickets (Pattern 4) ────────────────────────────────────────────────
+
+  // The agent server proxies this to the IT Agent using its own agent token —
+  // the browser's user token never leaves the HR agent.
+  async function fetchTickets() {
+    const resp = await fetch(`${config.agentServerUrl}/api/it/tickets`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const text = await resp.text();
+    let data = null;
+    if (text) { try { data = JSON.parse(text); } catch {} }
+    return { status: resp.status, ok: resp.ok, data };
+  }
+
+  // Reveal the tab only when the IT Agent is actually wired up: the endpoint
+  // answers 404 when IT_AGENT_ENABLED is false, so no extra client config.
+  async function probeItAgent() {
+    try {
+      const { status } = await fetchTickets();
+      if (status === 404) return;
+      const btn = $("tab-btn-tickets");
+      if (btn) btn.hidden = false;
+    } catch {
+      /* agent server down — leave the tab hidden */
+    }
+  }
+
+  async function refreshTickets() {
+    renderTickets(null);
+    try {
+      const { ok, status, data } = await fetchTickets();
+      if (!ok) {
+        const msg = data?.message || `HTTP ${status}`;
+        renderTickets([], msg);
+        return;
+      }
+      ticketsCache = data?.tickets || [];
+      renderTickets(ticketsCache);
+    } catch (e) {
+      renderTickets([], e.message);
+    }
+  }
+
+  async function silentRefreshTickets() {
+    try {
+      const { ok, data } = await fetchTickets();
+      if (!ok) return;
+      ticketsCache = data?.tickets || [];
+      renderTickets(ticketsCache);
+    } catch { /* leave the current view in place */ }
+  }
+
+  function renderTickets(tickets, errorMsg) {
+    const container = $("tickets-container");
+    if (!container) return;
+    if (tickets == null) { container.innerHTML = `<p class="muted">Loading…</p>`; return; }
+
+    if (errorMsg) {
+      container.innerHTML = `<p class="muted">Could not load IT tickets: ${esc(errorMsg)}</p>`;
+      return;
+    }
+
+    let html = `<table class="dashboard-table"><thead><tr>
+      <th>Ref</th><th>Subject</th><th>Category</th><th>Status</th>
+      <th>Requested for</th><th>Filed by</th>
+    </tr></thead><tbody>`;
+
+    if (tickets.length === 0) {
+      html += `<tr class="empty-row"><td colspan="6">No IT tickets yet. Ask the assistant to raise one.</td></tr>`;
+    } else {
+      for (const t of tickets) {
+        const statusClass = (t.status || "").toLowerCase().replace(/\s+/g, "-");
+        html += `<tr>
+          <td>${esc(t.ticket_id)}</td>
+          <td>${esc(t.subject)}</td>
+          <td>${esc(t.category)}</td>
+          <td><span class="status-badge ${statusClass}">${esc(t.status)}</span></td>
+          <td>${esc(t.requested_for)}</td>
+          <td class="muted">${esc(t.created_by)}</td>
+        </tr>`;
+      }
+    }
+    html += `</tbody></table>`;
+    container.innerHTML = html;
   }
 
   // ─── REST API client ────────────────────────────────────────────────────────
@@ -440,28 +540,32 @@ const app = (function () {
     if (isAdmin && search) rows = rows.filter((l) => (l.employee || "").toLowerCase().includes(search));
 
     let html = `<table class="dashboard-table"><thead><tr>`;
+    // Ref is shown so the user can quote it back to the assistant
+    // ("get LR001 approved") — it was previously only in a fading toast.
     if (isAdmin) {
-      html += `<th>Employee</th><th>Type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th>`;
+      html += `<th>Ref</th><th>Employee</th><th>Type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th>`;
     } else {
-      html += `<th>Type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th>`;
+      html += `<th>Ref</th><th>Type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th>`;
     }
     html += `</tr></thead><tbody>`;
 
     if (rows.length === 0) {
-      const cols = isAdmin ? 6 : 5;
+      const cols = isAdmin ? 7 : 6;
       html += `<tr class="empty-row"><td colspan="${cols}">No leave requests match your filters.</td></tr>`;
     } else {
       for (const l of rows) {
         const statusClass = (l.status || "").toLowerCase();
         const reqId = l.request_id || "";
         const cells = isAdmin
-          ? `<td>${esc(l.employee)}</td>
+          ? `<td>${esc(reqId)}</td>
+             <td>${esc(l.employee)}</td>
              <td>${esc(l.type || l.leave_type)}</td>
              <td>${esc(l.start_date)}</td>
              <td>${esc(l.end_date)}</td>
              <td>${esc(l.days_requested)}</td>
              <td><span class="status-badge ${statusClass}">${esc(l.status)}</span></td>`
-          : `<td>${esc(l.type || l.leave_type)}</td>
+          : `<td>${esc(reqId)}</td>
+             <td>${esc(l.type || l.leave_type)}</td>
              <td>${esc(l.start_date)}</td>
              <td>${esc(l.end_date)}</td>
              <td>${esc(l.days_requested)}</td>
@@ -502,16 +606,36 @@ const app = (function () {
         const data = await api("/api/leave-policy");
         leavePolicyCache = data.leave_types || [];
       } catch (e) {
-        toast("error", "Couldn't load leave policy", e.message);
+        // A toast alone fades in 4s and leaves an empty dropdown behind, which
+        // reads as "the app is broken" rather than "this call failed".
+        const why = e.status === 403
+          ? "your account is missing the 'hr_basic_rest' permission"
+          : e.message;
+        toast("error", "Couldn't load leave policy", why);
+        showLeaveTypeError(why);
         return;
       }
+    }
+    if (leavePolicyCache.length === 0) {
+      showLeaveTypeError("the server returned no leave types");
+      return;
     }
     populateLeaveTypes();
     populateApplySummary();
   }
 
+  // Make a failed policy load visible in the form itself, not just in a toast.
+  function showLeaveTypeError(why) {
+    const sel = $("leave-type");
+    if (sel) {
+      sel.innerHTML = `<option value="">Unavailable — ${esc(why)}</option>`;
+      sel.disabled = true;
+    }
+  }
+
   function populateLeaveTypes() {
     const sel = $("leave-type");
+    sel.disabled = false;
     sel.innerHTML = `<option value="">Select…</option>` +
       leavePolicyCache.map((p) => `<option value="${esc(p.leave_type)}">${esc(p.leave_type)}</option>`).join("");
     sel.onchange = populateApplySummary;
@@ -770,6 +894,8 @@ const app = (function () {
         ${detailRow("Days", d.days_requested)}
         ${detailRow("Status", `<span class="status-badge ${statusClass}">${esc(d.status)}</span>`)}
         ${detailRow("Reason", d.reason || "—")}
+        ${d.reviewed_by_name ? detailRow("Reviewed by", d.reviewed_by_name) : ""}
+        ${d.reviewed_via ? detailRow("Approval route", `<span class="muted">${esc(d.reviewed_via)}</span>`) : ""}
         ${d.leave_balance ? `
           <h4 style="margin-top:1.25rem;font-size:0.85rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">
             Current balance
@@ -859,7 +985,13 @@ const app = (function () {
       if (resp.status === 403) { addErrorMessage("You are not authorized to use this service."); return; }
 
       const data = await resp.json();
-      if (data.type === "obo_required") {
+      if (data.type === "google_required") {
+        // The agent holds Asgardeo authority but no Google grant. A different
+        // provider, a different consent — so a different button.
+        addAgentMessage(data.message);
+        pendingCalendarMessage = text;
+        $("google-connect-section").hidden = false;
+      } else if (data.type === "obo_required") {
         addAgentMessage(data.message);
         pendingMessage = text;
         showAuthorizeButton();
@@ -872,6 +1004,7 @@ const app = (function () {
           balanceCache = null;
           silentRefreshDashboard();
           if (activeTab === "manage") silentRefreshManageQueue();
+          if (activeTab === "tickets") silentRefreshTickets();
         }
       }
     } catch (e) {
@@ -954,9 +1087,55 @@ const app = (function () {
     }
   }
 
+  // Origin of the agent server, which serves the OBO popup page. Returns null if
+  // the configured URL is missing or unparseable, so the check below fails closed.
+  // Origin of the IT agent, which serves the service-desk consent popup.
+  function itAgentOrigin() {
+    try {
+      return new URL(config.itAgentUrl).origin;
+    } catch {
+      return null;
+    }
+  }
+
+  function agentOrigin() {
+    try { return new URL(config.agentServerUrl, window.location.origin).origin; }
+    catch { return null; }
+  }
+
   function handlePostMessage(event) {
+    // Only a popup served by one of our own agent servers may drive these flows;
+    // any other window holding a handle to ours could otherwise fake a result.
+    // The IT desk consent popup is served by the IT Agent, on its own origin.
+    const allowed = [agentOrigin(), itAgentOrigin()].filter(Boolean);
+    if (!allowed.includes(event.origin)) return;
     if (!event.data || !event.data.type) return;
+
+    if (event.data.type === "it_obo_success") {
+      $("desk-authorize-section").hidden = true;
+      addDeskMessage("agent", "Authorization successful. I can now act with your permissions.");
+      refreshDeskStatus();
+      const queued = deskPending;
+      deskPending = null;
+      if (queued) sendDeskMessage(queued);
+      return;
+    }
+    if (event.data.type === "it_obo_failed") {
+      addDeskMessage("error", `Authorization failed: ${event.data.error || "Unknown error"}`);
+      return;
+    }
+
     if (event.data.type === "obo_success") {
+      // The Google popup posts the same message; refresh its state either way.
+      refreshGoogleStatus();
+      if (pendingCalendarMessage) {
+        const queued = pendingCalendarMessage;
+        pendingCalendarMessage = null;
+        $("google-connect-section").hidden = true;
+        addAgentMessage("Google Calendar connected. Adding it now\u2026");
+        sendMessage(queued);
+        return;
+      }
       const msg = pendingMessage;
       hideAuthorizeButton();
       addAgentMessage("Authorization successful! Let me process your request now.");
@@ -964,6 +1143,189 @@ const app = (function () {
     } else if (event.data.type === "obo_failed") {
       addErrorMessage(`Authorization failed: ${event.data.error || "Unknown error"}`);
     }
+  }
+
+  // The in-chat calendar prompt needs somewhere to queue the request while
+  // the user completes Google consent.
+  let pendingCalendarMessage = null;
+
+  // Reached from the chat's connect prompt rather than the user menu, so the
+  // queued request can run itself once the grant comes back.
+  async function connectGoogleFromChat() {
+    $("google-connect-section").hidden = true;
+    await toggleGoogleCalendar();
+  }
+
+  // ─── Google Calendar (Pattern 6) ───────────────────────────────────────────
+
+  // A SECOND consent, to Google — separate from the Asgardeo authorization.
+  // The menu item stays hidden unless the agent has Google configured.
+  let googleConnected = false;
+
+  async function refreshGoogleStatus() {
+    try {
+      const resp = await fetch(`${config.agentServerUrl}/api/google/status`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const item = $("google-menu-item");
+      if (!item) return;
+      item.hidden = !data.enabled;
+      googleConnected = !!data.connected;
+      item.textContent = googleConnected
+        ? "Disconnect Google Calendar"
+        : "Connect Google Calendar";
+    } catch { /* agent down — leave the item hidden */ }
+  }
+
+  async function toggleGoogleCalendar() {
+    $("user-menu-popover").hidden = true;
+    if (googleConnected) {
+      try {
+        await fetch(`${config.agentServerUrl}/api/google/disconnect`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        toast("success", "Google Calendar disconnected",
+              "Revoke access fully at myaccount.google.com/permissions.");
+      } catch (e) {
+        toast("error", "Could not disconnect", e.message);
+      }
+      refreshGoogleStatus();
+      return;
+    }
+
+    try {
+      const resp = await fetch(`${config.agentServerUrl}/api/google/url`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!resp.ok) {
+        toast("error", "Google Calendar unavailable", "The agent has no Google configuration.");
+        return;
+      }
+      const { auth_url } = await resp.json();
+      // Same popup shape as the OBO flow; the callback posts back to us.
+      window.open(auth_url, "google_popup", "width=520,height=640,scrollbars=yes");
+    } catch (e) {
+      toast("error", "Could not start Google authorization", e.message);
+    }
+  }
+
+  // ─── IT Service Desk (Pattern 7) ───────────────────────────────────────────
+
+  // The browser calls the IT Agent DIRECTLY here — the HR agent is not in the
+  // path. The IT Agent then exchanges the user's consent for a delegated token
+  // and acts with their permissions, so the IT server authorizes the person,
+  // not the agent.
+
+  let deskAuthorized = false;
+  let deskPending = null;
+
+  async function deskFetch(path, opts = {}) {
+    return fetch(`${config.itAgentUrl}${path}`, {
+      ...opts,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        ...(opts.body ? { "Content-Type": "application/json" } : {}),
+        ...(opts.headers || {}),
+      },
+    });
+  }
+
+  // The tab reveals itself only for users the IT Agent will actually serve:
+  // a 403 here means the role lacks the desk scope, which is an authorization
+  // answer, not an error to show.
+  async function refreshDeskStatus() {
+    try {
+      const resp = await deskFetch("/api/desk/status");
+      const btn = $("tab-btn-desk");
+      if (!resp.ok) {
+        if (btn) btn.hidden = true;
+        return;
+      }
+      const data = await resp.json();
+      if (btn) btn.hidden = false;
+      deskAuthorized = !!data.authorized;
+
+      const badge = $("desk-origin-badge");
+      if (badge) {
+        badge.hidden = false;
+        badge.textContent = data.from_partner_org
+          ? `Signed in via ${data.home_org} (partner org)`
+          : `Signed in via ${data.home_org} org`;
+        badge.className = "origin-badge" + (data.from_partner_org ? " partner" : "");
+      }
+      $("desk-authorize-section").hidden = deskAuthorized;
+    } catch {
+      /* IT agent unreachable — leave the tab hidden */
+    }
+  }
+
+  function handleDeskSubmit(e) {
+    e.preventDefault();
+    const input = $("desk-input");
+    const text = input.value.trim();
+    if (!text) return false;
+    input.value = "";
+    sendDeskMessage(text);
+    return false;
+  }
+
+  async function sendDeskMessage(text) {
+    addDeskMessage("user", text);
+    try {
+      const resp = await deskFetch("/api/desk/chat", {
+        method: "POST",
+        body: JSON.stringify({ message: text }),
+      });
+      const data = await resp.json().catch(() => ({}));
+
+      if (resp.status === 401) { signOut(); return; }
+      if (resp.status === 403) {
+        addDeskMessage("error", data.message || "You are not permitted to use the service desk.");
+        return;
+      }
+      if (data.type === "obo_required") {
+        // Queue the message so it runs itself once consent comes back.
+        deskPending = text;
+        $("desk-authorize-section").hidden = false;
+        addDeskMessage("agent", data.message);
+        return;
+      }
+      if (!resp.ok || data.type === "error") {
+        addDeskMessage("error", data.message || `Request failed (${resp.status})`);
+        return;
+      }
+      addDeskMessage("agent", data.message);
+    } catch (err) {
+      addDeskMessage("error", `Could not reach the IT service desk: ${err.message}`);
+    }
+  }
+
+  async function initiateDeskOBO() {
+    try {
+      const resp = await deskFetch("/api/desk/obo/url");
+      if (!resp.ok) {
+        addDeskMessage("error", "Could not start authorization.");
+        return;
+      }
+      const { auth_url } = await resp.json();
+      window.open(auth_url, "it_obo_popup", "width=500,height=600,scrollbars=yes");
+    } catch (err) {
+      addDeskMessage("error", `Could not start authorization: ${err.message}`);
+    }
+  }
+
+  function addDeskMessage(kind, text) {
+    const log = $("desk-messages");
+    if (!log) return;
+    const who = kind === "user" ? "You" : kind === "error" ? "Error" : "IT Agent";
+    const div = document.createElement("div");
+    div.className = `msg ${kind}`;
+    div.innerHTML = `<span class="who">${esc(who)}</span>${esc(text)}`;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
   }
 
   // ─── Toast ──────────────────────────────────────────────────────────────────
@@ -1010,21 +1372,35 @@ const app = (function () {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      const data = await resp.json();
-      if (data.success) {
+      // Read as text first — error responses aren't always JSON (proxy 5xx pages).
+      const text = await resp.text();
+      let data = null;
+      if (text) { try { data = JSON.parse(text); } catch {} }
+
+      if (!resp.ok) {
+        // This endpoint's own 500 sends {error}; FastAPI's 403 sends {detail}.
+        const detail = [data?.error, data?.detail].find((v) => typeof v === "string" && v)
+          || (!text.startsWith("<") && text.length <= 200 ? text.trim() : "");
+        toast("error", "Reset failed", detail ? `${detail} (HTTP ${resp.status})` : `HTTP ${resp.status}`);
+        return;
+      }
+
+      if (data?.success) {
         toast("success", "Demo data reset", "Signing you out…");
         setTimeout(() => signOut(), 1200);
       } else {
-        toast("error", "Reset failed", data.error || "Unknown error");
+        toast("error", "Reset failed", data?.error || "Unknown error");
       }
     } catch (e) {
-      toast("error", "Reset failed", "Failed to reach the agent server.");
+      toast("error", "Reset failed", `Failed to reach the agent server: ${e.message}`);
     }
   }
 
   function signOut() {
     const savedIdToken = idToken;
     const savedAccessToken = accessToken;
+
+    pendingCalendarMessage = null;
 
     accessToken = null;
     idToken = null;
@@ -1080,6 +1456,12 @@ const app = (function () {
     resetApplyForm,
     // manage
     refreshManageQueue,
+    // IT tickets
+    refreshTickets,
+    // IT service desk (Pattern 7)
+    handleDeskSubmit,
+    initiateDeskOBO,
+    refreshDeskStatus,
     closeRejectModal,
     confirmReject,
     // details
@@ -1090,6 +1472,8 @@ const app = (function () {
     initiateOBOFlow,
     // user menu
     toggleUserMenu,
+    toggleGoogleCalendar,
+    connectGoogleFromChat,
     resetDatabase,
   };
 })();

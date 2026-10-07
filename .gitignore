@@ -75,3 +75,6 @@ bundle-analyzer-report.html
 **/.env
 
 .DS_Store
+
+# Google refresh tokens persisted by the agent (credentials)
+.google_grants.json

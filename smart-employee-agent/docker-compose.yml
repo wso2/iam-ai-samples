@@ -11,6 +11,34 @@ services:
       - HR_SERVER_HOST=0.0.0.0
       - MCP_ALLOWED_HOSTS="127.0.0.1,localhost,hr-server"
 
+  # Pattern 4 — IT MCP server. Only the IT agent talks to it.
+  it-server:
+    build:
+      context: ./it-server
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./it-server/.env
+    environment:
+      - IT_SERVER_HOST=0.0.0.0
+
+  # Pattern 4 — second agent identity, invoked by the HR agent.
+  it-agent:
+    build:
+      context: ./it-agent
+    ports:
+      - "5002:5002"
+    env_file:
+      - ./it-agent/.env
+    environment:
+      - IT_MCP_SERVER_URL=http://it-server:8001/mcp
+      - IT_AGENT_HOST=0.0.0.0
+      # Pattern 7: the desk is called from the browser, so the IT agent needs
+      # its own CORS allowlist. SPA_CLIENT_ID / IT_DESK_SCOPE arrive via env_file.
+      - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+    depends_on:
+      - it-server
+
   agent:
     build:
       context: ./agent
@@ -22,8 +50,14 @@ services:
       # Override localhost URL to use Docker service name
       - HR_MCP_SERVER_URL=http://hr-server:8000/mcp
       - AGENT_SERVER_HOST=0.0.0.0
+      # Set IT_AGENT_ENABLED=true in ./agent/.env to turn on Pattern 4.
+      - IT_AGENT_URL=http://it-agent:5002
+      # Pattern 6 (GOOGLE_* vars) arrives via env_file. Leave
+      # GOOGLE_REDIRECT_URI pointing at localhost:5001 — Google redirects the
+      # user's browser, which runs on the host, not inside this network.
     depends_on:
       - hr-server
+      - it-agent
 
   client:
     build:
@@ -37,5 +71,8 @@ services:
       # localhost URLs (the browser runs on the host, not inside Docker)
       - AGENT_SERVER_URL=http://localhost:5001
       - HR_SERVER_URL=http://localhost:8000
+      # Pattern 7: the browser calls the IT service desk directly, so this is
+      # a host URL too — not the it-agent service name.
+      - IT_AGENT_URL=http://localhost:5002
     depends_on:
       - agent

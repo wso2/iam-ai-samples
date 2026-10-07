@@ -11,7 +11,7 @@
 from datetime import date as dt_date
 from typing import Dict, List, Optional
 
-from service import store
+from service import events, store
 
 
 # ─── hr_basic ───────────────────────────────────────────────────────────────
@@ -183,6 +183,8 @@ async def get_leave_request_details(request_id: str) -> Optional[Dict]:
         "days_requested": req["days_requested"],
         "status": req["status"],
         "reason": req["reason"],
+        "reviewed_by_name": req.get("reviewed_by_name"),
+        "reviewed_via": req.get("reviewed_via"),
         "leave_balance": {
             "annual": balance.get("annual", 0),
             "sick": balance.get("sick", 0),
@@ -194,7 +196,7 @@ async def get_leave_request_details(request_id: str) -> Optional[Dict]:
 # ─── hr_approve ─────────────────────────────────────────────────────────────
 
 async def approve_leave_request(
-    request_id: str, reviewer_sub: str, reviewer_name: str
+    request_id: str, reviewer_sub: str, reviewer_name: str, actor: str = ""
 ) -> Dict:
     """Approve a pending leave request. Deducts from employee's balance."""
     req = store.leave_requests.get(request_id)
@@ -229,12 +231,33 @@ async def approve_leave_request(
     req["status"] = "Approved"
     req["reviewed_by_sub"] = reviewer_sub
     req["reviewed_by_name"] = reviewer_name
+    # How the decision reached us — a delegated (agent-carried) token names the
+    # agent here, a direct browser call does not. Surfaced in the UI so the
+    # delegation is visible without reading server logs.
+    req["reviewed_via"] = actor or "Directly (browser)"
+
+    # The employee may be nowhere near a browser, so nothing on their side can
+    # notice this. Tell the agent, which can reach them out-of-band.
+    events.leave_approved(
+        {**req, "request_id": request_id}, store.users.get(req["user_sub"], {})
+    )
 
     return {
         "success": True,
         "request_id": request_id,
         "new_status": "Approved",
         "employee": req["user_name"],
+        # The employee's own subject, not the reviewer's. An approver acting on
+        # someone else's request needs this to route follow-up actions (e.g. a
+        # calendar entry) to the employee's delegation rather than their own.
+        "employee_sub": req["user_sub"],
+        # Dates and type travel with the result so a caller can act on the
+        # approval (e.g. write a calendar entry) without a second read that
+        # would need hr_read_mcp.
+        "leave_type": req["leave_type"],
+        "start_date": req["start_date"],
+        "end_date": req["end_date"],
+        "days_requested": req["days_requested"],
         "notification": f"Leave request {request_id} for {req['user_name']} has been approved.",
     }
 
@@ -289,6 +312,9 @@ async def get_leaves_for_dashboard(
         if employee_name and employee_name.lower() not in req["user_name"].lower():
             continue
         results.append({
+            # Needed by the dashboard: shown in the Ref column, and used as
+            # data-request-id so a row click can open the details drawer.
+            "request_id": req_id,
             "employee": req["user_name"],
             "type": req["leave_type"],
             "start_date": req["start_date"],

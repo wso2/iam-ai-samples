@@ -2,7 +2,7 @@
 <!--
   Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
 
-  Smart Employee Agent — Client Application
+  Employee Portal — Client Application
 
   Tabbed UI: Dashboard, Apply for Leave, Manage Requests (HR Admin).
   Persistent Assistant side panel for AI agent interaction.
@@ -14,7 +14,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smart Employee Agent</title>
+  <title>Employee Portal</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -22,7 +22,7 @@
   <!-- ─── Login Overlay ───────────────────────────────────────────────── -->
   <div id="login-overlay">
     <div class="login-box">
-      <h1>Smart Employee Agent</h1>
+      <h1>Employee Portal</h1>
       <p class="subtitle">Your AI Concierge for Leave Management</p>
       <button class="login-btn" id="login-btn" onclick="app.initiateLogin()">
         Sign In
@@ -52,6 +52,12 @@
           Manage Requests
           <span id="pending-badge" class="pending-badge" hidden>0</span>
         </button>
+        <button id="tab-btn-tickets" class="tab" data-tab="tickets" role="tab" aria-selected="false" hidden>
+          IT Tickets
+        </button>
+        <button id="tab-btn-desk" class="tab" data-tab="desk" role="tab" aria-selected="false" hidden>
+          IT Service Desk
+        </button>
       </nav>
 
       <button class="assistant-toggle" id="assistant-toggle" onclick="app.toggleAssistant()" title="Toggle Assistant">
@@ -70,6 +76,9 @@
           <span class="caret">▾</span>
         </button>
         <div class="user-menu-popover" id="user-menu-popover" hidden>
+          <button class="menu-item" id="google-menu-item" onclick="app.toggleGoogleCalendar()" hidden>
+            Connect Google Calendar
+          </button>
           <button class="menu-item" onclick="app.resetDatabase()">Reset demo data</button>
           <button class="menu-item danger" onclick="app.signOut()">Sign out</button>
         </div>
@@ -162,6 +171,60 @@
       </section>
 
       <!-- ── Manage Requests Tab (HR Admin) ───────────────────────── -->
+      <section id="tab-tickets" class="tab-panel" role="tabpanel" hidden>
+        <div class="page-header">
+          <h2>IT Support Tickets</h2>
+          <button class="btn-ghost" onclick="app.refreshTickets()" title="Refresh">
+            &#8635; Refresh
+          </button>
+        </div>
+
+        <p class="muted" style="margin-bottom: 1rem;">
+          Filed by the <strong>IT Agent</strong> on its own identity, after the
+          HR Agent delegated to it. Ask the assistant something like
+          &ldquo;raise a ticket, my laptop won't boot&rdquo; and refresh.
+        </p>
+
+        <div class="card">
+          <div id="tickets-container">
+            <p class="muted">Loading&hellip;</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-desk" class="tab-panel" role="tabpanel" hidden>
+        <div class="page-header">
+          <h2>IT Service Desk</h2>
+          <span id="desk-origin-badge" class="origin-badge" hidden></span>
+        </div>
+
+        <p class="muted" style="margin-bottom: 1rem;">
+          This talks to the <strong>IT Agent directly</strong> &mdash; not through
+          the HR Agent. Once you authorize it, the agent acts with
+          <strong>your</strong> permissions, so the IT server decides what you may
+          do. Someone signed in from a partner organization gets exactly the
+          access their role was granted here, and no more.
+        </p>
+
+        <div class="card">
+          <div id="desk-messages" class="desk-log"></div>
+
+          <div id="desk-authorize-section" hidden>
+            <p class="muted">
+              The IT Agent needs your authorization before it can act with your
+              permissions.
+            </p>
+            <button class="btn-primary" onclick="app.initiateDeskOBO()">Authorize</button>
+          </div>
+
+          <form id="desk-form" onsubmit="return app.handleDeskSubmit(event)">
+            <input type="text" id="desk-input" placeholder="Ask the IT service desk&hellip;"
+                   autocomplete="off" />
+            <button type="submit" class="btn-primary">Send</button>
+          </form>
+        </div>
+      </section>
+
       <section id="tab-manage" class="tab-panel" role="tabpanel" hidden>
         <div class="page-header">
           <h2>Manage Pending Requests</h2>
@@ -199,6 +262,17 @@
         <p class="muted">The agent needs your authorization to perform this action.</p>
         <button id="authorize-btn" class="btn-primary" onclick="app.initiateOBOFlow()">
           Authorize
+        </button>
+      </div>
+
+      <!-- A SECOND consent, to Google. Nothing approved in Asgardeo grants it. -->
+      <div id="google-connect-section" hidden>
+        <p class="muted">
+          Adding this to your calendar needs your permission at Google &mdash;
+          separate from anything you approved here.
+        </p>
+        <button id="google-connect-btn" class="btn-primary" onclick="app.connectGoogleFromChat()">
+          Connect Google Calendar
         </button>
       </div>
 

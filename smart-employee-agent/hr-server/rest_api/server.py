@@ -71,6 +71,11 @@ class _AuthContext:
                 last = parts[1] if len(parts) > 1 else ""
         self.first_name = first
         self.last_name = last
+        # Out-of-band reachability, captured where available.
+        self.email = payload.get("email") or ""
+        self.username = (
+            payload.get("username") or payload.get("preferred_username") or ""
+        )
         self.full_name = f"{first} {last}".strip() or "User"
 
 
@@ -90,22 +95,31 @@ async def _authenticate(request: Request) -> _AuthContext | JSONResponse:
 
     ctx = _AuthContext(payload)
     if ctx.sub and ctx.first_name:
-        store.ensure_user(ctx.sub, ctx.first_name, ctx.last_name)
+        store.ensure_user(
+            ctx.sub, ctx.first_name, ctx.last_name,
+            email=ctx.email, username=ctx.username,
+        )
 
-    act = payload.get("act")
-    endpoint = request.url.path
-    scope_str = ", ".join(ctx.scopes) if ctx.scopes else "(none)"
-    if act:
-        actor_sub = act.get("sub") if isinstance(act, dict) else str(act)
-        logger.info(
-            "[REST %s >> OBO Token] user(sub)=%s | name=%s | agent(act.sub)=%s | scopes=%s",
-            endpoint, ctx.sub, ctx.full_name, actor_sub, scope_str,
-        )
-    else:
-        logger.info(
-            "[REST %s >> User Token] sub=%s | name=%s | scopes=%s",
-            endpoint, ctx.sub, ctx.full_name, scope_str,
-        )
+    # DEBUG, not INFO. The REST surface is the plain browser path — the user's
+    # own token, no delegation — and a single chat action triggers several
+    # dashboard refreshes behind it. At INFO these lines crowd out the MCP
+    # token lines, which are the ones that actually show the delegation.
+    # Raise the log level to DEBUG when you need to trace REST authorization.
+    if logger.isEnabledFor(logging.DEBUG):
+        act = payload.get("act")
+        endpoint = request.url.path
+        scope_str = ", ".join(ctx.scopes) if ctx.scopes else "(none)"
+        if act:
+            actor_sub = act.get("sub") if isinstance(act, dict) else str(act)
+            logger.debug(
+                "[REST %s >> OBO Token] user(sub)=%s | name=%s | agent(act.sub)=%s | scopes=%s",
+                endpoint, ctx.sub, ctx.full_name, actor_sub, scope_str,
+            )
+        else:
+            logger.debug(
+                "[REST %s >> User Token] sub=%s | name=%s | scopes=%s",
+                endpoint, ctx.sub, ctx.full_name, scope_str,
+            )
 
     return ctx
 

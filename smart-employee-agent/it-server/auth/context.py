@@ -25,12 +25,3 @@ current_user_first_name: contextvars.ContextVar[str] = contextvars.ContextVar(
 current_user_last_name: contextvars.ContextVar[str] = contextvars.ContextVar(
     "current_user_last_name", default=""
 )
-# How to reach this person when they are NOT in a browser: CIBA needs a
-# login_hint and an approval notice needs an address. Captured from whatever
-# the token carries; either may be empty.
-current_user_email: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "current_user_email", default=""
-)
-current_user_username: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "current_user_username", default=""
-)

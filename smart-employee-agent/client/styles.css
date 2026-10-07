@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
  *
- * Smart Employee Agent — Client styles.
+ * Employee Portal — Client styles.
  * Tabbed shell: Dashboard / Apply / Manage + persistent Assistant side panel.
  */
 
@@ -385,6 +385,10 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
 .status-badge.pending { background: var(--warning-soft); color: var(--warning); }
 .status-badge.approved { background: var(--success-soft); color: var(--success); }
 .status-badge.rejected { background: var(--danger-soft); color: var(--danger); }
+/* IT ticket statuses */
+.status-badge.open { background: var(--warning-soft); color: var(--warning); }
+.status-badge.in-progress { background: var(--success-soft); color: var(--success); }
+.status-badge.closed { background: var(--danger-soft); color: var(--danger); }
 
 .row-actions { display: inline-flex; gap: 0.4rem; }
 
@@ -837,3 +841,50 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; }
   .form-row.split { grid-template-columns: 1fr; }
   .drawer { width: 100%; }
 }
+
+
+/* ─── IT Service Desk (Pattern 7) ──────────────────────────────────────────
+   The origin badge is the only place federation is visible: the token the
+   agent receives looks identical whichever provider authenticated the user. */
+
+.origin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #eef2ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+}
+
+.origin-badge.partner {
+  background: #fff7ed;
+  color: #9a3412;
+  border-color: #fed7aa;
+}
+
+.desk-log {
+  min-height: 220px;
+  max-height: 45vh;
+  overflow-y: auto;
+  margin-bottom: 0.75rem;
+}
+
+.desk-log .msg {
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.desk-log .msg.user   { background: #eff6ff; }
+.desk-log .msg.agent  { background: #f8fafc; }
+.desk-log .msg.error  { background: #fef2f2; color: #991b1b; }
+.desk-log .msg .who   { font-weight: 600; font-size: 0.75rem; opacity: 0.7; display: block; }
+
+#desk-form { display: flex; gap: 0.5rem; }
+#desk-form input { flex: 1; }

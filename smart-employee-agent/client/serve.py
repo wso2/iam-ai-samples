@@ -1,7 +1,7 @@
 """
  Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
 
-  Smart Employee Agent v2 — Client Dev Server
+  Employee Portal v2 — Client Dev Server
 
   Serves the client SPA on port 3000 with a /config endpoint
   that exposes non-secret environment variables to the browser.
@@ -27,6 +27,9 @@ CONFIG = {
     "redirectUri": os.getenv("REDIRECT_URI", f"http://localhost:{PORT}/callback"),
     "agentServerUrl": os.getenv("AGENT_SERVER_URL", "http://localhost:5001"),
     "hrServerUrl": os.getenv("HR_SERVER_URL", "http://localhost:8000"),
+    # The IT service desk is called directly by the browser, not proxied
+    # through the HR agent, so the SPA needs its address.
+    "itAgentUrl": os.getenv("IT_AGENT_URL", "http://localhost:5002"),
 }
 
 
@@ -42,7 +45,7 @@ class ClientHandler(SimpleHTTPRequestHandler):
         if path == "/config":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
-            self.send_header("Cache-Control", "no-store")
+            # Cache-Control is added for every response by end_headers() below.
             self.end_headers()
             self.wfile.write(json.dumps(CONFIG).encode())
             return

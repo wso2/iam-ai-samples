@@ -16,9 +16,17 @@ import logging
 from asgardeo import AsgardeoConfig
 from asgardeo_ai import AgentConfig, AgentAuthManager
 
+from token_debug import dump_encoded
+
 logger = logging.getLogger(__name__)
 
 REFRESH_BUFFER_SECONDS = 30
+
+# Scopes the HR Agent requests for itself. 'it_agent_invoke' is what authorizes
+# it to call the IT Agent (Pattern 4) — the IT Agent checks for it before doing
+# any work. Asgardeo grants only the subset this agent's role permits, so
+# requesting a scope the role lacks is safe: it is silently dropped.
+AGENT_SCOPES = ["openid", "hr_basic_mcp", "it_agent_invoke"]
 
 
 def _required_env(key: str) -> str:
@@ -62,12 +70,19 @@ class AgentAuth:
 
         logger.info("Obtaining agent token via App Native Auth...")
         async with AgentAuthManager(self._asgardeo_config, self._agent_config) as auth_manager:
-            self._token = await auth_manager.get_agent_token(["openid", "hr_basic_mcp"])
+            self._token = await auth_manager.get_agent_token(AGENT_SCOPES)
 
         if hasattr(self._token, "expires_in") and self._token.expires_in:
             self._expires_at = time.time() + self._token.expires_in
         else:
             self._expires_at = time.time() + 3600
 
-        logger.info("Agent token obtained (scopes: hr_basic_mcp)")
+        # Fires once per refresh (roughly hourly), not per request — the token
+        # is cached for its lifetime. This is the agent acting as ITSELF, so
+        # the dump shows no `act` claim: there is no user behind it.
+        dump_encoded("[AGENT] Agent Token (own identity)", self._token.access_token)
+        logger.info(
+            "Agent token obtained (granted scopes: %s)",
+            getattr(self._token, "scope", None) or "(none)",
+        )
         return self._token

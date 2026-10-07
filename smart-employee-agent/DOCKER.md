@@ -1,4 +1,4 @@
-# Docker Deployment — Smart Employee Agent
+# Docker Deployment — Employee Portal
 
 Run all three services (HR Server, Agent, Client) using Docker Compose.
 
@@ -63,7 +63,7 @@ The HR server logs token details at INFO level on every authenticated request. T
 
 **Pattern 2 — Agent token (direct access, no user context):**
 ```
-[MCP >> Agent Token] sub=5f3a8b2c-1234-... | name=Smart Employee Agent | scopes=hr_basic_mcp, openid
+[MCP >> Agent Token] sub=5f3a8b2c-1234-... | name=Employee Portal | scopes=hr_basic_mcp, openid
 ```
 
 **Pattern 3 — OBO token (agent acting on behalf of user):**

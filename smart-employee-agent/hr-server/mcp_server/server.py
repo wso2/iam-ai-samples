@@ -26,9 +26,12 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 import config
 from auth.jwt_validator import JWTValidator, TokenError
+from auth.token_debug import dump_claims
 from auth.context import (
     current_scopes,
     current_token_info,
+    current_user_email,
+    current_user_username,
     current_user_sub,
     current_user_first_name,
     current_user_last_name,
@@ -106,15 +109,21 @@ class JWTTokenVerifier(TokenVerifier):
             current_user_sub.set(subject)
             current_user_first_name.set(first_name)
             current_user_last_name.set(last_name)
+            current_user_email.set(payload.get("email") or "")
+            current_user_username.set(
+                payload.get("username") or payload.get("preferred_username") or ""
+            )
 
             scope_str = ", ".join(scopes) if scopes else "(none)"
             if act:
                 actor_sub = act.get("sub") if isinstance(act, dict) else str(act)
+                dump_claims("[MCP] OBO Token", payload, token)
                 logger.info(
                     "[MCP >> OBO Token] user(sub)=%s | name=%s | agent(act.sub)=%s | scopes=%s",
                     subject, full_name, actor_sub, scope_str,
                 )
             else:
+                dump_claims("[MCP] Agent Token", payload, token)
                 logger.info(
                     "[MCP >> Agent Token] sub=%s | name=%s | scopes=%s",
                     subject, full_name, scope_str,
@@ -138,7 +147,7 @@ class JWTTokenVerifier(TokenVerifier):
 
 mcp = FastMCP(
     "HR & Leave Management",
-    token_verifier=JWTTokenVerifier(config.JWKS_URL, config.AUTH_ISSUER, config.CLIENT_ID),
+    token_verifier=JWTTokenVerifier(config.JWKS_URL, config.AUTH_ISSUER, config.MCP_AUDIENCES),
     auth=AuthSettings(
         issuer_url=AnyHttpUrl(config.AUTH_ISSUER),
         resource_server_url=AnyHttpUrl(f"http://localhost:{config.PORT}"),
@@ -308,10 +317,12 @@ async def approve_leave_request(request_id: str) -> dict:
     reviewer_name = current_full_name()
     ensure_current_user()
 
-    result = await hr_service.approve_leave_request(request_id, reviewer_sub, reviewer_name)
+    actor = get_actor_description()
+    result = await hr_service.approve_leave_request(
+        request_id, reviewer_sub, reviewer_name, actor=actor
+    )
 
     if result.get("success"):
-        actor = get_actor_description()
         logger.info(f"[AUDIT] Leave {request_id} approved by {actor}")
     return result
 

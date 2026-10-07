@@ -36,14 +36,35 @@ _SEED_LEAVE_POLICY = {
     },
 }
 
+# US federal holidays. Two years are seeded deliberately: a single-year list
+# silently goes stale part-way through the year, leaving the demo with no
+# upcoming holidays to show. Dates that fall on a weekend use the federal
+# observed day (Saturday -> the Friday before, Sunday -> the Monday after).
 _SEED_HOLIDAYS = [
+    # ── 2026 ──
     {"date": "2026-01-01", "name": "New Year's Day"},
-    {"date": "2026-03-20", "name": "Eid Al Fitr (expected)"},
-    {"date": "2026-05-27", "name": "Arafat Day (expected)"},
-    {"date": "2026-05-28", "name": "Eid Al Adha (expected)"},
-    {"date": "2026-07-18", "name": "Islamic New Year (expected)"},
-    {"date": "2026-12-01", "name": "Commemoration Day"},
-    {"date": "2026-12-02", "name": "UAE National Day"},
+    {"date": "2026-01-19", "name": "Martin Luther King, Jr. Day"},
+    {"date": "2026-02-16", "name": "Presidents' Day"},
+    {"date": "2026-05-25", "name": "Memorial Day"},
+    {"date": "2026-06-19", "name": "Juneteenth National Independence Day"},
+    {"date": "2026-07-03", "name": "Independence Day (observed)"},
+    {"date": "2026-09-07", "name": "Labor Day"},
+    {"date": "2026-10-12", "name": "Columbus Day"},
+    {"date": "2026-11-11", "name": "Veterans Day"},
+    {"date": "2026-11-26", "name": "Thanksgiving Day"},
+    {"date": "2026-12-25", "name": "Christmas Day"},
+    # ── 2027 ──
+    {"date": "2027-01-01", "name": "New Year's Day"},
+    {"date": "2027-01-18", "name": "Martin Luther King, Jr. Day"},
+    {"date": "2027-02-15", "name": "Presidents' Day"},
+    {"date": "2027-05-31", "name": "Memorial Day"},
+    {"date": "2027-06-18", "name": "Juneteenth National Independence Day (observed)"},
+    {"date": "2027-07-05", "name": "Independence Day (observed)"},
+    {"date": "2027-09-06", "name": "Labor Day"},
+    {"date": "2027-10-11", "name": "Columbus Day"},
+    {"date": "2027-11-11", "name": "Veterans Day"},
+    {"date": "2027-11-25", "name": "Thanksgiving Day"},
+    {"date": "2027-12-24", "name": "Christmas Day (observed)"},
 ]
 
 _DEFAULT_LEAVE_BALANCE = {
@@ -88,10 +109,18 @@ def default_balance() -> Dict[str, int]:
     return copy.deepcopy(_DEFAULT_LEAVE_BALANCE)
 
 
-def ensure_user(sub: str, first_name: str, last_name: str = "") -> Dict:
+def ensure_user(
+    sub: str, first_name: str, last_name: str = "",
+    email: str = "", username: str = "",
+) -> Dict:
     """Ensure a user record exists. Creates one with defaults if new.
 
     Called on every identity-aware tool invocation. Returns the user record.
+
+    `email` and `username` are how the person can be reached when they are NOT
+    in a browser — CIBA needs a login_hint, and the approval notice needs an
+    address. They are captured opportunistically from whatever the token
+    carries, and refreshed on later calls in case the first token lacked them.
     """
     full_name = f"{first_name} {last_name}".strip()
     if sub not in users:
@@ -100,6 +129,8 @@ def ensure_user(sub: str, first_name: str, last_name: str = "") -> Dict:
             "last_name": last_name,
             "name": full_name,
             "sub": sub,
+            "email": email,
+            "username": username,
             "first_seen": str(dt_date.today()),
         }
         leave_balances[sub] = default_balance()
@@ -108,6 +139,14 @@ def ensure_user(sub: str, first_name: str, last_name: str = "") -> Dict:
         users[sub]["first_name"] = first_name
         users[sub]["last_name"] = last_name
         users[sub]["name"] = full_name
+
+    # Backfill regardless of branch: the token that first created the record
+    # may not have carried these claims, and they are what make the user
+    # reachable when they are not in a browser.
+    if email and not users[sub].get("email"):
+        users[sub]["email"] = email
+    if username and not users[sub].get("username"):
+        users[sub]["username"] = username
     return users[sub]
 
 

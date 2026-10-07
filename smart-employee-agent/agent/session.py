@@ -33,9 +33,15 @@ class UserSession:
     chat_history: list[dict] = field(default_factory=list)
     pending_message: Optional[str] = None
 
+
     # In-progress OBO flow
     obo_code_verifier: Optional[str] = None
     obo_pkce_state: Optional[str] = None
+
+    # Google Calendar delegation (Pattern 6) — a SEPARATE consent from the
+    # Asgardeo one above, to a different IdP, revocable independently.
+    google_grant: Optional[Any] = None
+    google_oauth_state: Optional[str] = None
 
     # Activity tracking for TTL-based eviction.
     last_accessed: float = field(default_factory=lambda: time.time())
@@ -43,6 +49,11 @@ class UserSession:
     def touch(self) -> None:
         """Mark this session as recently accessed."""
         self.last_accessed = time.time()
+
+    @property
+    def google_connected(self) -> bool:
+        """The user has authorized this agent against their Google Calendar."""
+        return self.google_grant is not None
 
     @property
     def has_valid_obo(self) -> bool:
@@ -84,6 +95,15 @@ class SessionStore:
             return None
         for session in self._sessions.values():
             if session.obo_pkce_state == state:
+                return session
+        return None
+
+    def find_by_google_state(self, state: str) -> Optional[UserSession]:
+        """Find a session by its in-progress Google OAuth state."""
+        if not state:
+            return None
+        for session in self._sessions.values():
+            if session.google_oauth_state == state:
                 return session
         return None
 

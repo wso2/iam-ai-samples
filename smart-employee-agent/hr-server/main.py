@@ -45,4 +45,4 @@ app = build_app()
 
 if __name__ == "__main__":
     logger.info("Starting HR server on %s:%d", config.HOST, config.PORT)
-    uvicorn.run(app, host=config.HOST, port=config.PORT)
+    uvicorn.run(app, host=config.HOST, port=config.PORT, access_log=config.ACCESS_LOG)
