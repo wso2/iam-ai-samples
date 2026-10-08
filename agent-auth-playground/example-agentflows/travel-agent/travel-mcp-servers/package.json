@@ -1,0 +1,22 @@
+{
+  "name": "travel-mcp-servers",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node start-all.mjs"
+  },
+  "dependencies": {
+    "@asgardeo/mcp-express": "^0.2.1",
+    "@modelcontextprotocol/sdk": "^1.24.3",
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
+    "tsx": "^4.21.0",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.0",
+    "typescript": "^5.9.3"
+  }
+}

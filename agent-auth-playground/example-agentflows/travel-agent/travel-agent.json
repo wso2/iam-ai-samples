@@ -1,0 +1,170 @@
+{
+  "id": "workflow-1778058717929-n4qiqeu7a",
+  "name": "travel-agent",
+  "nodes": [
+    {
+      "id": "node-1778149661339-cqworlt5q",
+      "type": "chatTrigger",
+      "position": {
+        "x": 100,
+        "y": 250
+      },
+      "data": {
+        "label": "Chat Trigger"
+      }
+    },
+    {
+      "id": "node-1778149661339-4s8m8umiz",
+      "type": "aiAgent",
+      "position": {
+        "x": 350,
+        "y": 250
+      },
+      "data": {
+        "label": "AI Agent",
+        "systemPrompt": "You are a helpful assistant.",
+        "maxToolSteps": 6,
+        "agentCredentialId": "cred-1778144590367-egvwk",
+        "agentName": "travel-agent",
+        "maxMessages": 10
+      }
+    },
+    {
+      "id": "node-1778149673690-ii6t9b4jz",
+      "type": "mcpClient",
+      "position": {
+        "x": 681.740168506319,
+        "y": 10.978979784957772
+      },
+      "data": {
+        "label": "MCP Client",
+        "mcpServerEndpoint": "http://localhost:3001/mcp",
+        "name": "flight-search-mcp"
+      }
+    },
+    {
+      "id": "node-1778149708443-03mrxqube",
+      "type": "mcpClient",
+      "position": {
+        "x": 680.3461686927958,
+        "y": 133.8624724723643
+      },
+      "data": {
+        "label": "MCP Client",
+        "mcpServerEndpoint": "http://localhost:3002/mcp",
+        "name": "hotel-search-mcp"
+      }
+    },
+    {
+      "id": "node-1778149733488-y5dcmmvj9",
+      "type": "mcpClient",
+      "position": {
+        "x": 671.355077660099,
+        "y": 261.82749674717786
+      },
+      "data": {
+        "label": "MCP Client",
+        "mcpServerEndpoint": "http://localhost:3003/mcp",
+        "name": "currency-converter-mcp"
+      }
+    },
+    {
+      "id": "node-1778149773786-6xpsh3wxe",
+      "type": "mcpClient",
+      "position": {
+        "x": 668.1783293888218,
+        "y": 390.9738861538879
+      },
+      "data": {
+        "label": "MCP Client",
+        "mcpServerEndpoint": "http://localhost:3004/mcp",
+        "name": "booking-manager-mcp",
+        "useOAuth2": true,
+        "oauth2Flow": "obo",
+        "oauth2ConfigId": "oauth-1778149840319-cgsvj"
+      }
+    },
+    {
+      "id": "node-1778149883629-i7gm4grne",
+      "type": "mcpClient",
+      "position": {
+        "x": 677.3975378911776,
+        "y": 515.4407576030125
+      },
+      "data": {
+        "label": "MCP Client",
+        "mcpServerEndpoint": "http://localhost:3005/mcp",
+        "name": "airport-lounge-mcp",
+        "useOAuth2": true,
+        "oauth2ConfigId": "oauth-1778149940433-y5jlh"
+      }
+    },
+    {
+      "id": "node-1778150074670-tqw0opmd6",
+      "type": "llm",
+      "position": {
+        "x": 359.9468109703873,
+        "y": 19.929901298350444
+      },
+      "data": {
+        "label": "AI Service",
+        "provider": "",
+        "model": "",
+        "temperature": 0.7,
+        "maxTokens": 1000
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1778149661339-tugfnq8xb",
+      "source": "node-1778149661339-cqworlt5q",
+      "target": "node-1778149661339-4s8m8umiz"
+    },
+    {
+      "id": "edge-1778149678169-5lidbycit",
+      "source": "node-1778149661339-4s8m8umiz",
+      "target": "node-1778149673690-ii6t9b4jz",
+      "sourceHandle": "right",
+      "animated": true
+    },
+    {
+      "id": "edge-1778149724468-i3ran94bw",
+      "source": "node-1778149661339-4s8m8umiz",
+      "target": "node-1778149708443-03mrxqube",
+      "sourceHandle": "right",
+      "animated": true
+    },
+    {
+      "id": "edge-1778149737662-xol1eu7vk",
+      "source": "node-1778149661339-4s8m8umiz",
+      "target": "node-1778149733488-y5dcmmvj9",
+      "sourceHandle": "right",
+      "animated": true
+    },
+    {
+      "id": "edge-1778149852946-a8isct5bq",
+      "source": "node-1778149661339-4s8m8umiz",
+      "target": "node-1778149773786-6xpsh3wxe",
+      "sourceHandle": "right",
+      "animated": true
+    },
+    {
+      "id": "edge-1778149889177-czlekenl0",
+      "source": "node-1778149661339-4s8m8umiz",
+      "target": "node-1778149883629-i7gm4grne",
+      "sourceHandle": "right",
+      "animated": true
+    },
+    {
+      "id": "edge-1778150077464-3pn5dl2ni",
+      "source": "node-1778149661339-4s8m8umiz",
+      "target": "node-1778150074670-tqw0opmd6",
+      "sourceHandle": "top",
+      "targetHandle": "bottom",
+      "animated": true
+    }
+  ],
+  "createdAt": 1778149661339,
+  "updatedAt": 1778150104775
+}
