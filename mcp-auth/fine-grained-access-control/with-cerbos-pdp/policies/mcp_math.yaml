@@ -1,0 +1,33 @@
+---
+apiVersion: "api.cerbos.dev/v1"
+resourcePolicy:
+  version: "default"
+  resource: "mcp::math"
+  rules:
+    - actions: ["add"]
+      effect: EFFECT_ALLOW
+      roles: ["*"]
+      condition:
+        match:
+          expr: request.principal.attr.scopes.hasIntersection(["add"])
+
+    - actions: ["subtract"]
+      effect: EFFECT_ALLOW
+      roles: ["*"]
+      condition:
+        match:
+          expr: request.principal.attr.scopes.hasIntersection(["subtract"])
+    
+    - actions: ["multiply"]
+      effect: EFFECT_ALLOW
+      roles: ["*"]
+      condition:
+        match:
+          expr: request.principal.attr.scopes.hasIntersection(["multiply"])
+
+    - actions: ["divide"]
+      effect: EFFECT_ALLOW
+      roles: ["*"]
+      condition:
+        match:
+          expr: request.principal.attr.scopes.hasIntersection(["divide"])
