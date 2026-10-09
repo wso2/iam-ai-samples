@@ -1,0 +1,53 @@
+# Simplified A2A Reference Implementation
+# Asgardeo Authentication + A2A Protocol
+
+# =============================================================================
+# ASGARDEO CONFIGURATION
+# =============================================================================
+
+asgardeo:
+  org_name: "a2abasic"
+  base_url: "https://api.asgardeo.io/t/a2abasic"
+  authorize_endpoint: "https://api.asgardeo.io/t/a2abasic/oauth2/authorize"
+  token_endpoint: "https://api.asgardeo.io/t/a2abasic/oauth2/token"
+  issuer: "https://api.asgardeo.io/t/a2abasic/oauth2/token"
+
+# =============================================================================
+# ORCHESTRATOR AGENT (has Asgardeo identity)
+# =============================================================================
+
+orchestrator_agent:
+  host: "localhost"
+  port: 8000
+  description: "A2A Orchestrator with Asgardeo authentication"
+  
+  oauth:
+    redirect_uri: "http://localhost:8000/callback"
+    scopes:
+      - "openid"
+      - "profile"
+      - "booking:read"
+      - "booking:write"
+  
+  booking_agent_url: "http://localhost:8001"
+  
+  logging:
+    level: "INFO"
+
+# =============================================================================
+# BOOKING AGENT (simple token validator)
+# =============================================================================
+
+booking_agent:
+  host: "localhost"
+  port: 8001
+  description: "Travel booking service with mock data"
+  
+  token_validation:
+    issuer: "https://api.asgardeo.io/t/a2abasic/oauth2/token"
+    required_scopes:
+      - "booking:read"
+      - "booking:write"
+  
+  logging:
+    level: "INFO"
