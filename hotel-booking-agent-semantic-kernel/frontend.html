@@ -1,0 +1,1209 @@
+<!--
+  Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
+
+  This software is the property of WSO2 LLC. and its suppliers, if any.
+  Dissemination of any information or reproduction of any material contained
+  herein is strictly forbidden, unless permitted by WSO2 in accordance with
+  the WSO2 Commercial License available at http://wso2.com/licenses.
+  For specific language governing the permissions and limitations under
+  this license, please see the license as well as any agreement you’ve
+  entered into with WSO2 governing the purchase of this software and any
+-->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hotel Booking Assistant</title>
+    <!-- Include the marked library for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
+    <!-- Include DOMPurify for HTML sanitization -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@2.3.3/dist/purify.min.js"></script>
+    <!-- Include highlight.js for code syntax highlighting -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.3.1/styles/github.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.3.1/lib/highlight.min.js"></script>
+    <!-- UUID generation library -->
+    <script src="https://cdn.jsdelivr.net/npm/uuid@8.3.2/dist/umd/uuidv4.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #1976D2;
+            --primary-light: #e3f2fd;
+            --secondary-color: #f5f5f5;
+            --border-color: #e0e0e0;
+            --text-color: #212121;
+            --text-light: #757575;
+            --success-color: #4CAF50;
+            --danger-color: #f44336;
+            --warning-color: #FFC107;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            color: var(--text-color);
+            line-height: 1.5;
+            background-color: #fafafa;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        h2 {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        #chat {
+            list-style-type: none;
+            padding: 0;
+            margin: 0 0 20px 0;
+            height: 500px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            background-color: white;
+            box-shadow: var(--shadow);
+        }
+
+        #chat li {
+            margin: 8px;
+            padding: 10px 14px;
+            border-radius: var(--border-radius);
+            max-width: 80%;
+            line-height: 1.4;
+        }
+
+        .user-message {
+            background-color: var(--primary-light);
+            color: var(--text-color);
+            text-align: right;
+            margin-left: auto;
+            border-bottom-right-radius: 2px;
+            position: relative;
+        }
+
+        .assistant-message {
+            background-color: var(--secondary-color);
+            margin-right: auto;
+            border-bottom-left-radius: 2px;
+            position: relative;
+        }
+
+        /* Markdown content refinements */
+        .markdown-content {
+            text-align: left;
+        }
+
+        .markdown-content p {
+            margin: 0 0 8px 0;
+        }
+
+        .markdown-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4 {
+            margin: 12px 0 8px 0;
+            line-height: 1.2;
+        }
+
+        .markdown-content h1:first-child,
+        .markdown-content h2:first-child,
+        .markdown-content h3:first-child,
+        .markdown-content h4:first-child {
+            margin-top: 0;
+        }
+
+        .markdown-content ul,
+        .markdown-content ol {
+            margin: 4px 0;
+            padding-left: 20px;
+        }
+
+        .markdown-content li {
+            margin: 2px 0;
+            padding: 0;
+            max-width: none;
+            background: none;
+        }
+
+        .markdown-content pre {
+            background-color: #f6f8fa;
+            border-radius: 4px;
+            padding: 10px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+
+        .markdown-content code {
+            background-color: rgba(175, 184, 193, 0.2);
+            border-radius: 3px;
+            padding: 0.2em 0.4em;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.9em;
+        }
+
+        .markdown-content pre code {
+            background-color: transparent;
+            padding: 0;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .markdown-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 8px 0;
+            font-size: 0.9em;
+        }
+
+        .markdown-content th, .markdown-content td {
+            border: 1px solid #ddd;
+            padding: 6px 8px;
+            text-align: left;
+        }
+
+        .markdown-content th {
+            background-color: #f2f2f2;
+            font-weight: 600;
+        }
+
+        .markdown-content blockquote {
+            border-left: 4px solid var(--primary-color);
+            padding: 4px 12px;
+            color: var(--text-light);
+            margin: 8px 0;
+            background-color: rgba(25, 118, 210, 0.05);
+        }
+
+        .consent-buttons {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+        }
+
+        button {
+            padding: 8px 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            font-family: var(--font-family);
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        .accept-button {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .reject-button {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        #messageInput {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            position: relative;
+        }
+
+        #msg {
+            flex: 1;
+            padding: 12px 15px;
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            font-family: var(--font-family);
+            font-size: 1em;
+            transition: border-color 0.2s;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        #msg:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.2);
+        }
+
+        #sendButton {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 0 20px;
+            border-radius: var(--border-radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .system-message {
+            background-color: #fff8e1;
+            font-style: italic;
+            text-align: center;
+            padding: 8px;
+            margin: 8px;
+            border-radius: var(--border-radius);
+            max-width: none !important;
+            font-size: 0.9em;
+            color: var(--text-light);
+            border-left: 3px solid var(--warning-color);
+        }
+
+        .consent-context {
+            font-size: 0.85em;
+            color: var(--text-light);
+            margin-top: 5px;
+            background-color: rgba(0, 0, 0, 0.03);
+            padding: 5px 8px;
+            border-radius: 4px;
+        }
+
+        #session-info {
+            font-size: 0.8em;
+            color: var(--text-light);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Auth container refinements */
+        .auth-container {
+            background-color: #e8f5e9;
+            border-left: 4px solid var(--success-color);
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 4px;
+            box-shadow: var(--shadow);
+        }
+
+        .auth-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #2e7d32;
+        }
+
+        .auth-description {
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .auth-details {
+            background-color: rgba(0, 0, 0, 0.05);
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            font-size: 0.9em;
+        }
+
+        .auth-button {
+            background-color: var(--success-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .auth-button::after {
+            font-size: 1.2em;
+        }
+
+        /* Debug panel enhancements */
+        #debug-panel {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #263238;
+            border-radius: var(--border-radius);
+            display: none;
+            box-shadow: var(--shadow);
+        }
+
+        #debug-panel h3 {
+            color: white;
+            margin-bottom: 10px;
+            font-size: 1em;
+            font-weight: 500;
+        }
+
+        #debug-toggle {
+            font-size: 0.8em;
+            background-color: #37474F;
+            margin-top: 10px;
+            color: white;
+        }
+
+        #debug-log {
+            max-height: 150px;
+            overflow-y: auto;
+            margin-top: 10px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.8em;
+            white-space: pre-wrap;
+            background-color: #000;
+            color: #4CAF50;
+            padding: 10px;
+            border-radius: 4px;
+            line-height: 1.4;
+        }
+
+        /* Message timestamp */
+        .msg-timestamp {
+            font-size: 0.7em;
+            color: var(--text-light);
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        /* Typing indicator */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            margin: 8px;
+            padding: 10px 14px;
+            background-color: var(--secondary-color);
+            border-radius: var(--border-radius);
+            max-width: 60px;
+            margin-right: auto;
+            position: relative;
+        }
+
+        .typing-indicator span {
+            height: 8px;
+            width: 8px;
+            background-color: #b6b6b6;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 2px;
+            opacity: 0.4;
+            animation: typing 1s infinite;
+        }
+
+        .typing-indicator span:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0% {
+                opacity: 0.4;
+                transform: translateY(0);
+            }
+            50% {
+                opacity: 1;
+                transform: translateY(-4px);
+            }
+            100% {
+                opacity: 0.4;
+                transform: translateY(0);
+            }
+        }
+
+        /* Scrollbar customization */
+        #chat::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #chat::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        #chat::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+
+        #chat::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        /* New session button styling */
+        #new-session-btn {
+            background-color: transparent;
+            color: var(--text-light);
+            border: 1px solid var(--border-color);
+            font-size: 0.85em;
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #new-session-btn:hover {
+            background-color: #f5f5f5;
+            color: var(--text-color);
+        }
+
+        #new-session-btn::before {
+            content: "⟳";
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h2>Hotel Booking Assistant</h2>
+    <div id="session-info"></div>
+</header>
+
+<ul id="chat"></ul>
+
+<div id="messageInput">
+    <input id="msg" type="text" placeholder="Type your message..." autocomplete="off"/>
+    <button id="sendButton" onclick="sendMessage()">Send</button>
+</div>
+
+<!-- Debug panel (hidden by default) -->
+<div id="debug-panel">
+    <h3>Debug Information</h3>
+    <div id="debug-log"></div>
+</div>
+<button id="debug-toggle" onclick="toggleDebug()">Show Debug Panel</button>
+
+<script>
+    // Set up debug logging
+    const debugLog = document.getElementById('debug-log');
+    let debugEnabled = false;
+    let isTyping = false;
+
+    function log(message, data) {
+        if (debugEnabled) {
+            const timestamp = new Date().toISOString().substr(11, 8);
+            let logMessage = `[${timestamp}] ${message}`;
+
+            if (data !== undefined) {
+                if (typeof data === 'object') {
+                    logMessage += '\n' + JSON.stringify(data, null, 2);
+                } else {
+                    logMessage += ': ' + data;
+                }
+            }
+
+            console.log(logMessage);
+            debugLog.innerHTML += logMessage + '\n\n';
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+    }
+
+    function toggleDebug() {
+        const debugPanel = document.getElementById('debug-panel');
+        const debugToggle = document.getElementById('debug-toggle');
+
+        debugEnabled = !debugEnabled;
+        if (debugEnabled) {
+            debugPanel.style.display = 'block';
+            debugToggle.textContent = 'Hide Debug Panel';
+            log('Debug logging enabled');
+        } else {
+            debugPanel.style.display = 'none';
+            debugToggle.textContent = 'Show Debug Panel';
+        }
+    }
+
+    // Global flag for authorization state
+    window.authorizationCompleted = false;
+
+    // Generate or retrieve session ID
+    function getSessionId() {
+        let sessionId = localStorage.getItem('chatSessionId');
+
+        // If no session ID exists or we want a new one each time
+        if (!sessionId) {
+            // Use UUID library if available, otherwise fallback
+            if (typeof uuidv4 === 'function') {
+                sessionId = uuidv4();
+            } else {
+                sessionId = 'session_' + Math.random().toString(36).substring(2, 15);
+            }
+            localStorage.setItem('chatSessionId', sessionId);
+        }
+
+        return sessionId;
+    }
+
+    const sessionId = getSessionId();
+
+    // Add session info and new session button
+    function setupSessionInfo() {
+        const sessionInfo = document.getElementById('session-info');
+
+        const sessionIdSpan = document.createElement('span');
+        sessionIdSpan.textContent = 'Session ID: ' + sessionId.substring(0, 8) + '...';
+        sessionInfo.appendChild(sessionIdSpan);
+
+        const newSessionButton = document.createElement('button');
+        newSessionButton.id = 'new-session-btn';
+        newSessionButton.textContent = 'New Session';
+        newSessionButton.addEventListener('click', startNewSession);
+        sessionInfo.appendChild(newSessionButton);
+    }
+
+    setupSessionInfo();
+
+    // Configure marked for markdown rendering
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                headerIds: false,
+                mangle: false
+            });
+        }
+    });
+
+    // Track pending authorization requests
+    const pendingAuthRequests = {};
+
+    // Listen for messages from popup windows (for OAuth flow)
+    window.addEventListener('message', function (event) {
+        log('Received message from window', event.data);
+
+        try {
+            const data = event.data;
+
+            // Check for auth_callback message
+            if (data && data.type === 'auth_callback' && data.state) {
+                log('Valid auth callback received', data);
+
+                // Set the global flag to indicate authorization was completed
+                window.authorizationCompleted = true;
+
+                // Parse token if it's a string
+                let tokenData = data.token;
+                if (typeof tokenData === 'string') {
+                    try {
+                        tokenData = JSON.parse(tokenData);
+                    } catch (e) {
+                        log('Error parsing token string', e);
+                    }
+                }
+
+                // We received an OAuth token from the popup
+                if (pendingAuthRequests[data.state]) {
+                    log('Found pending auth request for state', data.state);
+
+                    <!--                        const authResponse = {-->
+                    <!--                            success: true,-->
+                    <!--                            state: data.state,-->
+                    <!--                            access_token: tokenData.access_token,-->
+                    <!--                            id_token: tokenData.id_token,-->
+                    <!--                            booking_details: pendingAuthRequests[data.state].context-->
+                    <!--                        };-->
+
+                <!--                        // Send the token back through the WebSocket-->
+                    <!--                        log('Sending token to backend via WebSocket');-->
+                    <!--                        ws.send(JSON.stringify(authResponse));-->
+                    addSystemMessage("Authorization completed successfully. Processing your booking...");
+
+                    // Clean up the pending request
+                    delete pendingAuthRequests[data.state];
+                } else {
+                    log('No pending auth request found for state', data.state);
+                }
+            }
+        } catch (error) {
+            log('Error processing window message', error);
+        }
+    });
+
+    // Connect to WebSocket with session ID as query parameter
+    let ws = new WebSocket(`ws://localhost:8000/chat?session_id=${sessionId}`);
+    let lastConsentRequest = null;
+
+    // Configuration
+    const config = {
+        sendJsonMessages: true,
+        receiveJsonMessages: true,
+        renderMarkdown: true
+    };
+
+    ws.onopen = () => {
+        log("WebSocket connected", sessionId);
+        addSystemMessage("Connected to the server");
+    };
+
+    ws.onmessage = (event) => {
+        let data = event.data;
+        log("Received WebSocket message", data);
+
+        // Hide typing indicator when a message is received
+        hideTypingIndicator();
+
+        // Try to parse as JSON if configured to receive JSON
+        if (config.receiveJsonMessages) {
+            try {
+                data = JSON.parse(event.data);
+                log("Parsed JSON message", data);
+
+                if (data.type === "message") {
+                    // Regular message
+                    log("Processing regular message");
+                    addAssistantMessage(data.content, data.messageId);
+                } else if (data.type === "consent_request") {
+                    // Consent request
+                    log("Processing consent request");
+                    lastConsentRequest = data;
+                    addConsentRequest(data);
+                } else if (data.type === "auth_request") {
+                    // OAuth authorization request
+                    log("Processing auth request", data);
+                    handleAuthorizationRequest(data);
+                } else {
+                    // Unknown message type, fallback to treating as text
+                    log("Unknown message type", data.type);
+                    addAssistantMessage(data.content || "Unknown message type", "unknown_" + Date.now());
+                }
+                return; // Successfully handled JSON message
+            } catch (error) {
+                // Not JSON or invalid JSON, treat as plain text
+                log("Failed to parse as JSON, treating as text", error);
+                data = event.data; // Reset to original string
+            }
+        }
+
+        // Handle as plain text (either because JSON parsing failed or not configured for JSON)
+        if (typeof data === 'string') {
+            log("Processing as plain text");
+            // Check for legacy consent format with [CONSENT_REQUIRED] tag
+            if (data.includes("[CONSENT_REQUIRED]")) {
+                const content = data.replace("[CONSENT_REQUIRED]", "");
+                // Create a synthetic consent request object
+                const consentData = {
+                    type: "consent_request",
+                    content: content,
+                    messageId: "legacy_consent_" + Date.now(),
+                    consentOptions: {
+                        accept: "Accept",
+                        reject: "Reject"
+                    }
+                };
+                log("Created synthetic consent request", consentData);
+                lastConsentRequest = consentData;
+                addConsentRequest(consentData);
+            } else {
+                // Regular text message
+                log("Adding as regular text message");
+                addAssistantMessage(data, "msg_" + Date.now());
+            }
+        }
+    };
+
+    ws.onerror = (error) => {
+        log("WebSocket error", error);
+        hideTypingIndicator();
+        addSystemMessage("Error connecting to the server. Please try again later.");
+    };
+
+    ws.onclose = (event) => {
+        log("WebSocket closed", event.code);
+        hideTypingIndicator();
+        addSystemMessage("Disconnected from the server");
+
+        // Attempt to reconnect after a delay if connection was closed unexpectedly
+        if (event.code !== 1000) { // 1000 is normal closure
+            addSystemMessage("Attempting to reconnect in 5 seconds...");
+            setTimeout(function () {
+                log("Attempting to reconnect WebSocket");
+                // Create a new WebSocket connection with the same session ID
+                ws = new WebSocket(`ws://localhost:8000/chat?session_id=${sessionId}`);
+                // Re-attach event handlers
+                ws.onopen = () => {
+                    log("WebSocket reconnected", sessionId);
+                    addSystemMessage("Reconnected to the server");
+                };
+                ws.onmessage = onMessageHandler;
+                ws.onerror = (error) => {
+                    log("WebSocket error on reconnect", error);
+                    addSystemMessage("Error reconnecting to the server.");
+                };
+                ws.onclose = onCloseHandler;
+            }, 5000);
+        }
+    };
+
+    function onMessageHandler(event) {
+        // This is just a reference to the main onmessage handler
+        ws.onmessage(event);
+    }
+
+    function onCloseHandler(event) {
+        // This is just a reference to the main onclose handler
+        ws.onclose(event);
+    }
+
+    function simpleMarkdownToHtml(text) {
+        // Basic markdown conversion as fallback
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\n/g, '<br>');
+    }
+
+    function getFormattedTimestamp() {
+        const now = new Date();
+        const hours = now.getHours().toString().padStart(2, '0');
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+    }
+
+    function addUserMessage(text) {
+        log("Adding user message", text);
+
+        // Hide any typing indicator
+        hideTypingIndicator();
+
+        let li = document.createElement("li");
+        li.className = "user-message";
+
+        // Message content
+        let messageText = document.createElement("div");
+        messageText.textContent = text;
+        li.appendChild(messageText);
+
+        // Timestamp
+        let timestamp = document.createElement("div");
+        timestamp.className = "msg-timestamp";
+        timestamp.textContent = getFormattedTimestamp();
+        li.appendChild(timestamp);
+
+        document.getElementById("chat").appendChild(li);
+
+        // Show typing indicator after user message
+        showTypingIndicator();
+
+        scrollToBottom();
+    }
+
+    function addAssistantMessage(text, messageId) {
+        log("Adding assistant message", {id: messageId, text: text.substring(0, 50) + (text.length > 50 ? '...' : '')});
+
+        let li = document.createElement("li");
+        li.className = "assistant-message";
+        li.setAttribute("data-message-id", messageId);
+
+        if (config.renderMarkdown) {
+            // Create a div for markdown content
+            let contentDiv = document.createElement("div");
+            contentDiv.className = "markdown-content";
+
+            // Try using the marked library if available
+            if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+                try {
+                    const htmlContent = marked.parse(text);
+                    contentDiv.innerHTML = DOMPurify.sanitize(htmlContent);
+                } catch (error) {
+                    log("Error rendering markdown", error);
+                    contentDiv.innerHTML = simpleMarkdownToHtml(text);
+                }
+            } else {
+                // Fallback to simple markdown
+                contentDiv.innerHTML = simpleMarkdownToHtml(text);
+            }
+
+            li.appendChild(contentDiv);
+
+            // Apply syntax highlighting to code blocks if available
+            setTimeout(() => {
+                if (typeof hljs !== 'undefined') {
+                    li.querySelectorAll('pre code').forEach((block) => {
+                        hljs.highlightBlock(block);
+                    });
+                }
+            }, 0);
+        } else {
+            // Plain text rendering
+            li.textContent = text;
+        }
+
+        // Timestamp
+        let timestamp = document.createElement("div");
+        timestamp.className = "msg-timestamp";
+        timestamp.textContent = getFormattedTimestamp();
+        li.appendChild(timestamp);
+
+        document.getElementById("chat").appendChild(li);
+        scrollToBottom();
+    }
+
+    function addSystemMessage(text) {
+        log("System message", text);
+        let li = document.createElement("li");
+        li.textContent = text;
+        li.className = "system-message";
+        document.getElementById("chat").appendChild(li);
+        scrollToBottom();
+    }
+
+    function addConsentRequest(data) {
+        log("Adding consent request", data);
+        let li = document.createElement("li");
+        li.className = "assistant-message";
+        li.setAttribute("data-message-id", data.messageId);
+
+        // Message content - with markdown support if enabled
+        if (config.renderMarkdown) {
+            let contentDiv = document.createElement("div");
+            contentDiv.className = "markdown-content";
+
+            // Try using the marked library if available
+            if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+                try {
+                    const htmlContent = marked.parse(data.content);
+                    contentDiv.innerHTML = DOMPurify.sanitize(htmlContent);
+                } catch (error) {
+                    log("Error rendering markdown in consent", error);
+                    contentDiv.innerHTML = simpleMarkdownToHtml(data.content);
+                }
+            } else {
+                // Fallback to simple markdown
+                contentDiv.innerHTML = simpleMarkdownToHtml(data.content);
+            }
+
+            li.appendChild(contentDiv);
+        } else {
+            let messageDiv = document.createElement("div");
+            messageDiv.textContent = data.content;
+            li.appendChild(messageDiv);
+        }
+
+        // Optional context information
+        if (data.consentContext && data.consentContext.details) {
+            let contextDiv = document.createElement("div");
+            contextDiv.className = "consent-context";
+
+            const details = data.consentContext.details;
+            let contextText = "";
+
+            for (const [key, value] of Object.entries(details)) {
+                // Convert camelCase or snake_case to readable text
+                const readableKey = key
+                    .replace(/_/g, ' ')
+                    .replace(/([A-Z])/g, ' $1')
+                    .replace(/^./, str => str.toUpperCase());
+
+                contextText += `${readableKey}: ${value}, `;
+            }
+
+            // Remove trailing comma and space
+            contextText = contextText.slice(0, -2);
+            contextDiv.textContent = contextText;
+            li.appendChild(contextDiv);
+        }
+
+        // Consent buttons
+        const consentDiv = document.createElement("div");
+        consentDiv.className = "consent-buttons";
+
+        const acceptButton = document.createElement("button");
+        acceptButton.textContent = data.consentOptions?.accept || "Accept";
+        acceptButton.className = "accept-button";
+        acceptButton.onclick = () => sendConsentResponse("accept", data);
+
+        const rejectButton = document.createElement("button");
+        rejectButton.textContent = data.consentOptions?.reject || "Reject";
+        rejectButton.className = "reject-button";
+        rejectButton.onclick = () => sendConsentResponse("reject", data);
+
+        consentDiv.appendChild(acceptButton);
+        consentDiv.appendChild(rejectButton);
+        li.appendChild(consentDiv);
+
+        // Timestamp
+        let timestamp = document.createElement("div");
+        timestamp.className = "msg-timestamp";
+        timestamp.textContent = getFormattedTimestamp();
+        li.appendChild(timestamp);
+
+        document.getElementById("chat").appendChild(li);
+        scrollToBottom();
+    }
+
+    // New function to handle authorization requests
+    function handleAuthorizationRequest(data) {
+        log("Handling authorization request", data);
+
+        // Store the request for when the popup returns
+        pendingAuthRequests[data.state] = data;
+
+        let li = document.createElement("li");
+        li.className = "assistant-message";
+
+        // Create auth container
+        let authContainer = document.createElement("div");
+        authContainer.className = "auth-container";
+
+        // Add title
+        let titleDiv = document.createElement("div");
+        titleDiv.className = "auth-title";
+        titleDiv.textContent = "Authorization Required";
+        authContainer.appendChild(titleDiv);
+
+        // Add description
+        let descDiv = document.createElement("div");
+        descDiv.className = "auth-description";
+        descDiv.textContent = "To complete your hotel booking, you need to authorize with your Asgardeo account.";
+        authContainer.appendChild(descDiv);
+
+        // Add booking details
+        if (data.context) {
+            let detailsDiv = document.createElement("div");
+            detailsDiv.className = "auth-details";
+
+            let detailsContent = "<strong>Booking Details:</strong><br>";
+            for (const [key, value] of Object.entries(data.context)) {
+                // Format the key name (e.g., "hotel_id" -> "Hotel ID")
+                const formattedKey = key
+                    .replace(/_/g, ' ')
+                    .replace(/([A-Z])/g, ' $1')
+                    .replace(/^./, str => str.toUpperCase());
+
+                detailsContent += `${formattedKey}: ${value}<br>`;
+            }
+
+            detailsDiv.innerHTML = detailsContent;
+            authContainer.appendChild(detailsDiv);
+        }
+
+        // Add authorize button
+        let authButton = document.createElement("button");
+        authButton.className = "auth-button";
+        authButton.textContent = "Authorize Booking";
+
+        // Reset global auth state
+        window.authorizationCompleted = false;
+
+        authButton.onclick = () => {
+            log("Auth button clicked, opening auth window", data.auth_url);
+
+            // Store booking details in the pending request for later use
+            if (data.context) {
+                pendingAuthRequests[data.state] = {
+                    ...data,
+                    booking_details: data.context  // Make sure booking details are stored here
+                };
+            }
+
+            // Open authorization URL in popup
+            const authWindow = window.open(
+                data.auth_url,
+                'OAuthWindow',
+                'width=600,height=700,left=200,top=100'
+            );
+
+            if (!authWindow) {
+                log("Popup blocked");
+                addSystemMessage("Popup was blocked. Please allow popups for this site.");
+            } else {
+                log("Auth window opened");
+                addSystemMessage("Authorization window opened. Please complete the login process.");
+
+                // Monitor if window is closed before completing auth
+                const checkClosed = setInterval(() => {
+                    if (authWindow.closed) {
+                        log("Auth window closed");
+                        clearInterval(checkClosed);
+
+                        // Wait a brief moment to allow any final messages to be processed
+                        setTimeout(() => {
+                            // Only show failure message if auth wasn't completed
+                            if (pendingAuthRequests[data.state] && !window.authorizationCompleted) {
+                                log("Auth window closed without completing authorization");
+                                addSystemMessage("Authorization window was closed. The booking was not completed.");
+
+                                // Send cancellation to backend
+                                log("Sending cancellation to backend", data.state);
+                                ws.send(JSON.stringify({
+                                    success: false,
+                                    state: data.state,
+                                    reason: "window_closed"
+                                }));
+
+                                delete pendingAuthRequests[data.state];
+                            }
+                        }, 500);  // Short delay to ensure messages are processed
+                    }
+                }, 1000);
+            }
+        };
+
+        authContainer.appendChild(authButton);
+        li.appendChild(authContainer);
+
+        // Timestamp
+        let timestamp = document.createElement("div");
+        timestamp.className = "msg-timestamp";
+        timestamp.textContent = getFormattedTimestamp();
+        li.appendChild(timestamp);
+
+        document.getElementById("chat").appendChild(li);
+        scrollToBottom();
+    }
+
+    function sendMessage() {
+        const input = document.getElementById("msg");
+        const message = input.value.trim();
+
+        if (!message) return;
+
+        log("Sending user message", message);
+        addUserMessage(message);
+
+        if (config.sendJsonMessages) {
+            // Send as JSON with session ID included
+            const jsonMsg = {
+                type: "user_message",
+                content: message,
+                sessionId: sessionId
+            };
+            log("Sending as JSON", jsonMsg);
+            ws.send(JSON.stringify(jsonMsg));
+        } else {
+            // Send as plain text
+            log("Sending as plain text");
+            ws.send(message);
+        }
+
+        input.value = "";
+    }
+
+    function sendConsentResponse(decision, consentData) {
+        log("Sending consent response", {decision, consentData});
+        const responseText = decision === "accept"
+            ? (consentData.consentOptions?.accept || "I accept")
+            : (consentData.consentOptions?.reject || "I reject");
+
+        addUserMessage(responseText);
+
+        if (config.sendJsonMessages) {
+            // Send structured response to the server with session ID
+            const jsonResponse = {
+                type: "consent_response",
+                decision: decision,
+                messageId: consentData.messageId,
+                originalRequest: consentData.consentContext,
+                sessionId: sessionId
+            };
+            log("Sending consent response as JSON", jsonResponse);
+            ws.send(JSON.stringify(jsonResponse));
+        } else {
+            // For plain text servers, send a simple response
+            log("Sending consent response as plain text");
+            ws.send(`I ${decision} the proposed action.`);
+        }
+
+        // Find and disable buttons after response is sent
+        document.querySelectorAll(`[data-message-id="${consentData.messageId}"] .consent-buttons`).forEach(buttonDiv => {
+            buttonDiv.querySelectorAll('button').forEach(button => {
+                button.disabled = true;
+                button.style.opacity = "0.5";
+            });
+            // Add message showing what was selected
+            const selectedOption = document.createElement("div");
+            selectedOption.style.fontSize = "0.8em";
+            selectedOption.style.marginTop = "5px";
+            selectedOption.textContent = `You selected: ${responseText}`;
+            buttonDiv.appendChild(selectedOption);
+        });
+    }
+
+    function showTypingIndicator() {
+        if (isTyping) return;
+        isTyping = true;
+
+        const typingDiv = document.createElement("li");
+        typingDiv.className = "typing-indicator";
+        typingDiv.id = "typing-indicator";
+
+        for (let i = 0; i < 3; i++) {
+            const dot = document.createElement("span");
+            typingDiv.appendChild(dot);
+        }
+
+        document.getElementById("chat").appendChild(typingDiv);
+        scrollToBottom();
+    }
+
+    function hideTypingIndicator() {
+        const indicator = document.getElementById("typing-indicator");
+        if (indicator) {
+            indicator.remove();
+            isTyping = false;
+        }
+    }
+
+    function scrollToBottom() {
+        const chatContainer = document.getElementById("chat");
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function startNewSession() {
+        log("Starting new session");
+        // Remove the stored session ID
+        localStorage.removeItem('chatSessionId');
+
+        // Close current WebSocket connection
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.close(1000, "User started a new session");
+        }
+
+        // Reload the page to start fresh
+        location.reload();
+    }
+
+    // Allow sending messages with Enter key
+    document.getElementById("msg").addEventListener("keypress", function (event) {
+        if (event.key === "Enter") {
+            sendMessage();
+        }
+    });
+
+    // Focus the input field when the page loads
+    window.addEventListener('load', () => {
+        document.getElementById('msg').focus();
+    });
+</script>
+</body>
+</html>
