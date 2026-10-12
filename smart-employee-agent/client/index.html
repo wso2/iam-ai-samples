@@ -76,9 +76,6 @@
           <span class="caret">▾</span>
         </button>
         <div class="user-menu-popover" id="user-menu-popover" hidden>
-          <button class="menu-item" id="google-menu-item" onclick="app.toggleGoogleCalendar()" hidden>
-            Connect Google Calendar
-          </button>
           <button class="menu-item" onclick="app.resetDatabase()">Reset demo data</button>
           <button class="menu-item danger" onclick="app.signOut()">Sign out</button>
         </div>
@@ -262,17 +259,6 @@
         <p class="muted">The agent needs your authorization to perform this action.</p>
         <button id="authorize-btn" class="btn-primary" onclick="app.initiateOBOFlow()">
           Authorize
-        </button>
-      </div>
-
-      <!-- A SECOND consent, to Google. Nothing approved in Asgardeo grants it. -->
-      <div id="google-connect-section" hidden>
-        <p class="muted">
-          Adding this to your calendar needs your permission at Google &mdash;
-          separate from anything you approved here.
-        </p>
-        <button id="google-connect-btn" class="btn-primary" onclick="app.connectGoogleFromChat()">
-          Connect Google Calendar
         </button>
       </div>
 

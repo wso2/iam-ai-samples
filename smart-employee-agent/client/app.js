@@ -124,7 +124,7 @@ const app = (function () {
     // role-permitted, so asking for everything is safe — an employee simply
     // does not receive it_desk_access, and the desk tab stays hidden.
     const scopes = [
-      "openid", "profile",
+      "openid", "profile", "email",
       "agent_access",
       "hr_basic_rest", "hr_self_rest", "hr_read_rest", "hr_approve_rest",
       "it_desk_access",
@@ -191,9 +191,9 @@ const app = (function () {
       const idClaims = idToken ? decodeJwtPayload(idToken) : {};
       userScopes = (claims.scope || tokenData.scope || "").split(" ").filter(Boolean);
       userSub = claims.sub || "";
-      userName = [idClaims.given_name, idClaims.last_name].filter(Boolean).join(" ")
+      userName = [idClaims.given_name, (idClaims.family_name || idClaims.last_name)].filter(Boolean).join(" ")
                  || idClaims.name || idClaims.preferred_username
-                 || [claims.given_name, claims.last_name].filter(Boolean).join(" ")
+                 || [claims.given_name, (claims.family_name || claims.last_name)].filter(Boolean).join(" ")
                  || claims.name || claims.preferred_username || "User";
       userRole = deriveRole(userScopes);
 
@@ -236,8 +236,6 @@ const app = (function () {
 
     // Reveal the IT Tickets tab if the IT Agent is wired up (Pattern 4).
     probeItAgent();
-    // Reveal the Google Calendar menu item if configured (Pattern 6).
-    refreshGoogleStatus();
     // Reveal the IT Service Desk tab if this user may use it (Pattern 7).
     refreshDeskStatus();
 
@@ -985,13 +983,7 @@ const app = (function () {
       if (resp.status === 403) { addErrorMessage("You are not authorized to use this service."); return; }
 
       const data = await resp.json();
-      if (data.type === "google_required") {
-        // The agent holds Asgardeo authority but no Google grant. A different
-        // provider, a different consent — so a different button.
-        addAgentMessage(data.message);
-        pendingCalendarMessage = text;
-        $("google-connect-section").hidden = false;
-      } else if (data.type === "obo_required") {
+      if (data.type === "obo_required") {
         addAgentMessage(data.message);
         pendingMessage = text;
         showAuthorizeButton();
@@ -1126,89 +1118,12 @@ const app = (function () {
     }
 
     if (event.data.type === "obo_success") {
-      // The Google popup posts the same message; refresh its state either way.
-      refreshGoogleStatus();
-      if (pendingCalendarMessage) {
-        const queued = pendingCalendarMessage;
-        pendingCalendarMessage = null;
-        $("google-connect-section").hidden = true;
-        addAgentMessage("Google Calendar connected. Adding it now\u2026");
-        sendMessage(queued);
-        return;
-      }
       const msg = pendingMessage;
       hideAuthorizeButton();
       addAgentMessage("Authorization successful! Let me process your request now.");
       if (msg) sendMessage(msg);
     } else if (event.data.type === "obo_failed") {
       addErrorMessage(`Authorization failed: ${event.data.error || "Unknown error"}`);
-    }
-  }
-
-  // The in-chat calendar prompt needs somewhere to queue the request while
-  // the user completes Google consent.
-  let pendingCalendarMessage = null;
-
-  // Reached from the chat's connect prompt rather than the user menu, so the
-  // queued request can run itself once the grant comes back.
-  async function connectGoogleFromChat() {
-    $("google-connect-section").hidden = true;
-    await toggleGoogleCalendar();
-  }
-
-  // ─── Google Calendar (Pattern 6) ───────────────────────────────────────────
-
-  // A SECOND consent, to Google — separate from the Asgardeo authorization.
-  // The menu item stays hidden unless the agent has Google configured.
-  let googleConnected = false;
-
-  async function refreshGoogleStatus() {
-    try {
-      const resp = await fetch(`${config.agentServerUrl}/api/google/status`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (!resp.ok) return;
-      const data = await resp.json();
-      const item = $("google-menu-item");
-      if (!item) return;
-      item.hidden = !data.enabled;
-      googleConnected = !!data.connected;
-      item.textContent = googleConnected
-        ? "Disconnect Google Calendar"
-        : "Connect Google Calendar";
-    } catch { /* agent down — leave the item hidden */ }
-  }
-
-  async function toggleGoogleCalendar() {
-    $("user-menu-popover").hidden = true;
-    if (googleConnected) {
-      try {
-        await fetch(`${config.agentServerUrl}/api/google/disconnect`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        toast("success", "Google Calendar disconnected",
-              "Revoke access fully at myaccount.google.com/permissions.");
-      } catch (e) {
-        toast("error", "Could not disconnect", e.message);
-      }
-      refreshGoogleStatus();
-      return;
-    }
-
-    try {
-      const resp = await fetch(`${config.agentServerUrl}/api/google/url`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (!resp.ok) {
-        toast("error", "Google Calendar unavailable", "The agent has no Google configuration.");
-        return;
-      }
-      const { auth_url } = await resp.json();
-      // Same popup shape as the OBO flow; the callback posts back to us.
-      window.open(auth_url, "google_popup", "width=520,height=640,scrollbars=yes");
-    } catch (e) {
-      toast("error", "Could not start Google authorization", e.message);
     }
   }
 
@@ -1400,8 +1315,6 @@ const app = (function () {
     const savedIdToken = idToken;
     const savedAccessToken = accessToken;
 
-    pendingCalendarMessage = null;
-
     accessToken = null;
     idToken = null;
     userScopes = [];
@@ -1472,8 +1385,6 @@ const app = (function () {
     initiateOBOFlow,
     // user menu
     toggleUserMenu,
-    toggleGoogleCalendar,
-    connectGoogleFromChat,
     resetDatabase,
   };
 })();

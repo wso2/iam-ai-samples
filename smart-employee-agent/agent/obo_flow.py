@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # Deliberately no it_* scopes: this agent never calls the IT server itself,
 # and asking for permissions it cannot use would inflate the consent screen.
 OBO_SCOPES = [
-    "openid", "profile",
+    "openid", "profile", "email",
     "hr_basic_mcp", "hr_self_mcp", "hr_read_mcp", "hr_approve_mcp",
 ]
 
@@ -44,13 +44,13 @@ FORCE_CONSENT = os.getenv("OBO_PROMPT_CONSENT", "").lower() == "true"
 # Google at Asgardeo, and Asgardeo passes Google's access token through in the
 # token response under `federated_tokens`.
 #
-# Only works on the code grant (which this flow is), and only for standard
-# OIDC connections with ShareFederatedToken enabled on the authenticator.
+# This is the code-grant path. Employee CIBA consent uses the same connection
+# with the mandatory Google-only adaptive script from the README.
 FEDERATED_IDP_NAME = os.getenv("FEDERATED_IDP_NAME", "")
 FEDERATED_TOKEN_SCOPE = os.getenv(
     "FEDERATED_TOKEN_SCOPE", "https://www.googleapis.com/auth/calendar.events"
 )
-SHARE_FEDERATED = bool(FEDERATED_IDP_NAME)
+SHARE_FEDERATED = bool(FEDERATED_IDP_NAME) and os.getenv("GOOGLE_CALENDAR_ENABLED", "false").lower() == "true"
 
 ALLOWED_ORIGINS = [
     o.strip()
@@ -187,7 +187,7 @@ async def exchange_code(agent_auth: AgentAuth, code: str, code_verifier: str):
         logger.info(
             "[FEDERATED] Asgardeo returned %d upstream token(s): %s",
             len(federated),
-            ", ".join(f"{f.get('idp')}({f.get('scope', '')[:60]})" for f in federated),
+            ", ".join(f"{f.get('idp')}({f.get('scope', '')})" for f in federated),
         )
     elif SHARE_FEDERATED:
         logger.warning(
@@ -224,9 +224,9 @@ def google_grant_from(federated: list):
             entry.get("scope", "?"),
         )
         return google_calendar.GoogleGrant(
-            refresh_token="",  # renewal goes through Asgardeo, not Google
             access_token=access,
             expires_at=time.time() + validity,
+            scope=entry.get("scope") or "",
         )
     return None
 

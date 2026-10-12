@@ -72,9 +72,9 @@ class JWTTokenVerifier(TokenVerifier):
             aut = payload.get("aut")
             act = payload.get("act")
 
-            # Extract user name from token claims — prefer given_name + last_name
+            # Extract user name from token claims — prefer given_name + family_name
             first_name = payload.get("given_name") or ""
-            last_name = payload.get("last_name") or ""
+            last_name = payload.get("family_name") or payload.get("last_name") or ""
 
             if not first_name and not last_name:
                 full = (

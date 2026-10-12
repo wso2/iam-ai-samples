@@ -3,51 +3,39 @@
 
   Google Calendar — Third-Party Delegated Access (Pattern 6)
 
-  The agent writes an all-day entry to the employee's own Google Calendar when
-  their leave is approved.
-
-  The IAM point: this is a SECOND, independent delegation, to a different
-  identity provider. Asgardeo has no authority over Google, so consenting to
-  the agent in Asgardeo grants it nothing here — the user must separately
-  authorize Google Calendar access, and can revoke it separately too.
-
-      Pattern 3  user delegates their Asgardeo authority to the agent (OBO)
-      Pattern 5  a second human delegates theirs, out-of-band (CIBA)
-      Pattern 6  user delegates their GOOGLE authority to the agent
-
-  Google's REST API is called directly with httpx — no google client library —
-  so the token handling stays visible rather than hidden in an SDK.
+  Uses the employee's Google access token shared by Asgardeo after OBO or
+  CIBA consent. The agent calls Calendar directly, but never Google's OAuth
+  token endpoint. A fresh federated token must be obtained through Asgardeo
+  when this grant expires.
 """
 
 import logging
 import time
-from urllib.parse import urlencode
 
 import httpx
 
 logger = logging.getLogger(__name__)
-
-AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
-TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 EVENTS_ENDPOINT = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
-
-# Only what is needed to add an entry. Not calendar.readonly, not full calendar.
 CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events"
-
+EVENT_WRITE_SCOPES = {
+    CALENDAR_SCOPE,
+    "https://www.googleapis.com/auth/calendar.events.owned",
+    "https://www.googleapis.com/auth/calendar",
+}
 REFRESH_BUFFER_SECONDS = 60
 
 
 class GoogleCalendarError(Exception):
-    """A Google Calendar call failed in a way worth telling the user about."""
+    """A Google grant or Calendar call failed."""
 
 
 class GoogleGrant:
-    """One user's Google delegation, held in memory alongside their session."""
+    """An upstream access token held only in the employee's agent session."""
 
-    def __init__(self, refresh_token: str, access_token: str = "", expires_at: float = 0.0):
-        self.refresh_token = refresh_token
+    def __init__(self, access_token: str, expires_at: float, scope: str):
         self.access_token = access_token
         self.expires_at = expires_at
+        self.scope = scope
 
     @property
     def is_fresh(self) -> bool:
@@ -55,88 +43,19 @@ class GoogleGrant:
 
 
 class GoogleCalendarClient:
-    """Runs the Google OAuth dance and writes calendar entries."""
-
-    def __init__(self, client_id: str, client_secret: str, redirect_uri: str):
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.redirect_uri = redirect_uri
-
-    @property
-    def configured(self) -> bool:
-        return bool(self.client_id and self.client_secret and self.redirect_uri)
-
-    def authorization_url(self, state: str) -> str:
-        """Consent URL for the popup.
-
-        access_type=offline + prompt=consent is what makes Google return a
-        refresh token; without both, a returning user gets an access token only
-        and the grant dies in an hour.
-        """
-        params = {
-            "client_id": self.client_id,
-            "redirect_uri": self.redirect_uri,
-            "response_type": "code",
-            "scope": CALENDAR_SCOPE,
-            "state": state,
-            "access_type": "offline",
-            "prompt": "consent",
-            "include_granted_scopes": "true",
-        }
-        return f"{AUTH_ENDPOINT}?{urlencode(params)}"
-
-    async def exchange_code(self, code: str) -> GoogleGrant:
-        """Swap the authorization code for tokens."""
-        data = {
-            "code": code,
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-            "redirect_uri": self.redirect_uri,
-            "grant_type": "authorization_code",
-        }
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(TOKEN_ENDPOINT, data=data)
-
-        if resp.status_code != 200:
-            raise GoogleCalendarError(f"Token exchange failed: {_describe(resp)}")
-
-        body = resp.json()
-        refresh = body.get("refresh_token")
-        if not refresh:
-            # Google withholds it if the user previously consented and we did
-            # not force a fresh prompt.
-            raise GoogleCalendarError(
-                "Google did not return a refresh token. Revoke the app's access "
-                "at myaccount.google.com/permissions and connect again."
-            )
-        return GoogleGrant(
-            refresh_token=refresh,
-            access_token=body.get("access_token", ""),
-            expires_at=time.time() + float(body.get("expires_in", 3600)),
-        )
+    """Write events using federated tokens; no separate Google OAuth client."""
 
     async def ensure_access_token(self, grant: GoogleGrant) -> str:
-        """Return a usable access token, refreshing when it has aged out."""
-        if grant.is_fresh:
-            return grant.access_token
-
-        data = {
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-            "refresh_token": grant.refresh_token,
-            "grant_type": "refresh_token",
-        }
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(TOKEN_ENDPOINT, data=data)
-
-        if resp.status_code != 200:
-            # invalid_grant here usually means the user revoked access.
-            raise GoogleCalendarError(f"Could not refresh Google access: {_describe(resp)}")
-
-        body = resp.json()
-        grant.access_token = body.get("access_token", "")
-        grant.expires_at = time.time() + float(body.get("expires_in", 3600))
-        logger.info("[GOOGLE] access token refreshed")
+        if not grant.is_fresh:
+            raise GoogleCalendarError(
+                "Google authorization has expired. Authorize again through Google in Asgardeo."
+            )
+        if not EVENT_WRITE_SCOPES.intersection(grant.scope.split()):
+            raise GoogleCalendarError(
+                f"Google token is missing Calendar event access ({CALENDAR_SCOPE}); "
+                f"granted scopes: {grant.scope or '(none)'}. "
+                "Check the Google connection's allowed/requested scopes and grant Calendar consent."
+            )
         return grant.access_token
 
     async def create_leave_event(

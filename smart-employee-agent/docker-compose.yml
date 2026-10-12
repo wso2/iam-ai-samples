@@ -9,10 +9,11 @@ services:
     environment:
       - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
       - HR_SERVER_HOST=0.0.0.0
-      - MCP_ALLOWED_HOSTS="127.0.0.1,localhost,hr-server"
+      - AGENT_WEBHOOK_URL=http://agent:5001/api/events/leave-approved
 
   # Pattern 4 — IT MCP server. Only the IT agent talks to it.
   it-server:
+    profiles: ["it"]
     build:
       context: ./it-server
     ports:
@@ -24,6 +25,7 @@ services:
 
   # Pattern 4 — second agent identity, invoked by the HR agent.
   it-agent:
+    profiles: ["it"]
     build:
       context: ./it-agent
     ports:
@@ -52,12 +54,9 @@ services:
       - AGENT_SERVER_HOST=0.0.0.0
       # Set IT_AGENT_ENABLED=true in ./agent/.env to turn on Pattern 4.
       - IT_AGENT_URL=http://it-agent:5002
-      # Pattern 6 (GOOGLE_* vars) arrives via env_file. Leave
-      # GOOGLE_REDIRECT_URI pointing at localhost:5001 — Google redirects the
-      # user's browser, which runs on the host, not inside this network.
+      # CIBA and federated-token configuration arrives via env_file.
     depends_on:
       - hr-server
-      - it-agent
 
   client:
     build:

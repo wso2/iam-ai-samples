@@ -12,13 +12,14 @@ A sample application demonstrating **seven IAM patterns for AI agents** using [A
 | **2. Agent as Autonomous Client** | Agent authenticates as itself for basic operations | Agent Token (App Native Auth) | Agent queries company holidays, leave policy |
 | **3. Agent on Behalf of User** | Agent acts with user's elevated privileges via OBO token | OBO Token (Auth Code + Actor Token) | Agent applies leave, checks balance for user |
 | **4. Agent Delegating to Agent** | One agent invokes another; each authorizes independently | Two Agent Tokens (caller + callee) | HR Agent asks the IT Agent about VPN, files an IT ticket |
-| **5. Out-of-Band Approval (CIBA)** | Agent gets authorization from a human who is *not* in the session | OBO Token via CIBA (Agent Token as `actor_token`) | HR Admin approves a leave request on their phone |
-| **6. Third-Party Delegated Access** | Agent calls an API at *another* identity provider, using a consent granted there | Google OAuth grant (refresh token, per user) | Agent writes an approved leave to the employee's Google Calendar |
+| **5. Out-of-Band Consent (CIBA)** | Agent asks the employee for Calendar consent after HR approves leave | Employee OBO Token via CIBA (Agent Token as `actor_token`) | Employee approves Calendar sync on their phone |
+| **6. Third-Party Delegated Access** | Agent calls Google using a federated token shared by Asgardeo | Google access token in `federated_tokens` | Agent writes approved leave to the consenting employee's Google Calendar |
 | **7. Federated User → Agent** | A person authenticated by a *different* IdP uses an agent directly, with their own authority | User Token (federated) → OBO Token | A partner-org IT admin resolves tickets through the IT Agent |
 
-Patterns 4 and 6 are **optional** and off by default:
+Patterns 4, 5 and 6 are **optional** and off by default:
 
 - Pattern 4 — set `IT_AGENT_ENABLED=true` in `agent/.env`. See [Pattern 4: Agent-to-Agent](#pattern-4-agent-to-agent-delegation).
+- Pattern 5 — enable employee Calendar consent with `CIBA_ENABLED=true` together with Pattern 6. See [Pattern 5: Employee Calendar Consent](#pattern-5-employee-calendar-consent-with-ciba).
 - Pattern 6 — set `GOOGLE_CALENDAR_ENABLED=true` in `agent/.env`. See [Pattern 6: Third-Party Delegated Access](#pattern-6-third-party-delegated-access-google-calendar).
 - Pattern 7 — runs on top of Pattern 4's IT agent. See [Pattern 7: Federated Partner-Org Access](#pattern-7-federated-partner-org-access).
 
@@ -77,9 +78,11 @@ Both paths execute the same `service/hr_service.py` functions, so behavior is id
 
 **No SCIM2 identity resolution.** Unlike v1, there is no M2M application and no `GET /scim2/Users/{sub}` lookup. User identity comes directly from JWT claims (`sub` + `name`). Users are auto-registered with default leave balances on first interaction.
 
-**Two Asgardeo applications** provide clean IAM separation:
+**Two core Asgardeo applications** provide clean IAM separation:
 - **SPA Application** — Browser authenticates via PKCE and receives tokens with `*_rest` scopes for direct REST API access (dashboard)
 - **MCP Client Application** — Agent authenticates as a first-class identity (App Native Auth) and receives tokens with `*_mcp` scopes for MCP tool invocation. Also handles OBO flow when the agent needs to act on behalf of a user.
+
+Patterns 5-6 add a separate confidential **CIBA application** for employee Calendar consent and a Google OIDC connection for sharing the upstream token.
 
 ## Project Structure
 
@@ -96,8 +99,8 @@ smart-employee-agent/
 │   ├── session.py              # Per-user session store
 │   ├── agent_auth.py           # Agent token management (App Native Auth)
 │   ├── obo_flow.py             # OBO flow handling (PKCE + token exchange)
-│   ├── ciba_flow.py            # CIBA initiation + polling — Pattern 5
-│   ├── google_calendar.py      # Google OAuth + Calendar API — Pattern 6, optional
+│   ├── ciba_flow.py            # Employee CIBA consent + polling — Pattern 5
+│   ├── google_calendar.py      # Federated Google token + Calendar API — Pattern 6, optional
 │   ├── requirements.txt
 │   └── .env.example
 ├── it-agent/                   # IT Agent (port 5002) — Pattern 4, optional
@@ -138,6 +141,21 @@ smart-employee-agent/
 - An [Asgardeo](https://asgardeo.io) account (free tier works)
 - A [Google AI Studio](https://aistudio.google.com/) API key (for Gemini LLM)
 
+### Create the Gemini API key
+
+1. Sign in to [Google AI Studio's API Keys page](https://aistudio.google.com/apikey).
+2. Create an API key in a Google Cloud project. If your existing project is not listed, import it from **Dashboard > Projects** first.
+3. Copy the key into `agent/.env`:
+
+   ```dotenv
+   GOOGLE_API_KEY=<your-gemini-api-key>
+   MODEL_NAME=gemini-2.5-flash
+   ```
+
+4. For Pattern 4, configure `GOOGLE_API_KEY` in `it-agent/.env` too. Restart each agent after changing its environment.
+
+The Gemini API key is separate from the Google OAuth client used for Calendar federation. Keep the key in the server-side `.env` files. Google AI Studio creates keys restricted to the Gemini API; unrestricted standard keys are rejected. See [Google's API key guide](https://ai.google.dev/gemini-api/docs/api-key).
+
 ---
 
 ## Asgardeo Configuration
@@ -159,7 +177,7 @@ smart-employee-agent/
 | `hr_basic_rest` | Company holidays, leave policy |
 | `hr_self_rest` | Own leave balance and requests for dashboard |
 | `hr_read_rest` | All leave requests for dashboard |
-| `hr_approve_rest` | Role marker for HR Admin |
+| `hr_approve_rest` | Approve/reject leave requests |
 
 #### MCP Resources (for Agent)
 
@@ -200,15 +218,17 @@ The SPA handles browser PKCE login and dashboard REST access.
    - `hr-rest-api` (grant all: `hr_basic_rest`, `hr_self_rest`, `hr_read_rest`, `hr_approve_rest`)
 6. **Configure User Attributes:**
    - Navigate to the **User Attributes** section of the application
-   - Under the **profile** section, ensure `given_name` and `family_name` are selected as **Requested** and **Mandatory**
+   - Under the **profile** section, ensure `given_name`, `family_name` and `email` are selected as **Requested** and **Mandatory**
 7. **Configure Access Token:**
    - Navigate to the **Protocol** tab → **Access Token** section
    - Set **Token Type** to **JWT**
-   - Under the **Access Token Attributes** dropdown, select `given_name` and `family_name`
+   - Under the **Access Token Attributes** dropdown, select `given_name`, `family_name` and `email`
 8. Note the **SPA Client ID** → used in:
    - `client/.env` as `CLIENT_ID`
    - `agent/.env` as `TOKEN_AUDIENCE` (for validating user JWTs)
    - `hr-server/.env` as `SPA_CLIENT_ID`
+
+9. Under **Roles**, set the application's **Role audience** to **Organization**. This sample shares organization roles across the SPA, MCP client and optional CIBA application.
 
 ### Step 4: Create an MCP Client Application (for Agent)
 
@@ -222,21 +242,28 @@ The MCP Client handles agent authentication (App Native Auth) and OBO flow.
    - `hr-mcp` (grant all: `hr_basic_mcp`, `hr_self_mcp`, `hr_read_mcp`, `hr_approve_mcp`)
 6. **Configure User Attributes:**
    - Navigate to the **User Attributes** section of the application
-   - Under the **profile** section, ensure `given_name` and `family_name` are selected as **Requested** and **Mandatory**
+   - Under the **profile** section, ensure `given_name`, `family_name` and `email` are selected as **Requested** and **Mandatory**
 7. **Configure Access Token:**
    - Navigate to the **Protocol** tab → **Access Token** section
    - Set **Token Type** to **JWT**
-   - Under the **Access Token Attributes** dropdown, select `given_name` and `family_name`
+   - Under the **Access Token Attributes** dropdown, select `given_name`, `family_name` and `email`
 8. Note the **MCP Client ID** → used in:
    - `agent/.env` as `ASGARDEO_CLIENT_ID`
    - `hr-server/.env` as `CLIENT_ID`
 
+9. Under **Roles**, set **Role audience** to **Organization**.
+
 ### Step 5: Create Roles
+
+Go to **User Management > Roles > New Role** and select **Organization** as the audience for every role below. Add its API/MCP permissions, then assign its users or agents. Also select **Organization** as the role audience on every application that issues the sample's tokens. Authorizing a resource on the application and assigning role permissions are both required.
 
 | Role | REST Scopes (SPA) | MCP Scopes (Agent/OBO) |
 |------|-------------------|----------------------|
 | `employee` | `agent_access`, `hr_basic_rest`, `hr_self_rest` | `hr_basic_mcp`, `hr_self_mcp` |
 | `hr_admin` | All employee scopes + `hr_read_rest`, `hr_approve_rest` | All employee + `hr_read_mcp`, `hr_approve_mcp` |
+| `hr_agent` | None | `hr_basic_mcp` |
+
+Assign `hr_agent` to the **Corporate Concierge agent identity** from Step 2. Assign `employee` and `hr_admin` to human users. The agent's own role grants basic access; personal and administrative actions use the user's OBO permissions.
 
 ### Step 6: Create Demo Users
 
@@ -458,19 +485,21 @@ The `hr_approve_rest` scope is granted to the `hr_admin` role per the Asgardeo c
 | 22 | Empty message | Error: "Message cannot be empty" |
 | 23 | Click "Reset Data" | Resets all in-memory data → signs out → fresh start |
 
-### Pattern 6 Tests (Google Calendar)
+### Patterns 5-6 Tests (Employee CIBA Consent and Calendar)
 
-Requires `GOOGLE_CALENDAR_ENABLED=true`.
+Requires Google token sharing and the mandatory script, `CIBA_ENABLED=true`,
+`GOOGLE_CALENDAR_ENABLED=true`, matching webhook secrets and the CIBA audience.
 
-| # | Test | User | Expected |
-|---|------|------|----------|
-| 24 | User menu with Google disabled | Any | No "Connect Google Calendar" item |
-| 25 | Connect Google Calendar | Employee | Popup → consent → item flips to "Disconnect" |
-| 26 | Admin approves the employee's leave | HR Admin | Event lands on the **employee's** calendar, not the admin's |
-| 27 | Approve for an employee who never connected | HR Admin | Approval succeeds; agent reports it could not sync |
-| 28 | Multi-day leave (10th-12th) | Employee | Event covers all three days (Google's end date is exclusive) |
-| 29 | Disconnect, then approve again | Employee | No event; approval still succeeds |
-| 30 | Revoke at myaccount.google.com, then approve | Employee | Agent reports the refresh failed, approval still succeeds |
+| Test | Expected |
+|---|---|
+| Admin approves through Manage Requests or chat | Leave is approved; employee receives CIBA prompt |
+| Employee signs in through Google and consents | Own leave verified with `hr_self_mcp`; Google token creates event |
+| Employee refuses or times out | Leave stays Approved; no Calendar event |
+| CIBA response has no Google token | Clear configuration error; no direct OAuth/email fallback |
+| Google token lacks Calendar scope | Granted scopes logged; no event write |
+| Expired Google token | Fresh Asgardeo authorization required; no Google token-endpoint call |
+| Multi-day leave | Event includes every leave day (exclusive end date) |
+| Webhook secrets differ | HTTP 403; employee CIBA flow does not start |
 
 ---
 
@@ -527,7 +556,7 @@ token instead.
 
 On top of the Pattern 1-3 setup:
 
-1. **API Resource** — "IT Service API", identifier `it_service_api`, scopes:
+1. **MCP Resource** — "IT Service MCP", identifier `it_service_api`, scopes:
    `it_basic_mcp`, `it_ticket_mcp`.
 2. **API Resource** — "Agent Invocation API", identifier `agent_invocation_api`,
    scope: `it_agent_invoke`.
@@ -541,6 +570,22 @@ On top of the Pattern 1-3 setup:
    - HR Agent's role gains `it_agent_invoke`.
    - New role `it_agent` with `it_basic_mcp` + `it_ticket_mcp`, assigned to the
      IT Agent.
+
+Create `it_agent` with audience **Organization**, and keep the MCP Client application's role audience set to **Organization**.
+
+### Client IDs and token audiences
+
+With the shared MCP Client Application used in this README:
+
+| Component | Variable | Application client ID |
+|---|---|---|
+| HR agent | `ASGARDEO_CLIENT_ID` | MCP client |
+| IT agent | `ASGARDEO_CLIENT_ID` | MCP client |
+| IT agent | `TOKEN_AUDIENCE` | MCP client: the audience of the **calling HR agent's token** |
+| IT agent | `SPA_CLIENT_ID` | SPA: needed for Pattern 7 browser calls |
+| IT server | `CLIENT_ID` | MCP client: the audience of the IT agent's tool-call token |
+
+`it-agent/.env` must use the MCP client ID for `TOKEN_AUDIENCE`, while `agent/.env` uses the SPA client ID for its own `TOKEN_AUDIENCE`. These servers validate different callers. If you register a separate MCP application for the IT agent, its `ASGARDEO_CLIENT_ID` and `it-server/.env`'s `CLIENT_ID` use that IT application's ID, but its inbound `TOKEN_AUDIENCE` still uses the HR agent's MCP application ID.
 
 > After changing roles or permissions, **restart the agent that holds the
 > token**. Agent tokens are cached for their full lifetime (~1 hour), so a
@@ -627,140 +672,306 @@ Denials are equally explicit:
 [SCOPE DENIED] Required: 'it_ticket_mcp' | Present: ['hr_basic_mcp', 'openid']
 ```
 
+## Pattern 5: Employee Calendar Consent with CIBA
+
+After an HR Admin approves leave through the dashboard or chat, the HR server
+notifies the agent. The employee can be away from the portal: Asgardeo sends a
+CIBA authentication link to their verified email address. The employee signs in
+through Google and decides whether to add the approved leave to their Calendar.
+
+```text
+HR Admin -> HR REST/MCP: approve leave
+HR server -> Agent webhook: leave-approved event
+Agent -> Asgardeo CIBA: ask the employee for Calendar consent
+Employee -> Google sign-in + consent through Asgardeo
+Asgardeo -> Agent: employee OBO token + Google federated token
+Agent -> HR MCP: verify the employee owns this approved leave
+Agent -> Google Calendar: create the event with the employee's Google token
+```
+
+CIBA does **not** ask an admin to approve leave. The admin's normal REST/OBO
+permissions authorize that decision. CIBA requests only the employee's consent
+for the follow-up Calendar action. There is no `CIBA_APPROVER` setting.
+
+### Asgardeo configuration
+
+1. Complete the [Google federation setup in Pattern 6](#pattern-6-third-party-delegated-access-google-calendar).
+2. Create a separate **Standard-Based Application (OIDC)**, for example
+   **Employee Calendar Consent**. Keep it **confidential** (Public Client off)
+   and record its client ID and client secret.
+3. Under **Protocol > Allowed grant types**, enable **CIBA**. Set its request
+   expiry to **300 seconds** and enable **Email** notification delivery. This
+   sample polls for approval; it does not deliver the External channel's
+   `auth_url` itself. Configure an organization email provider and use employees
+   with verified email addresses. See the [CIBA configuration guide](https://wso2.com/asgardeo/docs/guides/authentication/configure-ciba-grant/).
+4. Set access tokens to **JWT** and role audience to **Organization**. Authorize
+   `hr-mcp` with `hr_self_mcp`. The employee's organization role must grant that
+   scope too. Request `given_name`, `family_name` and `email`, and include them
+   in **Access Token Attributes**.
+5. Configure **Google as the only authenticator in the application's first
+   login step**, and add the mandatory [adaptive authentication script](#mandatory-calendar-authentication-script).
+   Leaving Username & Password as an alternative can authenticate the employee
+   without obtaining a Google token.
+
+The CIBA application's client secret is different from the agent identity's
+`AGENT_SECRET`. No callback endpoint in the agent is needed for the CIBA grant.
+
+### Configure the services
+
+Generate one shared webhook secret:
+
+```bash
+python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
+```
+
+Update the existing keys in `agent/.env`; keep only one entry for each key:
+
+```dotenv
+CIBA_ENABLED=true
+CIBA_CLIENT_ID=<employee-calendar-consent-app-client-id>
+CIBA_CLIENT_SECRET=<employee-calendar-consent-app-client-secret>
+CIBA_NOTIFY_SCOPES=openid profile email hr_self_mcp
+CIBA_NOTIFY_TIMEOUT_SECONDS=300
+AGENT_WEBHOOK_SECRET=<generated-shared-secret>
+GOOGLE_CALENDAR_ENABLED=true
+FEDERATED_IDP_NAME=Google
+FEDERATED_TOKEN_SCOPE=https://www.googleapis.com/auth/calendar.events
+```
+
+Update `hr-server/.env`:
+
+```dotenv
+CIBA_CLIENT_ID=<same-employee-calendar-consent-app-client-id>
+AGENT_WEBHOOK_URL=http://localhost:5001/api/events/leave-approved
+AGENT_WEBHOOK_SECRET=<same-generated-shared-secret>
+```
+
+`CIBA_CLIENT_ID` makes the HR MCP server accept the audience of the employee's
+CIBA token. The webhook secret authenticates the HR server's event; it does not
+substitute for the employee's consent or token permissions. In Docker Compose,
+the webhook URL is overridden to `http://agent:5001/api/events/leave-approved`.
+Restart both native services, or recreate the containers after editing `.env`.
+
+### Try it and diagnose failures
+
+1. Sign in as an employee and create a leave request.
+2. As an HR Admin, approve it in **Manage Requests** or through chat.
+3. The employee receives the Asgardeo CIBA email. Open it, sign in through
+   Google, grant Calendar access, and approve the Calendar action.
+4. The agent verifies the approved leave using the employee's `hr_self_mcp`
+   token, then adds an all-day event to the employee's Calendar.
+
+Expected log sequence:
+
+```text
+[EVENT >> Agent] leave-approved sent for LR001
+[OFFLINE << HR] leave-approved for LR001
+[OFFLINE >> CIBA] asked ... to confirm Calendar sync for LR001
+[CIBA] federated_tokens:
+[OFFLINE >> Verified] LR001 confirmed as Approved ...
+[GOOGLE >> Calendar] event created ...
+```
+
+- **Webhook 403:** the two `AGENT_WEBHOOK_SECRET` values differ, a later duplicate
+  key overrides the intended value, or the agent still has its pre-restart config.
+- **JWT audience failure:** set the same `CIBA_CLIENT_ID` in both services.
+- **Missing `hr_self_mcp`:** check CIBA application authorization, organization
+  role audience and the employee's role permissions.
+- **No `federated_tokens`:** check the connection's API-only token-sharing
+  settings, the Google-only login step and the mandatory script. Successful
+  CIBA authentication alone does not establish Google Calendar access.
+- **Missing Calendar scope:** inspect the Google entry's `scope`, not the
+  top-level Asgardeo `scope`. The grant must permit Calendar event writes.
+
+The approval remains successful if CIBA is declined, times out, or Calendar
+fails. A failed webhook is not automatically replayed; approve a new request
+when testing a configuration fix. There is no direct Google OAuth popup or
+fallback email link in this sample.
+
 ## Pattern 6: Third-Party Delegated Access (Google Calendar)
 
-When an HR Admin approves a leave request, the agent writes the leave onto the
-**employee's own Google Calendar**. Off by default — set
-`GOOGLE_CALENDAR_ENABLED=true` in `agent/.env`.
-
-Patterns 1-5 all take place inside one trust domain: Asgardeo issues every
-token, and every server validates against the same JWKS. Pattern 6 is the first
-time the agent leaves that domain, and the interesting part is what does *not*
-carry across.
-
-```
-HR Admin ──OBO token (hr_approve_mcp)──> HR MCP     approve LR001   [Asgardeo]
-                                            │
-                                            ▼
-Agent ──employee's Google refresh token──> Google Calendar API      [Google]
-```
-
-### What this demonstrates
-
-- **Authority does not cross providers.** Asgardeo has no authority over
-  Google. An HR Admin holding every scope in the tenant still cannot put an
-  entry on someone's calendar — that permission exists only at Google, and only
-  the employee can grant it.
-- **The trigger and the authority are different identities.** The *admin's*
-  Asgardeo authority approves the leave. The *employee's* Google grant writes
-  the calendar entry. The agent holds both and must pick the right one; it
-  looks the employee up by the `employee_sub` the HR server returns with the
-  approval, and never falls back to the admin's grant.
-- **Separate consent, separate revocation.** The employee grants calendar
-  access in a second popup that has nothing to do with the OBO consent, and
-  revokes it at
-  [myaccount.google.com/permissions](https://myaccount.google.com/permissions)
-  without touching Asgardeo. Disconnecting in the user menu drops the agent's
-  copy of the grant; revoking at Google kills it everywhere.
-- **Least privilege at the third party too.** The agent requests
-  `calendar.events` — enough to add an entry, not to read the employee's
-  calendar.
-- **The external call cannot fail the business action.** A calendar error never
-  turns a successful approval into a failed one; it is reported alongside it.
+The employee's Google access token is **shared by Asgardeo in
+`federated_tokens`**, alongside the Asgardeo access token. The Asgardeo token
+verifies HR permissions; the Google token authorizes the Calendar API. The agent
+calls Google's Calendar API directly, but does not call Google's OAuth token
+endpoint or store Google client secrets or refresh tokens.
 
 ### Google Cloud setup
 
-> Google replaced the old **OAuth consent screen** page with the **Google Auth
-> Platform**. Its settings now live under four sections — Branding, Audience,
-> Data Access, and Clients — so older guides pointing at "OAuth consent screen"
-> no longer match the console.
+1. Select the Google Cloud project whose OAuth client will be used by the
+   Asgardeo connection. Under **APIs & Services > Library**, enable **Google
+   Calendar API**.
+2. Under **Google Auth Platform**, configure Branding and Audience. For an
+   External app in **Testing**, add each demo employee's Google account under
+   **Audience > Test users**.
+3. Under **Data Access > Add or remove scopes**, add
+   `https://www.googleapis.com/auth/calendar.events`. The Google sign-in scopes
+   `openid`, `profile` and `email` supply identity attributes. Calendar event
+   access is the only additional Google API scope this demo requests.
+4. Under **Clients**, create a **Web application** OAuth client, with redirect:
 
-1. **APIs & Services > Library** — enable the **Google Calendar API**.
-2. **Google Auth Platform** ([/auth/overview](https://console.cloud.google.com/auth/overview))
-   — if this project has never been configured, complete the **Get started**
-   wizard: app name, support email, then **Audience**.
-   - Set the audience to **External** so any Google account can consent.
-   - On a personal `@gmail.com` account **Internal is not offered** — the app is
-     External by definition and no choice appears. That is expected.
-3. **Data Access** ([/auth/scopes](https://console.cloud.google.com/auth/scopes))
-   — **Add or remove scopes**, then add
-   `https://www.googleapis.com/auth/calendar.events`.
-4. **Audience** ([/auth/audience](https://console.cloud.google.com/auth/audience))
-   — while publishing status is **Testing**, add every demo employee's Google
-   account under **Test users**. Consent is refused for anyone not listed, and
-   this is the most common setup failure.
-5. **Clients** ([/auth/clients](https://console.cloud.google.com/auth/clients))
-   — **Create client > Web application**, with the authorized redirect URI
-   `http://localhost:5001/api/google/callback` (exact match, no trailing slash).
-6. Copy the client ID and secret into `agent/.env`:
+   ```text
+   https://api.asgardeo.io/t/<tenant>/commonauth
+   ```
+
+5. Configure that client ID and secret **on the Asgardeo connection**. The Gemini
+   `GOOGLE_API_KEY` is a separate credential and remains in the agents' `.env` files.
+
+Declaring a scope in Data Access does not grant it to a token. The Google
+authorization request must ask for it and the employee must grant it. Unverified
+apps can be tested with listed test users; a verification warning is expected.
+See [Google's consent setup](https://developers.google.com/workspace/guides/configure-oauth-consent)
+and [verification exceptions for testing](https://developers.google.com/identity/protocols/oauth2/production-readiness/sensitive-scope-verification#exceptions-to-verification-requirements).
+
+### Asgardeo Google connection and API-only token sharing
+
+Create a **Standard-Based OIDC connection**, named **Google** in these examples,
+using Google's authorization, token and user-info endpoints:
+
+| Setting | Value |
+|---|---|
+| Authorization endpoint | `https://accounts.google.com/o/oauth2/v2/auth` |
+| Token endpoint | `https://oauth2.googleapis.com/token` |
+| User-info endpoint | `https://openidconnect.googleapis.com/v1/userinfo` |
+| Scopes / additional query parameter | `scope=openid email profile https://www.googleapis.com/auth/calendar.events` |
+| Callback | `https://api.asgardeo.io/t/<tenant>/commonauth` |
+
+Map Google's name/email claims, enable JIT provisioning and add the connection
+to the SPA login flow. Sign in through Google once to provision the employee,
+then assign their `employee` **organization role** to that Asgardeo user. The
+employee who creates the leave and consents must be the same identity.
+
+Token sharing is configured on the **connection's federated authenticator** via
+the Identity Provider Management API; it is not a toggle in the console UI.
+Follow the [management API authentication guide](https://wso2.com/asgardeo/docs/apis/authentication/#get-an-access-token)
+to obtain a management access token with `internal_idp_view` and
+`internal_idp_update`. Use that management token only for the following setup
+calls, not the sample's SPA, agent or CIBA tokens.
 
 ```bash
-GOOGLE_CALENDAR_ENABLED=true
-GOOGLE_CLIENT_ID=<google-oauth-client-id>
-GOOGLE_CLIENT_SECRET=<google-oauth-client-secret>
-GOOGLE_REDIRECT_URI=http://localhost:5001/api/google/callback
+ASGARDEO_BASE_URL=https://api.asgardeo.io/t/<tenant>
+# Set MANAGEMENT_ACCESS_TOKEN locally to the management API bearer token.
+
+# Find the Google connection's ID.
+curl --fail-with-body -sS \
+  -H "Authorization: Bearer $MANAGEMENT_ACCESS_TOKEN" \
+  "$ASGARDEO_BASE_URL/api/server/v1/identity-providers"
+
+# Find its federated authenticator ID.
+curl --fail-with-body -sS \
+  -H "Authorization: Bearer $MANAGEMENT_ACCESS_TOKEN" \
+  "$ASGARDEO_BASE_URL/api/server/v1/identity-providers/<idp-id>/federated-authenticators"
+
+# Fetch the existing authenticator body before updating it.
+curl --fail-with-body -sS \
+  -H "Authorization: Bearer $MANAGEMENT_ACCESS_TOKEN" \
+  "$ASGARDEO_BASE_URL/api/server/v1/identity-providers/<idp-id>/federated-authenticators/<authenticator-id>" \
+  -o google-authenticator.json
 ```
 
-> No Asgardeo configuration is needed for this pattern — which is the point.
+In the local `google-authenticator.json`, preserve the existing authenticator
+fields and `properties` array, adding/updating these two entries:
 
-### Try it
-
-The employee connects Google **once**, then an admin's approval syncs
-automatically.
-
-| Step | As | Action | What should happen |
-|---|---|---|---|
-| 1 | Employee | User menu → **Connect Google Calendar** | Google popup → consent → "Connected" |
-| 2 | Employee | "Apply for 3 days annual leave from the 10th" | Creates LR001 (OBO consent if not yet given) |
-| 3 | HR Admin | "Approve LR001" in chat | Approved, **and** the entry appears on the *employee's* calendar |
-| 4 | Employee | Check Google Calendar | All-day event "Annual Leave — <name>" spanning the full range |
-| 5 | Employee | User menu → **Disconnect Google Calendar** | Grant dropped; a later approval reports it could not sync |
-
-The agent syncs on both approval routes: a direct approval in chat (above) and
-an out-of-band CIBA approval (Pattern 5), where the employee is the one in the
-chat and the admin approves on their phone.
-
-### Reading the logs
-
-```
-# The Asgardeo hop — the admin's delegated authority
-[CHAT >> OBO Token] user(sub)=<admin-uuid> | scopes=hr_approve_mcp openid
-[AUDIT] Leave LR001 approved by Agent <agent-uuid> on behalf of Alice Admin
-
-# The Google hop — the EMPLOYEE's authority, not the admin's
-[GOOGLE >> Calendar] event created id=... 2026-09-10..2026-09-13 (end exclusive)
-[GOOGLE >> Calendar] synced LR001 to employee(sub)=<employee-uuid> | approved in-session by <admin-uuid>
+```json
+[
+  {"key":"ShareFederatedToken","value":"true"},
+  {"key":"FederatedTokenAllowedScope","value":"https://www.googleapis.com/auth/calendar.events"}
+]
 ```
 
-When the employee never connected Google, the approval still stands and the
-agent says so rather than failing:
+Also ensure the connection's scope configuration requests
+`openid email profile https://www.googleapis.com/auth/calendar.events`. If the
+GET response masks a client secret, supply the real Google client secret in the
+local update body. Apply it with:
 
+```bash
+curl --fail-with-body -sS -X PUT \
+  -H "Authorization: Bearer $MANAGEMENT_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data-binary @google-authenticator.json \
+  "$ASGARDEO_BASE_URL/api/server/v1/identity-providers/<idp-id>/federated-authenticators/<authenticator-id>"
 ```
-[GOOGLE] no active session for employee(sub)=<employee-uuid> — nothing to sync
+
+Re-read the authenticator and confirm both properties were saved. See the
+[Identity Provider Management API](https://wso2.com/asgardeo/docs/apis/idp/) for
+request schemas. Keep the local management token and payload containing client
+credentials out of Git.
+
+### Mandatory Calendar authentication script
+
+On the **CIBA application**, configure a single login step with **Google as its
+only authenticator**. Enable conditional/adaptive authentication and apply:
+
+```javascript
+var onLoginRequest = function(context) {
+    executeStep(1, {
+        authenticationOptions: [{ idp: 'Google' }],
+        stepOptions: { forceAuth: 'true' },
+        authenticatorParams: {
+            federated: {
+                'Google': {
+                    share_federated_token: 'true',
+                    federated_token_scope: 'https://www.googleapis.com/auth/calendar.events'
+                }
+            }
+        }
+    }, {});
+};
 ```
 
-### Limits (read this)
+Replace both occurrences of `Google` with your connection's configured name.
+The script supplies token-sharing parameters and **forces the Google
+authentication step** rather than reusing an existing Asgardeo SSO session.
+Script-supplied sharing parameters take precedence over request query values.
+The older `OBO_PROMPT_CONSENT` option only forces an OBO consent screen; it does
+not replace this script. See [WSO2's authentication script reference](https://is.docs.wso2.com/en/latest/references/conditional-auth/api-reference/).
 
-- **Grants live in memory**, alongside the session, and are lost when the agent
-  restarts — the employee reconnects. A real deployment stores refresh tokens
-  encrypted and keyed by user, out of process.
-- **The employee needs an active agent session.** The grant is held per session,
-  so an employee who has not talked to the agent in this process has nothing for
-  the admin's approval to find. Fine for a demo; a real system reads the grant
-  from that persistent store instead.
-- **The manual "Manage Requests" tab does not sync.** Those approvals go
-  browser → HR REST and never touch the agent, so there is no agent holding the
-  Google grant. Only chat approvals sync — which is honest about *who* is
-  calling the external API.
-- **`prompt=consent` is forced** on every authorization, because Google
-  withholds the refresh token from a returning user otherwise, and a grant
-  without one dies in an hour.
-- **Refresh tokens expire after 7 days while the app is in Testing.** Google
-  issues short-lived refresh tokens to unverified External apps, so a demo
-  environment left idle for a week fails the next sync with `invalid_grant` and
-  the employee must reconnect. Grants are lost on restart here anyway, so this
-  seldom shows up — an **Internal** audience (Workspace orgs only) avoids it
-  entirely, as does publishing the app.
+For in-session Calendar requests through the OBO popup, configure the same
+Google-only step and script on the MCP Client Application. This changes its
+user login flow, not the HR/IT agent credential flow. Pattern 7's partner login
+uses the SPA and the IT agent's separate desk OBO flow; configure its partner
+connection as described in that section rather than replacing it with Google.
+
+### Enable and verify
+
+Set the flags and connection name from [Pattern 5](#configure-the-services), then
+restart the agent. `FEDERATED_IDP_NAME` must match the connection name, not an
+authenticator class such as `OpenIDConnectAuthenticator`.
+
+The token response must contain both kinds of authority:
+
+```json
+{
+  "access_token": "<Asgardeo employee OBO token>",
+  "scope": "openid hr_self_mcp",
+  "federated_tokens": [{
+    "idp": "Google",
+    "scope": "openid https://www.googleapis.com/auth/calendar.events",
+    "tokenValidityPeriod": "3599",
+    "accessToken": "<Google access token>"
+  }]
+}
+```
+
+The Google token's scopes must include event-write access. The top-level
+`hr_self_mcp` scope is for HR and grants no Google permissions. By default the
+CIBA log prints the federated response with token values redacted. Set
+`DEBUG_FEDERATED_TOKENS_RAW=true` to print only the complete Google federated
+values during a demo; it does not enable the Asgardeo JWT dumps. Restart after
+changing this flag, and turn it off after inspection.
+
+Google grants and OBO sessions are held in memory and disappear on restart or
+sign-out. Expired Google tokens require fresh authentication through Asgardeo;
+the agent never attempts a Google refresh-token exchange. Multi-day events use
+Google's exclusive end date so the complete leave range is covered.
+
+An employee can also ask **“Add approved leave LR001 to my Google Calendar”** in
+chat. If their federated grant is missing or expired, the portal offers its
+existing OBO **Authorize** button to get a fresh Google grant through Asgardeo.
+An admin's approval alone never writes an event; the employee's explicit chat
+request or their CIBA approval authorizes Calendar sync.
+
+---
 
 ## Pattern 7: Federated Partner-Org Access
 
@@ -833,7 +1044,7 @@ On top of the Pattern 4 setup:
 4. **Enable JIT provisioning** on the connection, so federated users
    materialize locally and can hold roles.
 5. **New scopes** on the existing IT API resources:
-   - `it_resolve_mcp` on the IT Service API — closing tickets, and whole-queue
+   - `it_resolve_mcp` on the IT Service MCP resource — closing tickets, and whole-queue
      visibility.
    - `it_desk_access` on the Agent API resource — permission to use the service
      desk at all.
@@ -847,13 +1058,34 @@ On top of the Pattern 4 setup:
    Map the partner directory's group onto `it_service_desk` so engineers get
    their permissions on first login without anyone provisioning them by hand.
 7. **Register the desk callback** — add
-   `http://localhost:5002/api/desk/obo/callback` to the MCP Client
-   Application's redirect URIs, and set it as `IT_REDIRECT_URI` in
-   `it-agent/.env`. Unlike Pattern 4 this is a real browser redirect.
+   `http://localhost:5002/api/desk/obo/callback` to the IT agent's MCP Client
+   Application and set it as `IT_REDIRECT_URI` in `it-agent/.env`. Unlike Pattern
+   4 this is a real browser redirect. If the HR MCP application has the
+   Google-only Calendar login script from Pattern 6, create a **separate MCP
+   Client Application for the IT Service Desk** so its login flow can use the
+   partner connection. Authorize the IT MCP scopes on that application, enable
+   App-Native Authentication for the IT agent, set JWT access tokens and
+   Organization role audience, and configure its partner/employee login options.
+   In that case set:
+
+   ```dotenv
+   # it-agent/.env
+   ASGARDEO_CLIENT_ID=<it-mcp-client-app-client-id>
+   TOKEN_AUDIENCE=<hr-mcp-client-app-client-id>
+   SPA_CLIENT_ID=<spa-app-client-id>
+   IT_REDIRECT_URI=http://localhost:5002/api/desk/obo/callback
+   ```
+
+   ```dotenv
+   # it-server/.env
+   CLIENT_ID=<it-mcp-client-app-client-id>
+   ```
 
 Also set `SPA_CLIENT_ID` in `it-agent/.env`: browser tokens are minted for the
 SPA and agent tokens for the MCP client app, so the IT agent accepts both
 audiences and tells them apart by `aut`.
+
+Create the `it_service_desk` role with audience **Organization** and set the partner application's role audience to **Organization** too.
 
 ### Try it
 
@@ -910,9 +1142,10 @@ Denials name which guard fired:
 
 ## Seeing the tokens
 
-The tokens themselves are never logged and never reach the browser — a delegated
-token lives only in the agent process's memory. What the logs show is the
-decoded claims, which is what a resource server actually authorizes on.
+Delegated HR tokens and Google federated tokens stay in the agent process's
+memory. By default logs omit credential values; the explicit raw-token debug
+flags below print them for inspection. The decoded claims show what a resource
+server authorizes.
 
 Every MCP call prints one line naming the kind of token that carried it:
 
@@ -1001,3 +1234,28 @@ sequence shows exactly where the delegation is constructed.
 - Check that API Resources are authorized for the application in Asgardeo
 - Verify role-to-scope assignments include the needed scopes
 - Ensure the user is assigned to the correct role
+
+### CIBA and Google Calendar troubleshooting
+
+- For webhook, audience, permissions and federated-token errors, use the
+  [Pattern 5 diagnostic checklist](#try-it-and-diagnose-failures).
+- `TOKEN_AUDIENCE` in the IT agent is the **calling HR agent's MCP client ID**;
+  it is not the SPA ID. Browser access uses the separate `SPA_CLIENT_ID`.
+- When Google returns only sign-in scopes, check that `calendar.events` is
+  declared in Google Data Access, requested by the connection/script and granted
+  by the employee. Existing sign-in consent is not proof of Calendar permission.
+- Changing `.env` requires a native process restart or Docker container
+  recreation. Check for duplicate keys when a new value appears to be ignored.
+
+### Offline regression checks
+
+From `smart-employee-agent/agent`, activate its virtual environment and run:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+These checks mock Asgardeo and Google. They cover employee CIBA refusal/expiry,
+leave ownership, missing scopes/tokens, webhook authentication, Calendar event
+boundaries and federated-only credential logging. They do not send emails or
+create real Calendar events.
