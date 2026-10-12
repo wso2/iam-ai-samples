@@ -17,11 +17,6 @@ import httpx
 logger = logging.getLogger(__name__)
 EVENTS_ENDPOINT = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
 CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events"
-EVENT_WRITE_SCOPES = {
-    CALENDAR_SCOPE,
-    "https://www.googleapis.com/auth/calendar.events.owned",
-    "https://www.googleapis.com/auth/calendar",
-}
 REFRESH_BUFFER_SECONDS = 60
 
 
@@ -50,7 +45,7 @@ class GoogleCalendarClient:
             raise GoogleCalendarError(
                 "Google authorization has expired. Authorize again through Google in Asgardeo."
             )
-        if not EVENT_WRITE_SCOPES.intersection(grant.scope.split()):
+        if CALENDAR_SCOPE not in grant.scope.split():
             raise GoogleCalendarError(
                 f"Google token is missing Calendar event access ({CALENDAR_SCOPE}); "
                 f"granted scopes: {grant.scope or '(none)'}. "

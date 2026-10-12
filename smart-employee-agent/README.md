@@ -953,7 +953,7 @@ The token response must contain both kinds of authority:
 }
 ```
 
-The Google token's scopes must include event-write access. The top-level
+The Google token's scopes must include `https://www.googleapis.com/auth/calendar.events`. The top-level
 `hr_self_mcp` scope is for HR and grants no Google permissions. By default the
 CIBA log prints the federated response with token values redacted. Set
 `DEBUG_FEDERATED_TOKENS_RAW=true` to print only the complete Google federated

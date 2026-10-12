@@ -88,13 +88,17 @@ class FederatedCalendarTests(unittest.IsolatedAsyncioTestCase):
                 await calendar.GoogleCalendarClient().ensure_access_token(grant)
             client.assert_not_called()
 
-    async def test_identity_only_scope_cannot_write_events(self):
-        grant = calendar.GoogleGrant("fake-google-token", time.time() + 3600, "openid profile email")
-        with patch.object(calendar.httpx, "AsyncClient") as client:
-            with self.assertRaisesRegex(calendar.GoogleCalendarError, "missing Calendar"):
-                await calendar.GoogleCalendarClient().create_leave_event(
-                    grant, "Annual Leave", "2026-11-10", "2026-11-12")
-            client.assert_not_called()
+    async def test_token_without_demo_calendar_scope_cannot_write_events(self):
+        for scope in ["openid profile email",
+                      "https://www.googleapis.com/auth/calendar.events.owned",
+                      "https://www.googleapis.com/auth/calendar"]:
+            with self.subTest(scope=scope):
+                grant = calendar.GoogleGrant("fake-google-token", time.time() + 3600, scope)
+                with patch.object(calendar.httpx, "AsyncClient") as client:
+                    with self.assertRaisesRegex(calendar.GoogleCalendarError, "missing Calendar"):
+                        await calendar.GoogleCalendarClient().create_leave_event(
+                            grant, "Annual Leave", "2026-11-10", "2026-11-12")
+                    client.assert_not_called()
 
     async def test_accepts_event_write_scope_without_google_client_credentials(self):
         grant = main.obo_flow.google_grant_from(federated())
