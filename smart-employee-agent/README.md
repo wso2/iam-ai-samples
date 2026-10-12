@@ -843,13 +843,18 @@ employee who creates the leave and consents must be the same identity.
 
 Token sharing is configured on the **connection's federated authenticator** via
 the Identity Provider Management API; it is not a toggle in the console UI.
+The individual federated-authenticator endpoint supports **GET and PUT**, not
+PATCH. Use **GET -> modify the full authenticator configuration -> PUT -> GET**.
+The parent IDP endpoint's limited property PATCH is a different operation and
+is not used for these authenticator settings.
 Follow the [management API authentication guide](https://wso2.com/asgardeo/docs/apis/authentication/#get-an-access-token)
 to obtain a management access token with `internal_idp_view` and
 `internal_idp_update`. Use that management token only for the following setup
 calls, not the sample's SPA, agent or CIBA tokens.
 
 ```bash
-ASGARDEO_BASE_URL=https://api.asgardeo.io/t/<tenant>
+ASGARDEO_BASE_URL='https://api.asgardeo.io/t/<tenant>'
+# Replace <tenant>, <idp-id> and <authenticator-id> with their actual values.
 # Set MANAGEMENT_ACCESS_TOKEN locally to the management API bearer token.
 
 # Find the Google connection's ID.
@@ -862,15 +867,18 @@ curl --fail-with-body -sS \
   -H "Authorization: Bearer $MANAGEMENT_ACCESS_TOKEN" \
   "$ASGARDEO_BASE_URL/api/server/v1/identity-providers/<idp-id>/federated-authenticators"
 
-# Fetch the existing authenticator body before updating it.
-curl --fail-with-body -sS \
+# GET the complete current configuration of the authenticator being updated.
+curl --fail-with-body -sS -X GET \
   -H "Authorization: Bearer $MANAGEMENT_ACCESS_TOKEN" \
   "$ASGARDEO_BASE_URL/api/server/v1/identity-providers/<idp-id>/federated-authenticators/<authenticator-id>" \
   -o google-authenticator.json
 ```
 
 In the local `google-authenticator.json`, preserve the existing authenticator
-fields and `properties` array, adding/updating these two entries:
+settings and every existing entry in its `properties` array. Add or replace
+the following two entries inside that array, keeping the rest of the GET
+response intact. The array below is **only the entries to merge**, not the
+complete PUT request body:
 
 ```json
 [
@@ -882,7 +890,8 @@ fields and `properties` array, adding/updating these two entries:
 Also ensure the connection's scope configuration requests
 `openid email profile https://www.googleapis.com/auth/calendar.events`. If the
 GET response masks a client secret, supply the real Google client secret in the
-local update body. Apply it with:
+local update body. **PUT sends the complete edited authenticator object**,
+including its existing client, endpoint and enabled/default settings:
 
 ```bash
 curl --fail-with-body -sS -X PUT \
@@ -892,10 +901,19 @@ curl --fail-with-body -sS -X PUT \
   "$ASGARDEO_BASE_URL/api/server/v1/identity-providers/<idp-id>/federated-authenticators/<authenticator-id>"
 ```
 
-Re-read the authenticator and confirm both properties were saved. See the
-[Identity Provider Management API](https://wso2.com/asgardeo/docs/apis/idp/) for
-request schemas. Keep the local management token and payload containing client
-credentials out of Git.
+GET the same endpoint again and confirm both new properties and the previous
+configuration were preserved:
+
+```bash
+curl --fail-with-body -sS -X GET \
+  -H "Authorization: Bearer $MANAGEMENT_ACCESS_TOKEN" \
+  "$ASGARDEO_BASE_URL/api/server/v1/identity-providers/<idp-id>/federated-authenticators/<authenticator-id>"
+```
+
+See the [Identity Provider Management API](https://wso2.com/asgardeo/docs/apis/idp/)
+and its [federated-authenticator GET/PUT schema](https://github.com/wso2/identity-api-server/blob/master/components/org.wso2.carbon.identity.api.server.idp/org.wso2.carbon.identity.api.server.idp.v1/src/main/resources/idp.yaml#L791).
+Keep the local management token and payload containing client credentials out
+of Git.
 
 ### Mandatory Calendar authentication script
 
