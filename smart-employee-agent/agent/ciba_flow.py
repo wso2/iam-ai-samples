@@ -1,21 +1,14 @@
 """
  Copyright (c) 2025, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
 
-  CIBA Flow — Out-of-Band Approval for a Non-Interactive Agent (Pattern 5)
+  CIBA Flow — Employee Calendar Consent (Pattern 5)
 
-  Client Initiated Backchannel Authentication lets the agent obtain a user's
-  authorization when that user is NOT in the session and has no browser here.
-  The agent asks Asgardeo to reach the approver on their own device; the
-  approver consents there; the agent polls until a token comes back.
+  After HR approves a leave request, the agent asks the employee for consent
+  on their own device. The returned Asgardeo OBO token verifies the leave;
+  the Google federated token authorizes the Calendar event.
 
-  How this differs from the OBO popup (Pattern 3):
-
-      Pattern 3  the user driving the chat approves, in a browser redirect
-      Pattern 5  a DIFFERENT human approves, out-of-band, no browser involved
-
-  Passing the agent's token as `actor_token` makes Asgardeo issue a delegated
-  token: `sub` is the approver, `act.sub` is the agent. That is the same shape
-  the HR MCP server already validates, so nothing downstream needs to change.
+  Passing the agent's token as actor_token records the agent in the returned
+  delegated token's act claim. The employee is the subject of that token.
 
   The SDK implements only authorization_code and refresh_token, so the CIBA
   grant is issued here with direct calls to the Asgardeo endpoints.
@@ -50,41 +43,43 @@ DENIED = "access_denied"
 # Not from Asgardeo — our own marker for "the poll never reached the server".
 TRANSIENT = "_transient_network_error"
 
-# Fields every CIBA token response carries. Anything else is worth calling out
-# by name — it is how a feature like federated token sharing would surface,
-# and the SDK's typed model would otherwise discard it unseen.
-_STANDARD_FIELDS = {
-    "access_token", "refresh_token", "id_token", "token_type",
-    "expires_in", "scope",
+_CREDENTIAL_FIELDS = {
+    "accesstoken", "refreshtoken", "idtoken", "actortoken",
+    "subjecttoken", "clientsecret", "token", "secret",
 }
 
 
 def _log_token_response(body: dict) -> None:
-    """Log every field Asgardeo returned, not just the ones we consume.
+    """Log only the federated tokens received in the CIBA token response.
 
-    Token values are truncated unless DEBUG_TOKENS_RAW is on, so this is safe
-    to leave enabled: it shows the SHAPE of the response without writing
-    credentials to the log.
+    DEBUG_FEDERATED_TOKENS_RAW prints complete upstream token values without
+    enabling the Asgardeo JWT dumps. DEBUG_TOKENS_RAW also enables this output
+    for compatibility. Otherwise, credentials are redacted recursively.
     """
-    raw = os.getenv("DEBUG_TOKENS_RAW", "").lower() == "true"
+    federated = body.get("federated_tokens")
+    if not federated:
+        logger.info("[CIBA] federated_tokens: none returned")
+        return
 
-    def show(v):
-        text = json.dumps(v) if isinstance(v, (dict, list)) else str(v)
-        if raw or len(text) <= 60:
-            return text
-        return f"{text[:60]}… ({len(text)} chars)"
+    raw = any(
+        os.getenv(key, "").lower() == "true"
+        for key in ("DEBUG_FEDERATED_TOKENS_RAW", "DEBUG_TOKENS_RAW")
+    )
 
-    lines = ["[CIBA] token response — every field returned:"]
-    for key in sorted(body):
-        mark = "   " if key in _STANDARD_FIELDS else " * "
-        lines.append(f"  {mark}{key:20} = {show(body[key])}")
+    def redact(value, key=""):
+        normalized_key = key.replace("_", "").replace("-", "").lower()
+        if not raw and normalized_key in _CREDENTIAL_FIELDS:
+            return f"<redacted ({len(str(value))} chars)>" if value else "<empty>"
+        if isinstance(value, dict):
+            return {k: redact(v, k) for k, v in value.items()}
+        if isinstance(value, list):
+            return [redact(item) for item in value]
+        return value
 
-    extras = sorted(set(body) - _STANDARD_FIELDS)
-    if extras:
-        lines.append(f"  (* non-standard fields: {', '.join(extras)})")
-    else:
-        lines.append("  (no non-standard fields — nothing beyond the usual OAuth set)")
-    logger.info("\n".join(lines))
+    logger.info(
+        "[CIBA] federated_tokens:\n%s",
+        json.dumps(redact(federated), indent=2, ensure_ascii=False, default=str),
+    )
 
 # A long poll over an unreliable network will drop requests. Keep going unless
 # they fail repeatedly in a row, which means the network is genuinely down.

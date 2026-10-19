@@ -62,7 +62,7 @@ class _AuthContext:
         self.scopes: list[str] = payload.get("scope", "").split() if payload.get("scope") else []
 
         first = payload.get("given_name") or ""
-        last = payload.get("last_name") or ""
+        last = payload.get("family_name") or payload.get("last_name") or ""
         if not first and not last:
             full = payload.get("name") or payload.get("preferred_username") or ""
             if full:
