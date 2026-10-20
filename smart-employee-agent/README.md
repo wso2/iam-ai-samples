@@ -548,9 +548,9 @@ implements only `authorization_code` and `refresh_token`, with no
 (`sub`=user, `act`=IT Agent, `act.act`=HR Agent) would carry the user's authority
 across both hops, but is not reachable through the SDK today.
 
-If you need the user's authority on the second hop, do not use this pattern
-as-is — give the IT MCP tools user-scoped guards and propagate a real delegated
-token instead.
+If you need the user's authority on the second hop, turn on the optional token
+exchange described in [Carrying the user's authority](#optional-carrying-the-users-authority-token-exchange).
+The IT Agent calls the token endpoint directly for that grant.
 
 ### Asgardeo configuration
 
@@ -584,6 +584,7 @@ With the shared MCP Client Application used in this README:
 | IT agent | `TOKEN_AUDIENCE` | MCP client: the audience of the **calling HR agent's token** |
 | IT agent | `SPA_CLIENT_ID` | SPA: needed for Pattern 7 browser calls |
 | IT server | `CLIENT_ID` | MCP client: the audience of the IT agent's tool-call token |
+| IT agent, IT server | `EXCHANGE_CLIENT_ID` | Token-exchange app: the audience of delegated tokens (optional, `A2A_DELEGATION` only) |
 
 `it-agent/.env` must use the MCP client ID for `TOKEN_AUDIENCE`, while `agent/.env` uses the SPA client ID for its own `TOKEN_AUDIENCE`. These servers validate different callers. If you register a separate MCP application for the IT agent, its `ASGARDEO_CLIENT_ID` and `it-server/.env`'s `CLIENT_ID` use that IT application's ID, but its inbound `TOKEN_AUDIENCE` still uses the HR agent's MCP application ID.
 
@@ -620,6 +621,39 @@ Then in `agent/.env` set `IT_AGENT_ENABLED=true` and restart the HR agent.
 | "What software can I request?" | IT Agent returns the catalog with approval rules |
 | "Raise a ticket, my laptop won't boot" | IT Agent files a ticket, reports the `IT00x` reference |
 | "How many leave days do I have?" | Still HR + OBO — delegation does not affect Pattern 3 |
+
+### Optional: carrying the user's authority (token exchange)
+
+With `A2A_DELEGATION=true`, the HR Agent forwards the user's OBO token and the
+IT Agent exchanges it (RFC 8693, `it-agent/token_exchange.py`) for a token with
+`sub`=user, `act`=IT Agent, `act.act`=HR Agent. The IT MCP server then
+authorizes the **person**, not the agent.
+
+1. **Token-exchange app** — create a confidential application (for example
+   "IT Agent Token Exchange") with the **Token Exchange** grant, **JWT** access
+   tokens and role audience **Organization**. It needs no real redirect URL.
+   Authorize `it_service_api` on it with `it_basic_mcp`, `it_ticket_mcp`.
+2. **User roles** — the delegated token carries only the scopes the *user*
+   holds. Give users a role with `it_basic_mcp` + `it_ticket_mcp`; without one
+   the exchange returns only `openid` and the IT tools fail with
+   `insufficient_scope`.
+3. **Environment**:
+
+   | File | Setting |
+   |---|---|
+   | `agent/.env` | `A2A_DELEGATION=true` |
+   | `it-agent/.env` | `A2A_DELEGATION=true`, `EXCHANGE_CLIENT_ID`, `EXCHANGE_CLIENT_SECRET`, optionally `A2A_REQUIRE_DELEGATION=true` |
+   | `it-server/.env` | `EXCHANGE_CLIENT_ID` — the same value as in `it-agent/.env` |
+
+   Delegated tokens are issued to the exchange app, so their `aud` is
+   `EXCHANGE_CLIENT_ID`. Without it in `it-server/.env`, the IT server rejects
+   them with `Invalid audience`.
+4. Restart the HR agent, IT agent and IT server.
+
+The first IT question now prompts the user to **Authorize**. After a role
+change, the user must authorize again to get a token with the new scopes. A
+working exchange logs `[EXCHANGE >> Delegated Token]` in the IT agent and
+`[IT-MCP >> OBO Token] user(sub)=… | agent(act.sub)=…` in the IT server.
 
 ### Seeing tickets in the UI
 

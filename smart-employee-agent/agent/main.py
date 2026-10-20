@@ -277,6 +277,9 @@ def build_system_prompt(session: UserSession) -> str:
         "- Route IT questions (VPN, passwords, software, laptops, outages, IT\n"
         "  tickets) to ask_it_agent, and HR questions to the HR tools. Never answer\n"
         "  IT questions from your own knowledge when ask_it_agent is available.\n"
+        "- Always call ask_it_agent for IT requests, even with basic access only.\n"
+        "  Never decide on your own that you lack permission; the tool requests\n"
+        "  the user's authorization itself when it is needed.\n"
         "- If ask_it_agent reports that you are not authorized to contact the IT\n"
         "  Service Desk, that is an agent permission problem — relay it and do NOT\n"
         "  ask the user to authorize anything.\n"
@@ -419,6 +422,23 @@ def _build_it_agent_tool(agent_access_token: str, session: UserSession):
         if resp.status_code == 502 and _safe_json(resp).get("error") == "delegation_failed":
             detail = _safe_json(resp).get("message", "delegation failed")
             logger.warning("[A2A DENIED] %s", detail)
+            if "subject token" in detail.lower():
+                # Asgardeo rejected the forwarded OBO token itself — typically
+                # revoked after a role change or sign-out, though it has not
+                # reached its exp yet. It is useless for delegation, so drop it
+                # and route through the same re-authorize path as an expiry.
+                session.obo_token = None
+                session.obo_scopes = []
+                session.obo_expires_at = 0.0
+                logger.info(
+                    "[A2A >> IT Agent] forwarded OBO token is no longer active — "
+                    "cleared it; prompting the user to authorize again"
+                )
+                return (
+                    "token_expired: your authorization is no longer valid. "
+                    "Please authorize again so I can act on your behalf at the "
+                    "IT Service Desk."
+                )
             return (
                 "The IT Service Desk could not act with your permissions, and is "
                 f"configured not to fall back to its own. ({detail})"

@@ -23,12 +23,15 @@ from token_debug import dump_encoded
 logger = logging.getLogger(__name__)
 
 # All HR MCP scopes to request — Asgardeo grants only role-permitted ones.
-# Deliberately no it_* scopes: this agent never calls the IT server itself,
-# and asking for permissions it cannot use would inflate the consent screen.
+# This agent never calls the IT server itself, so it_* scopes are requested
+# only with A2A_DELEGATION: the OBO token is then forwarded to the IT Agent and
+# exchanged, and the exchanged token cannot carry scopes this one lacks.
 OBO_SCOPES = [
     "openid", "profile", "email",
     "hr_basic_mcp", "hr_self_mcp", "hr_read_mcp", "hr_approve_mcp",
 ]
+if os.getenv("A2A_DELEGATION", "").lower() == "true":
+    OBO_SCOPES += ["it_basic_mcp", "it_ticket_mcp"]
 
 # Origins the client may be served from. Doubles as the CORS allowlist in main.py
 # and as the postMessage targets for the callback popup below.
